@@ -1,6 +1,40 @@
 # Progress
 
-## Current: M4 The great UI: done 2026-10-23
+## Current: M5 Orchestration: done 2026-10-23
+
+Exit criterion: **S4 with a real agent as Conductor** passes (`e2e/live-m5.spec.ts`). Claude Code conducted Claude Code, Codex and Gemini reviewers and wrote the "where they agree" note in 49 s. The same flow runs in CI with the demo agent (`e2e/m5.spec.ts`). Details are in `docs/qa/M5.md`.
+
+### Done
+
+- **Workspace MCP server (§10.1):**
+  - Streamable HTTP on 127.0.0.1 with a bearer token per chat. Stateless, refuses browsers.
+  - Tools: `list_projects`, `list_chats`, `read_chat`, `spawn_chat`, `send_message`, `wait_for_chats`, `get_diff`, `create_note`, `append_note`, `focus`, plus `tidy_canvas` and `close_chat`.
+  - Guardrails: spawned chats get the same or a stricter mode, a per-caller running limit, closing only your own chats after the user confirms.
+  - The `latis-mcp` stdio shim for agents that only speak stdio.
+- **Agents get MCP servers:** Claude Code (`mcpServers`, `MCP_TOOL_TIMEOUT`), Codex (`config.mcp_servers`, `developerInstructions`, approval mode, MCP elicitations shown as approvals), ACP (`mcpServers` in `session/new`/`load`, instructions with the first message), and the demo agent (scripted tool calls).
+- **Conductor (§10.2):**
+  - A pinned chat at the top left, on the first ready agent of Claude Code, Codex, Gemini.
+  - `resources/conductor/SYSTEM.md` plus the user's `AGENTS.md`.
+  - Settings → Conductor (agent, preferences, spawn limit), starter prompts, "Ask the Conductor" in ⌘K.
+- **Give workspace tools** on any chat (⋯ menu and ⌘K). Agent-spawned chats, notes, focus views and tidy-ups appear on the canvas live.
+- **MCP connections (§9.15):**
+  - stdio or HTTP, with env and headers encrypted with safeStorage.
+  - "Share with every chat", or attach per chat from the ⋯ menu.
+  - Import from Claude Desktop, Claude Code, Cursor, Gemini CLI, Codex and VS Code, only on click and with a preview.
+- **Skills (§9.14):**
+  - `<dataDir>/skills/*.md`, `<project>/.latis/skills/`, and SKILL.md folders.
+  - `/name` suggestions in the composer; the agent receives the skill text.
+  - Settings → Skills with import.
+- **Tests:** 96 unit, 31 native, 21 e2e (+ live S4 and live Codex tools, opt-in).
+
+### Not done / known issues
+
+- Gemini using the workspace tools through the shim hasn't been run live (its free-tier quota ran out). Gemini's ACP mode retries silently on 429, so such a turn looks like it's still working.
+- No OAuth sign-in for HTTP MCP servers.
+- `create_card`, `update_card` and `create_flow` come with M6.
+- The Conductor isn't listed in the sidebar's project tree (it isn't in a project). Reach it with ⌘K → "Ask the Conductor".
+
+## M4 The great UI: done 2026-10-23
 
 Exit criteria: **S1 keyboard-only** passes (`e2e/m3.spec.ts`). **Design review against §8**: `e2e/design.spec.ts` captures both themes; findings are fixed and listed in `docs/qa/M4.md`. CI is green on all three OSes (Linux check + macOS/Windows/Linux packages).
 

@@ -3,7 +3,12 @@ import { NodeResizer, type NodeProps } from "@xyflow/react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import {
   AlertTriangle,
+  Check,
   CornerDownRight,
+  Network,
+  Pin,
+  Plug,
+  Settings2,
   Folder,
   FolderOpen,
   GitBranch,
@@ -21,13 +26,21 @@ import {
 } from "lucide-react";
 import type { ImageAttachment, QueuedMessage } from "@latis/shared";
 import { buildTranscript } from "@latis/shared";
-import { Button, Menu, MenuItem, MenuSeparator, StatusDot, cn } from "@latis/ui";
+import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot, cn } from "@latis/ui";
 import { useZoomLevel } from "../canvas/zoom";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { ChatCondensed, ChatTile } from "./ChatCompact";
 import { Item, type ItemActions } from "./items";
 import { ModelPicker, PermissionPicker, ReasoningPicker } from "./pickers";
+import { SkillSuggestions, useSkillSuggestions } from "./SkillSuggestions";
 import { TerminalChatBody } from "./TerminalChatBody";
+
+/** Things to ask the Conductor, shown while it has no messages (§10.2). */
+const CONDUCTOR_STARTERS = [
+  "Have three agents each review the auth module from different angles and summarise where they agree.",
+  "Which chats are done? Summarise what each changed.",
+  "Tidy my canvas.",
+];
 
 const FALLBACK_HUE: Record<string, string> = { "claude-code": "amber-sand", codex: "slate-blue", gemini: "sky", fake: "violet" };
 
@@ -65,6 +78,8 @@ export const FullChat = memo(function FullChat({
   };
   const [editingTitle, setEditingTitle] = useState(false);
   const list = useRef<VirtuosoHandle>(null);
+  const connections = useWorkspace((st) => st.connections);
+  const suggest = useSkillSuggestions(draft, chat?.summary.projectId ?? null);
 
   const actions = useMemo<ItemActions>(
     () => ({
@@ -107,6 +122,8 @@ export const FullChat = memo(function FullChat({
   const folder = s.cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? s.cwd;
   const terminalAgent = agent?.kind === "terminal";
   const unenforced = !terminalAgent && s.permissionMode === "full-auto" && (agent?.unenforceable ?? []).includes("full-auto");
+  const conductor = s.role === "conductor";
+  const ownConnections = connections.filter((c) => !c.shared);
 
   const setImages = (list: ImageAttachment[]) => useWorkspace.setState((st) => ({ attachments: { ...st.attachments, [chatId]: list } }));
   const submit = () => {
@@ -139,6 +156,16 @@ export const FullChat = memo(function FullChat({
       >
         <header className="latis-drag flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3 active:cursor-grabbing">
           <StatusDot status={s.status} />
+          {conductor && (
+            <span title="The Conductor is pinned here and can't be deleted." className="text-accent" data-testid="conductor-badge">
+              <Pin size={12} />
+            </span>
+          )}
+          {!conductor && s.workspaceTools && (
+            <span title="Has the workspace tools: can see and start other chats." className="text-accent">
+              <Network size={12} />
+            </span>
+          )}
           {editingTitle ? (
             <input
               autoFocus
@@ -260,6 +287,39 @@ export const FullChat = memo(function FullChat({
                   <SquareTerminal size={13} /> Open as terminal
                 </MenuItem>
               )}
+              {conductor ? (
+                <MenuItem onSelect={() => useWorkspace.getState().setSettingsOpen(true, "Conductor")}>
+                  <Settings2 size={13} /> Conductor settings…
+                </MenuItem>
+              ) : (
+                !terminalAgent &&
+                s.agentId !== "fake" && (
+                  <MenuItem onSelect={() => void useWorkspace.getState().setWorkspaceTools(chatId, !s.workspaceTools)}>
+                    <Network size={13} /> {s.workspaceTools ? "Remove workspace tools" : "Give workspace tools"}
+                  </MenuItem>
+                )
+              )}
+              {!terminalAgent && ownConnections.length > 0 && (
+                <>
+                  <MenuSeparator />
+                  <MenuLabel>Connections for this chat</MenuLabel>
+                  {ownConnections.map((c) => {
+                    const on = s.connections.includes(c.id);
+                    return (
+                      <MenuItem
+                        key={c.id}
+                        onSelect={() =>
+                          void useWorkspace
+                            .getState()
+                            .setConnections(chatId, on ? s.connections.filter((x) => x !== c.id) : [...s.connections, c.id])
+                        }
+                      >
+                        {on ? <Check size={13} /> : <Plug size={13} />} {c.name}
+                      </MenuItem>
+                    );
+                  })}
+                </>
+              )}
               <MenuSeparator />
               <MenuItem onSelect={() => void restart(chatId)}>
                 <RotateCcw size={13} /> Restart agent
@@ -279,7 +339,26 @@ export const FullChat = memo(function FullChat({
             >
               {chat.loaded && items.length === 0 ? (
                 <p className="px-3.5 py-3 text-[13px] text-text-3">
-                  {s.agentId === "fake" ? (
+                  {conductor ? (
+                    <span className="flex flex-col gap-2" data-testid="conductor-intro">
+                      <span>
+                        I&apos;m the Conductor. I can start chats with any of your agents, wait for them, read what they did and put the
+                        results on the canvas. Try:
+                      </span>
+                      {CONDUCTOR_STARTERS.map((t) => (
+                        <button
+                          key={t}
+                          className="rounded-control border border-line px-2.5 py-1.5 text-left text-text-2 hover:border-line-strong hover:text-text-1"
+                          onClick={() => {
+                            setDraft(t);
+                            composerRef.current?.focus();
+                          }}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </span>
+                  ) : s.agentId === "fake" ? (
                     <>
                       Say anything to start. Include <code className="font-mono text-text-2">/crash</code> to see how a crashed agent is
                       handled.
@@ -325,6 +404,7 @@ export const FullChat = memo(function FullChat({
 
             <footer className="nodrag shrink-0 border-t border-line p-2">
               {queue && queue.length > 0 && <QueueList chatId={chatId} queue={queue} />}
+              <SkillSuggestions matches={suggest.matches} index={suggest.index} onPick={(sk) => setDraft(suggest.pick(sk))} />
               <div className="rounded-control border border-line bg-bg-1 focus-within:border-line-strong">
                 {images && images.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 px-2 pt-2" aria-label="Attached images" data-testid="attachments">
@@ -358,6 +438,11 @@ export const FullChat = memo(function FullChat({
                     void Promise.all(files.map(readImage)).then((list) => setImages([...(images ?? []), ...list]));
                   }}
                   onKeyDown={(e) => {
+                    const picked = suggest.onKey(e);
+                    if (picked !== undefined) {
+                      if (picked !== null) setDraft(picked);
+                      return;
+                    }
                     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       submit();
@@ -369,7 +454,9 @@ export const FullChat = memo(function FullChat({
                       ? agent?.steering
                         ? "Steer: reaches the agent at its next step…"
                         : "Queue a message for when this turn ends…"
-                      : `Ask ${agentLabel}…`
+                      : conductor
+                        ? "Ask the Conductor to coordinate your chats…"
+                        : `Ask ${agentLabel}…`
                   }
                   aria-label="Message"
                   data-testid="composer"

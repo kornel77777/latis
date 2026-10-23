@@ -79,3 +79,11 @@ The platform binary packages are excluded from the app (`!**/claude-agent-sdk-*/
 ## Steering (probed live 2026-10-23)
 
 Pushing `{ type: "user", message, parent_tool_use_id: null, priority: "next" }` into the streaming input while a turn runs delivers it at the model's next step **without ending the turn**: one `result` for the whole turn, and the model followed the new instruction (ran `echo STEERED` instead of `echo second`). The CLI doesn't echo the steered message back in the stream, so Latis records it itself (`user.steered` event). The replay query skips `priority: "next"` messages.
+
+## MCP servers and instructions (verified 2026-10-23, SDK 0.3.309, CLI 2.1.309)
+
+- `Options.mcpServers` takes `{ [name]: { type: "http", url, headers } | { type: "stdio", command, args, env } }`. Tools show up as `mcp__<server>__<tool>`; Claude Code may load them lazily via `ToolSearch` first, which is visible as a step.
+- MCP tool calls go through `canUseTool` like any other tool. Latis allows `mcp__latis__*` without asking (except in read-only chats).
+- Long tool calls: the CLI's own MCP timeout is set with the `MCP_TOOL_TIMEOUT` env var (ms). Latis sets 30 minutes because `wait_for_chats` blocks.
+- Instructions: `systemPrompt: { type: "preset", preset: "claude_code", append }` keeps Claude Code's own prompt and adds Latis's.
+- Live S4 (`e2e/live-m5.spec.ts`): as the Conductor, Claude Code called `spawn_chat` ×3 (and chose `permission_mode: "read-only"` itself), then `wait_for_chats` and `create_note`, in a 47 s turn.

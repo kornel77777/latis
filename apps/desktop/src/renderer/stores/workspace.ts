@@ -8,7 +8,9 @@ import {
   type FocusView,
   type BrowserState,
   type ImageAttachment,
+  type McpConnection,
   type Prefs,
+  type Skill,
   type PtyInfo,
   type QueuedMessage,
   type ReviewItem,
@@ -40,6 +42,8 @@ export interface Toast {
   message: string;
   action?: { label: string; run: () => void };
 }
+
+export type SettingsSection = "Agents" | "Conductor" | "Connections" | "Skills" | "Appearance" | "Notifications";
 
 export type ChatOptions = Partial<Pick<ChatSummary, "model" | "reasoning" | "permissionMode" | "title">>;
 
@@ -99,6 +103,11 @@ interface WorkspaceState {
   browser: BrowserState | null;
   /** Images waiting in a chat's composer (pasted, or from the element picker). */
   attachments: Record<string, ImageAttachment[]>;
+  settingsSection: SettingsSection;
+  /** MCP connections (§9.15), for Settings and the chat menu. */
+  connections: McpConnection[];
+  /** Skills by project id ("" = no project), loaded when a composer is used (§9.14). */
+  skills: Record<string, Skill[]>;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -144,7 +153,11 @@ interface WorkspaceState {
   openAsTerminal(chatId: string): Promise<void>;
   signIn(agentId: string): Promise<void>;
   setPrefs(patch: Partial<Prefs>): Promise<void>;
-  setSettingsOpen(open: boolean): void;
+  setSettingsOpen(open: boolean, section?: SettingsSection): void;
+  loadConnections(): Promise<void>;
+  loadSkills(projectId: string | null, force?: boolean): Promise<Skill[]>;
+  setWorkspaceTools(chatId: string, on: boolean): Promise<void>;
+  setConnections(chatId: string, ids: string[]): Promise<void>;
   finishOnboarding(): Promise<void>;
   createSandbox(): Promise<Project | null>;
   /** New chat in a project: asks about a separate worktree first when another chat already works there. */
@@ -315,6 +328,9 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   dockTab: "Terminal",
   browser: null,
   attachments: {},
+  settingsSection: "Agents",
+  connections: [],
+  skills: {},
 
   async load() {
     try {
@@ -346,9 +362,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         views,
         demoInProjects: info.demoInProjects,
         // First run: nothing on the canvas and onboarding never finished (§8.10).
-        onboardingOpen: !prefs.onboarded && canvas.nodes.length === 0,
+        onboardingOpen: !prefs.onboarded && canvas.chats.every((c) => c.role === "conductor") && !canvas.projects.length,
       });
       void get().loadAgents();
+      void get().loadConnections();
       await Promise.all(canvas.chats.map((c) => Promise.all([get().loadTranscript(c.id), get().loadTimeline(c.id)])));
     } catch (err) {
       set({ loadError: err instanceof Error ? err.message : String(err) });
@@ -624,7 +641,37 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   async setPrefs(patch) {
     set({ prefs: await latis.invoke("prefs:set", patch) });
   },
-  setSettingsOpen: (open) => set({ settingsOpen: open }),
+  setSettingsOpen: (open, section) => set({ settingsOpen: open, ...(section && { settingsSection: section }) }),
+  async loadConnections() {
+    try {
+      set({ connections: await latis.invoke("mcp:list") });
+    } catch (err) {
+      console.warn("loading connections failed", err);
+    }
+  },
+  async loadSkills(projectId, force) {
+    const key = projectId ?? "";
+    const cached = get().skills[key];
+    if (cached && !force) return cached;
+    const list = await latis.invoke("skills:list", { projectId });
+    set((s) => ({ skills: { ...s.skills, [key]: list } }));
+    return list;
+  },
+  async setWorkspaceTools(chatId, on) {
+    try {
+      applySummary(await latis.invoke("chat:setWorkspaceTools", { chatId, on }));
+      get().toast(on ? "This chat can now see and start other chats. It applies from its next message." : "Workspace tools removed.");
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async setConnections(chatId, ids) {
+    try {
+      applySummary(await latis.invoke("chat:setConnections", { chatId, ids }));
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
   async finishOnboarding() {
     set({ onboardingOpen: false });
     await get().setPrefs({ onboarded: true });
@@ -739,6 +786,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   async deleteNodes(nodeIds) {
     try {
       const { deleted } = await latis.invoke("canvas:delete", { nodeIds });
+      if (!deleted.length) {
+        get().toast("The Conductor is pinned to the canvas and can't be deleted.");
+        return;
+      }
       const gone = new Set(deleted);
       set((s) => {
         const removed = s.nodes.filter((n) => gone.has(n.id));
@@ -985,6 +1036,39 @@ export function subscribeToMain(): void {
   latis.on("focus:chat", (raw) => {
     const parsed = eventContract["focus:chat"].safeParse(raw);
     if (parsed.success) useWorkspace.getState().focusChat(parsed.data.chatId);
+  });
+  latis.on("canvas:upsert", (raw) => {
+    const parsed = eventContract["canvas:upsert"].safeParse(raw);
+    if (!parsed.success) return console.warn("dropped invalid canvas:upsert payload");
+    const { nodes, chats, projects, reveal } = parsed.data;
+    useWorkspace.setState((s) => {
+      const byId = new Map(nodes.map((n) => [n.id, n]));
+      const known = new Set(s.nodes.map((n) => n.id));
+      const merged = s.nodes.map((n) => {
+        const u = byId.get(n.id);
+        // Existing nodes keep where the user put them; data (note text) and frame sizes follow main.
+        return u ? { ...n, data: u.data as FlowNode["data"], ...(u.type === "frame" && { width: u.w, height: u.h }) } : n;
+      });
+      const added = nodes.filter((n) => !known.has(n.id)).map((n) => ({ ...toFlowNode(n), className: "latis-appear" }));
+      const nextChats = { ...s.chats };
+      for (const c of chats)
+        nextChats[c.id] = nextChats[c.id]
+          ? { ...nextChats[c.id]!, summary: c }
+          : { summary: c, turns: [], events: [], lastSeq: -1, loaded: true };
+      return {
+        nodes: sortNodes([...merged, ...added]),
+        chats: nextChats,
+        projects: { ...s.projects, ...Object.fromEntries(projects.map((p) => [p.id, p])) },
+      };
+    });
+    if (reveal) useWorkspace.getState().focusNode(reveal);
+  });
+  latis.on("canvas:command", (raw) => {
+    const parsed = eventContract["canvas:command"].safeParse(raw);
+    if (!parsed.success) return;
+    const cmd = parsed.data;
+    if (cmd.type === "tidy") useWorkspace.getState().tidyUp();
+    else useWorkspace.setState((s) => ({ views: [...s.views.filter((v) => v.id !== cmd.view.id), cmd.view], activeView: cmd.view.id }));
   });
   latis.on("agents:changed", (raw) => {
     const parsed = eventContract["agents:changed"].safeParse(raw);

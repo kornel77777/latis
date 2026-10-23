@@ -220,3 +220,55 @@ Pasted or picked images go to the agent with the message, but turns store text o
 ### 2026-10-23: LATIS_DEMO_IN_PROJECTS (tests)
 
 The demo agent stays out of real folders in the UI. With `LATIS_DEMO_IN_PROJECTS=1` it can work in projects, so e2e tests can drive real file changes (worktrees, review, merge) without tokens.
+
+### 2026-10-23: Workspace MCP server is stateless, with a token per chat
+
+The server (`src/main/mcp/server.ts`) listens on `127.0.0.1` on a random port. Each chat gets its own random bearer token, made when its agent starts and kept for the app's lifetime. The token tells the server which chat is calling, which is what placement ("next to the caller") and the guardrails need. A single per-launch token couldn't tell callers apart.
+
+The server is stateless Streamable HTTP with JSON responses: every POST gets a fresh `McpServer` bound to its caller, and GET/DELETE answer 405. Requests are refused when they carry an `Origin` header (browsers) or a `Host` other than 127.0.0.1/localhost on our port (DNS rebinding). The tools themselves live in `WorkspaceService` (`src/main/mcp/workspace.ts`), so they're tested without HTTP.
+
+### 2026-10-23: How agents get the workspace tools
+
+- Claude Code and Codex get the HTTP server directly (Claude: `mcpServers` with a `type: "http"` entry; Codex: `config.mcp_servers.latis` with `url`, `http_headers` and `tool_timeout_sec` on `thread/start`/`thread/resume`).
+- ACP agents and the demo agent get the stdio shim `latis-mcp` (`out/main/latis-mcp.js`, run as Electron-as-Node), which forwards each line to the server. ACP only promises stdio MCP, so this works with any of them.
+- `wait_for_chats` blocks, so tool timeouts are raised to 30 minutes (Codex `tool_timeout_sec`, Claude `MCP_TOOL_TIMEOUT`). The tool's own timeout tops out at 29.5 minutes.
+- Calls to `latis` tools don't ask the user. Claude's `canUseTool` and the ACP permission handler allow them, except in read-only chats. The guardrails are in Latis instead.
+
+### 2026-10-23: Workspace tool guardrails
+
+- A spawned chat runs in the caller's permission mode. `spawn_chat` accepts `permission_mode` only if it's stricter.
+- One caller may have at most `prefs.maxSpawned` chats (default 6) working or waiting at once (Settings → Conductor).
+- `close_chat` works only on chats the caller spawned, and only after a native confirmation dialog. It soft-deletes, so the chat stays restorable from ⌘K.
+- Every call shows in the caller's transcript as the agent's own MCP tool step. Latis doesn't add a second log.
+- `wait_for_chats` returns as soon as no listed chat is working. A chat that needs the user counts as stopped and is reported with a note, so the Conductor can tell the user instead of hanging.
+
+### 2026-10-23: Spec tools added and left for M6
+
+Added `tidy_canvas` and `close_chat`. §10.2 asks the Conductor to tidy the canvas, and §10.1's guardrails talk about closing chats, but the tool table has neither. `create_card`/`update_card`/`create_flow` wait for cards and flows (M6). A folder that isn't a project yet becomes one when `spawn_chat` targets it.
+
+### 2026-10-23: The Conductor
+
+- The Conductor is an ordinary chat row with `role = 'conductor'`, created once at startup at the top left of the canvas.
+- Its agent is the first one installed and signed in, in the order Claude Code, Codex, Gemini. It can be changed in Settings → Conductor, which starts a new conversation because a different agent can't resume the old one.
+- It works in `<dataDir>/conductor/`. Its instructions are `resources/conductor/SYSTEM.md` (bundled) plus `<dataDir>/conductor/AGENTS.md` (the user's, opened from Settings). These go in as a system prompt append (Claude), `developerInstructions` (Codex), or with the first message (ACP, which has no system prompt).
+- `softDelete` skips it, so it can't be deleted.
+- E2E: `LATIS_SKIP_CONDUCTOR=1` (the default in `helpers.ts`) and `LATIS_CONDUCTOR_AGENT=<id>`.
+
+### 2026-10-23: MCP connections and secrets
+
+- Connections are stored in `mcp_servers`. Env values and headers are one JSON blob encrypted with `safeStorage`; the renderer only ever sees their key names. Where no keychain is available (`isEncryptionAvailable()` false, e.g. Linux without a keyring), saving a connection with secrets is refused rather than stored in plain text.
+- Shared connections go to every chat whose agent supports MCP. Other connections are attached per chat from its ⋯ menu.
+- Changes apply when the agent next starts. Toggling a connection or the workspace tools restarts the session, which resumes the conversation, but only between turns.
+- The name `latis` is reserved.
+
+**Import:** only after the user clicks Import, and only from a fixed list of files: Claude Desktop, `~/.claude.json`, Cursor, Gemini CLI, `~/.codex/config.toml`, VS Code. Latis reads only their MCP server section. Each server is shown with its command or URL and its key names before anything is copied.
+
+**Not done:** OAuth sign-in for HTTP servers (§9.15 AC1). An agent that supports OAuth itself may still sign in on its own.
+
+### 2026-10-23: Skills are expanded by Latis
+
+A known `/name` in a message is replaced by `<skill name="…">…</skill>` blocks ahead of the text. The agent receives the expanded message; the transcript keeps what the user typed. Unknown `/words` (paths, agent slash commands, demo scripts) are left alone. A project's `.latis/skills/` wins over the user's `<dataDir>/skills/` on a name clash. `name:` and `description:` come from front matter when present.
+
+### 2026-10-23: Codex approves Latis's tools; elicitations become approvals
+
+Codex asks (`mcpServer/elicitation/request`) before any MCP tool that isn't marked read-only. For Latis's own server, Latis sets `default_tools_approval_mode = "approve"` (`McpServerConfig.trusted`). Other servers' elicitations are shown as ordinary permission requests and answered `accept`/`decline`. URL-mode elicitations (sign-in pages) aren't supported yet and are declined.

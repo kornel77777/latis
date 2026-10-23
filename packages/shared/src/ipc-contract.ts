@@ -71,6 +71,14 @@ export const ChatSummary = z.object({
   worktree: WorktreeInfo.nullable(),
   createdAt: z.number(),
   lastActivityAt: z.number(),
+  /** "conductor" for the pinned Conductor chat (§10.2). */
+  role: z.enum(["conductor"]).nullable(),
+  /** The chat can use the Workspace MCP tools (§10.1). */
+  workspaceTools: z.boolean(),
+  /** The chat that started this one through the workspace tools. */
+  spawnedBy: z.string().nullable(),
+  /** MCP connections attached to this chat on top of the shared ones (§9.15). */
+  connections: z.array(z.string()),
 });
 export type ChatSummary = z.infer<typeof ChatSummary>;
 
@@ -140,6 +148,70 @@ export const PtyInfo = z.object({
 });
 export type PtyInfo = z.infer<typeof PtyInfo>;
 
+/** An MCP connection (§9.15). Secret values never leave main; only their names do. */
+export const McpConnection = z.object({
+  id: z.string(),
+  name: z.string(),
+  transport: z.enum(["stdio", "http"]),
+  command: z.string().nullable(),
+  args: z.array(z.string()),
+  url: z.string().nullable(),
+  envKeys: z.array(z.string()),
+  headerKeys: z.array(z.string()),
+  /** Passed to every chat whose agent supports MCP. */
+  shared: z.boolean(),
+});
+export type McpConnection = z.infer<typeof McpConnection>;
+
+const McpName = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/, "Use letters, digits, - and _ only.");
+
+export const McpConnectionInput = z.object({
+  /** Updates this connection; secrets left out keep their saved values. */
+  id: z.string().optional(),
+  name: McpName,
+  transport: z.enum(["stdio", "http"]),
+  command: z.string().max(4000).optional(),
+  args: z.array(z.string().max(4000)).max(100).optional(),
+  url: z.string().url().max(4000).optional(),
+  env: z.record(z.string(), z.string().max(20_000)).optional(),
+  headers: z.record(z.string(), z.string().max(20_000)).optional(),
+  shared: z.boolean(),
+});
+export type McpConnectionInput = z.infer<typeof McpConnectionInput>;
+
+/** MCP servers found in another app's config, shown before anything is copied (§9.15 AC2). */
+export const McpImportCandidate = z.object({
+  source: z.string(),
+  path: z.string(),
+  servers: z.array(
+    z.object({
+      name: z.string(),
+      transport: z.enum(["stdio", "http"]),
+      command: z.string().nullable(),
+      args: z.array(z.string()),
+      url: z.string().nullable(),
+      envKeys: z.array(z.string()),
+      headerKeys: z.array(z.string()),
+      /** A connection with this name already exists. */
+      exists: z.boolean(),
+    }),
+  ),
+});
+export type McpImportCandidate = z.infer<typeof McpImportCandidate>;
+
+/** A reusable prompt snippet (§9.14), used as /name in the composer. */
+export const Skill = z.object({
+  name: z.string(),
+  description: z.string(),
+  source: z.enum(["user", "project"]),
+  path: z.string(),
+});
+export type Skill = z.infer<typeof Skill>;
+
 /** A saved focus view (§8.7), shown as a title-bar tab. */
 export const FocusView = z.object({
   id: z.string(),
@@ -195,6 +267,8 @@ export const Prefs = z.object({
   appearance: Appearance,
   /** Getting-started checklist steps done (§8.10 step 4), or null once dismissed. */
   checklist: z.array(z.enum(["send", "approve", "diff", "zoom", "palette"])).nullable(),
+  /** Most chats one chat may have running through spawn_chat (§10.1 guardrails). */
+  maxSpawned: z.number().int().min(1).max(20),
 });
 export type Prefs = z.infer<typeof Prefs>;
 
@@ -504,6 +578,22 @@ export const invokeContract = {
       })
       .nullable(),
   },
+  /** Gives or takes the Workspace MCP tools (§10.2); applies from the chat's next message. */
+  "chat:setWorkspaceTools": { req: z.object({ chatId: z.string(), on: z.boolean() }), res: ChatSummary },
+  "chat:setConnections": { req: z.object({ chatId: z.string(), ids: z.array(z.string()).max(50) }), res: ChatSummary },
+  "mcp:list": { req: none, res: z.array(McpConnection) },
+  "mcp:save": { req: McpConnectionInput, res: McpConnection },
+  "mcp:remove": { req: z.object({ id: z.string() }), res: ok },
+  /** Reads other apps' MCP configs only when the user clicks Import (§9.15 AC2). */
+  "mcp:importScan": { req: none, res: z.array(McpImportCandidate) },
+  "mcp:import": { req: z.object({ path: z.string(), names: z.array(z.string()).min(1) }), res: z.array(McpConnection) },
+  "skills:list": { req: z.object({ projectId: z.string().nullable() }), res: z.array(Skill) },
+  "skills:openFolder": { req: none, res: ok },
+  /** Copies a picked folder containing SKILL.md into the skills folder. */
+  "skills:import": { req: none, res: Skill.nullable() },
+  "skills:read": { req: z.object({ path: z.string() }), res: z.object({ body: z.string() }) },
+  "conductor:setAgent": { req: z.object({ agentId: z.string() }), res: ChatSummary },
+  "conductor:openPrefs": { req: none, res: ok },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */
@@ -530,6 +620,19 @@ export const eventContract = {
   "reviews:changed": z.array(ReviewItem),
   "browser:state": BrowserState,
   "chat:timeline": z.object({ chatId: z.string(), entries: z.array(TimelineEntry) }),
+  /** Main added or changed canvas items itself (the workspace tools, the Conductor). */
+  "canvas:upsert": z.object({
+    nodes: z.array(CanvasNode),
+    chats: z.array(ChatSummary),
+    projects: z.array(Project),
+    /** Bring this node into view. */
+    reveal: z.string().nullable(),
+  }),
+  /** The workspace tools opened a focus view or asked for a canvas action. */
+  "canvas:command": z.discriminatedUnion("type", [
+    z.object({ type: z.literal("focus"), view: FocusView }),
+    z.object({ type: z.literal("tidy") }),
+  ]),
 } as const;
 
 export type InvokeChannel = keyof typeof invokeContract;

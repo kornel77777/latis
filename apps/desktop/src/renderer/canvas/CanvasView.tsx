@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Background, BackgroundVariant, MiniMap, ReactFlow, useReactFlow, useViewport, type NodeTypes } from "@xyflow/react";
 import { FolderOpen, LayoutGrid, Sparkles, StickyNote } from "lucide-react";
-import { Button } from "@latis/ui";
+import { Button, cn } from "@latis/ui";
 import { ChatNode } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
 import { Checklist } from "../app/Checklist";
@@ -41,6 +41,9 @@ export function CanvasView() {
   const grid = useWorkspace((s) => s.prefs?.appearance.grid ?? "dots");
   const wallpaper = useWorkspace((s) => s.prefs?.appearance.wallpaper ?? null);
   const nodeCount = nodes.length;
+  // The Conductor alone doesn't make the canvas non-empty; the welcome moves aside for it.
+  const conductorNode = useWorkspace((s) => Object.values(s.chats).find((c) => c.summary.role === "conductor")?.summary.nodeId);
+  const empty = nodes.every((n) => n.id === conductorNode);
   useEffect(() => reportVisibleChats(container.current), [nodeCount, focusRequest]);
 
   useEffect(() => {
@@ -156,8 +159,10 @@ export function CanvasView() {
       </ReactFlow>
 
       <Checklist />
-      {nodes.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      {empty && (
+        <div
+          className={cn("pointer-events-none absolute inset-0 flex items-center", nodes.length ? "justify-end pr-[10%]" : "justify-center")}
+        >
           <div className="pointer-events-auto flex max-w-sm flex-col items-center gap-3 text-center">
             <div className="text-[16px] font-semibold text-text-1">An empty sky</div>
             <p className="text-[13px] leading-relaxed text-text-2">

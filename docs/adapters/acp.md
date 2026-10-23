@@ -86,3 +86,12 @@ Not in ACP v1. The Claude bridge advertises `_meta.steering.supported` / `prompt
 - **Thoughts:** streamed as `agent_thought_chunk` with a bold title line.
 - **Process tree:** `gemini` re-launches itself as a child `node --max-old-space-size=…` process. Killing only the wrapper leaves the child running, so Latis starts agents in their own process group and kills the group (`taskkill /T` on Windows).
 - **Resume:** `session/load` replays a `<session_context>` user chunk and the history before responding; Latis drops them.
+
+## MCP servers (verified 2026-10-23, Gemini CLI 0.65)
+
+- `session/new` and `session/load` take `mcpServers`. Every agent must accept stdio entries `{ name, command, args, env: [{ name, value }] }`. HTTP entries `{ type: "http", name, url, headers: [{ name, value }] }` are allowed only when `initialize` returns `agentCapabilities.mcpCapabilities.http`. Gemini 0.65 reports `{ http: true, sse: true }`.
+- Latis gives ACP agents its own server through the stdio shim `latis-mcp`, so any ACP agent works. Other HTTP connections are passed only to agents that advertise `http`.
+- ACP has no system prompt. The Conductor's instructions go in front of the first message of a new session, inside `<instructions>`.
+- Permission requests for Latis's tools (title `… (latis MCP Server)`) are allowed by Latis, except in read-only chats.
+- **Quota:** when the Gemini free tier is out of daily requests (429), `gemini --acp` keeps retrying and sends nothing, so the turn looks like it's working indefinitely. `gemini -p` shows the 429. Gemini calling the workspace tools through the shim is not verified live yet: the quota ran out during M5. The shim itself is covered by the e2e Conductor test.
+- Live S4: a Gemini chat spawned by the Conductor reviewed the auth module in 9 s.

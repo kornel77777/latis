@@ -1,10 +1,22 @@
-import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
+import { app, BrowserWindow, dialog, nativeTheme, safeStorage, shell } from "electron";
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import type { Appearance, AttentionItem, FocusView, PermissionMode, Prefs, RequestResponse, Theme } from "@latis/shared";
+import type {
+  Appearance,
+  AttentionItem,
+  ChatSummary,
+  FocusView,
+  McpServerConfig,
+  PermissionMode,
+  Prefs,
+  RequestResponse,
+  SessionOptions,
+  Theme,
+} from "@latis/shared";
+import conductorSystem from "../../resources/conductor/SYSTEM.md?raw";
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
 import { SessionSupervisor } from "./agents/supervisor";
@@ -17,8 +29,12 @@ import { Notifier } from "./notify";
 import { resolveDataDir } from "./paths";
 import { openDb } from "./store/db";
 import { EventLog } from "./store/event-log";
-import { WorkspaceStore } from "./store/workspace";
+import { CHAT_SIZE, WorkspaceStore } from "./store/workspace";
 import { PtyManager } from "./terminal/pty-manager";
+import { Connections } from "./mcp/connections";
+import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer } from "./mcp/server";
+import { WorkspaceService } from "./mcp/workspace";
+import { Skills } from "./skills";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 let win: BrowserWindow | null = null;
@@ -73,6 +89,7 @@ const DEFAULT_PREFS: Prefs = {
   appearance: DEFAULT_APPEARANCE,
   // Tests skip the tour, and with it the checklist.
   checklist: process.env.LATIS_SKIP_ONBOARDING === "1" ? null : [],
+  maxSpawned: 6,
 };
 function prefs(): Prefs {
   const saved = store.getSetting<Partial<Prefs>>("prefs") ?? {};
@@ -149,8 +166,155 @@ const supervisor = new SessionSupervisor(
     beforeTurn: (chatId, turnId) => changes.beforeTurn(chatId, turnId),
     afterTurn: (chatId, turnId, finalMessage) => changes.afterTurn(chatId, turnId, finalMessage),
   },
+  {
+    sessionOptions: (chat) => sessionOptions(chat),
+    expand: (chatId, text) => {
+      const chat = store.getChat(chatId);
+      const project = chat?.projectId ? store.getProject(chat.projectId) : undefined;
+      return skills.expand(text, project && !project.folderMissing ? project.folderPath : null);
+    },
+  },
 );
 notifier.badge(store.openAttention());
+
+// ── Orchestration (§9.14, §9.15, §10) ─────────────────────────────────────────
+
+const skills = new Skills(join(dataDir, "skills"));
+const connections = new Connections(store, {
+  available: () => safeStorage.isEncryptionAvailable(),
+  encrypt: (t) => safeStorage.encryptString(t),
+  decrypt: (b) => safeStorage.decryptString(b),
+});
+
+const conductorDir = join(dataDir, "conductor");
+const conductorPrefs = join(conductorDir, "AGENTS.md");
+function ensureConductorDir() {
+  mkdirSync(conductorDir, { recursive: true });
+  if (!existsSync(conductorPrefs))
+    writeFileSync(
+      conductorPrefs,
+      "# My preferences for the Conductor\n\nWrite anything the Conductor should always keep in mind: agents you prefer for which jobs, folders you work in, how you like summaries.\n",
+    );
+}
+
+const workspace = new WorkspaceService({
+  store,
+  canvasId,
+  supervisor,
+  agents: {
+    available: async () =>
+      (await agents.list()).filter(
+        (a) => a.installed && a.kind === "structured" && (a.id !== "fake" || process.env.LATIS_DEMO_IN_PROJECTS === "1"),
+      ),
+  },
+  changes,
+  openProject: (folder, x, y) => {
+    const r = openProject(canvasId, folder, x, y);
+    return r;
+  },
+  confirm: async (message, detail) => {
+    const options = { type: "question" as const, buttons: ["Close it", "Keep it"], defaultId: 1, cancelId: 1, message, detail };
+    const r = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
+    return r.response === 0;
+  },
+  ui: {
+    upsert: (payload) => emit(win?.webContents, "canvas:upsert", payload),
+    focus: (view) => emit(win?.webContents, "canvas:command", { type: "focus", view }),
+    tidy: () => emit(win?.webContents, "canvas:command", { type: "tidy" }),
+  },
+  maxSpawned: () => prefs().maxSpawned,
+});
+const mcpServer = new WorkspaceMcpServer(workspace);
+const mcpReady = mcpServer.start().catch((err: unknown) => console.error("[mcp] the workspace server didn't start", err));
+const shimPath = join(here, "latis-mcp.js");
+
+/** Latis's own server for a chat: HTTP where the agent takes it, otherwise the stdio shim. */
+function latisServer(chat: ChatSummary): McpServerConfig {
+  const token = mcpServer.tokenFor(chat.id);
+  const http = chat.agentId === "claude-code" || chat.agentId === "codex";
+  return http
+    ? {
+        name: "latis",
+        transport: "http",
+        url: mcpServer.url,
+        headers: { Authorization: `Bearer ${token}` },
+        toolTimeoutSec: TOOL_TIMEOUT_SEC,
+        trusted: true,
+      }
+    : {
+        name: "latis",
+        transport: "stdio",
+        command: process.execPath,
+        args: [shimPath],
+        env: { ELECTRON_RUN_AS_NODE: "1", LATIS_MCP_URL: mcpServer.url, LATIS_MCP_TOKEN: token },
+        toolTimeoutSec: TOOL_TIMEOUT_SEC,
+        trusted: true,
+      };
+}
+
+const TOOLS_NOTE =
+  "You can see and coordinate the other chats in Latis through the `latis` MCP tools (list_chats, read_chat, spawn_chat, send_message, wait_for_chats, get_diff, create_note, focus). Use them when the user asks you to work with other chats or agents.";
+
+async function sessionOptions(chat: ChatSummary): Promise<Partial<SessionOptions>> {
+  const adapter = agents.get(chat.agentId);
+  if (!adapter?.capabilities.mcp) return {};
+  await mcpReady;
+  const conductor = chat.role === "conductor";
+  const servers = [...(conductor || chat.workspaceTools ? [latisServer(chat)] : []), ...connections.configsFor(chat.connections)];
+  let instructions: string | undefined;
+  if (conductor) {
+    ensureConductorDir();
+    const mine = readFileSync(conductorPrefs, "utf8").trim();
+    instructions = `${conductorSystem}\n\n# The user's preferences (AGENTS.md)\n\n${mine}`;
+  } else if (chat.workspaceTools) instructions = TOOLS_NOTE;
+  return {
+    ...(servers.length && { mcpServers: servers }),
+    ...(instructions && { systemPromptAppend: instructions }),
+    // Claude Code's own limit on a tool call; wait_for_chats can take minutes.
+    env: { MCP_TOOL_TIMEOUT: String(TOOL_TIMEOUT_SEC * 1000) },
+  };
+}
+
+const CONDUCTOR_ORDER = ["claude-code", "codex", "gemini"];
+
+/** The pinned Conductor chat (§10.2), created once at the canvas's top left. */
+async function ensureConductor() {
+  if (process.env.LATIS_SKIP_CONDUCTOR === "1" || store.conductor()) return;
+  const list = await agents.list();
+  const forced = process.env.LATIS_CONDUCTOR_AGENT;
+  const ready = CONDUCTOR_ORDER.map((id) => list.find((a) => a.id === id && a.installed && a.signedIn)).find(Boolean);
+  const agentId = forced ?? ready?.id ?? "claude-code";
+  if (store.conductor()) return;
+  ensureConductorDir();
+  const top = store.loadCanvas(canvasId).nodes.filter((n) => !n.parentId);
+  const x = top.length ? Math.min(...top.map((n) => n.x)) - CHAT_SIZE.w - 80 : 0;
+  const y = top.length ? Math.min(...top.map((n) => n.y)) : 0;
+  const created = store.createChatNode({
+    canvasId,
+    projectId: null,
+    parentId: null,
+    x,
+    y,
+    agentId,
+    model: agentId === "fake" ? "demo-1" : null,
+    reasoning: null,
+    permissionMode: store.getSetting<PermissionMode>("defaultPermissionMode") ?? "auto-edit",
+    cwd: conductorDir,
+    title: "Conductor",
+    role: "conductor",
+  });
+  store.updateChat(created.chat.id, { titleLocked: true });
+  emit(win?.webContents, "canvas:upsert", { nodes: [created.node], chats: [store.getChat(created.chat.id)!], projects: [], reveal: null });
+}
+
+/** Workspace tools and connections are fixed when an agent starts, so they apply from the next message. */
+async function restartForOptions(chatId: string) {
+  if (supervisor.busy(chatId)) throw new Error("Wait for the current turn to finish, then try again.");
+  await supervisor.release(chatId);
+  const chat = store.getChat(chatId)!;
+  emit(win?.webContents, "chat:updated", chat);
+  return chat;
+}
 
 function applyTheme(theme: Theme) {
   nativeTheme.themeSource = theme;
@@ -527,6 +691,69 @@ registerHandlers({
     const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
     return `data:${mime};base64,${buf.toString("base64")}`;
   },
+  "chat:setWorkspaceTools": ({ chatId, on }) => {
+    const chat = store.getChat(chatId);
+    if (!chat) throw new Error("That chat no longer exists.");
+    if (chat.role === "conductor") throw new Error("The Conductor always has the workspace tools.");
+    if (!agents.get(chat.agentId)?.capabilities.mcp) throw new Error("This agent can't use MCP tools.");
+    if (supervisor.busy(chatId)) throw new Error("Wait for the current turn to finish, then try again.");
+    store.setChatFlags(chatId, { workspaceTools: on });
+    return restartForOptions(chatId);
+  },
+  "chat:setConnections": ({ chatId, ids }) => {
+    if (!store.getChat(chatId)) throw new Error("That chat no longer exists.");
+    if (supervisor.busy(chatId)) throw new Error("Wait for the current turn to finish, then try again.");
+    const known = new Set(connections.list().map((c) => c.id));
+    store.setChatFlags(chatId, { connections: ids.filter((id) => known.has(id)) });
+    return restartForOptions(chatId);
+  },
+  "mcp:list": () => connections.list(),
+  "mcp:save": (input) => connections.save(input),
+  "mcp:remove": ({ id }) => {
+    connections.remove(id);
+    return { ok: true };
+  },
+  "mcp:importScan": () => connections.scan(),
+  "mcp:import": ({ path, names }) => connections.import(path, names),
+  "skills:list": ({ projectId }) => {
+    const p = projectId ? store.getProject(projectId) : undefined;
+    return skills.list(p && !p.folderMissing ? p.folderPath : null);
+  },
+  "skills:openFolder": async () => {
+    mkdirSync(skills.userDir, { recursive: true });
+    return { ok: (await shell.openPath(skills.userDir)) === "" };
+  },
+  "skills:import": async () => {
+    const options = { title: "Import a skill folder (with SKILL.md)", properties: ["openDirectory"] as "openDirectory"[] };
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+    const folder = r.filePaths[0];
+    if (r.canceled || !folder) return null;
+    return skills.importFolder(folder);
+  },
+  "skills:read": ({ path }) => {
+    // Only files Latis listed as skills.
+    const all = [...skills.list(null), ...store.listProjects().flatMap((p) => (p.folderMissing ? [] : skills.list(p.folderPath)))];
+    if (!all.some((s) => s.path === path)) throw new Error("That isn't a skill Latis knows.");
+    return { body: skills.body(path) };
+  },
+  "conductor:setAgent": async ({ agentId }) => {
+    const c = store.conductor();
+    if (!c) throw new Error("There's no Conductor yet.");
+    const a = agents.get(agentId);
+    if (!a || agents.isTerminal(agentId) || !a.capabilities.mcp) throw new Error("The Conductor needs an agent that can use MCP tools.");
+    if (supervisor.busy(c.id)) throw new Error("Wait for the Conductor to finish, then try again.");
+    await supervisor.release(c.id);
+    store.setChatFlags(c.id, { agentId, model: agentId === "fake" ? "demo-1" : null, reasoning: null });
+    // A different agent can't resume the old one's conversation.
+    store.updateChat(c.id, { nativeSessionId: null });
+    const chat = store.getChat(c.id)!;
+    emit(win?.webContents, "chat:updated", chat);
+    return chat;
+  },
+  "conductor:openPrefs": async () => {
+    ensureConductorDir();
+    return { ok: (await shell.openPath(conductorPrefs)) === "" };
+  },
   "settings:getTheme": () => store.getSetting<Theme>("theme") ?? "dark",
   "settings:setTheme": (theme) => {
     store.setSetting("theme", theme);
@@ -571,6 +798,7 @@ function createWindow() {
 
 void app.whenReady().then(() => {
   createWindow();
+  void ensureConductor().catch((err: unknown) => console.error("[conductor] couldn't create the Conductor", err));
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -599,6 +827,7 @@ app.on("before-quit", (e) => {
   quitting = true;
   void supervisor.disposeAll().finally(() => {
     ptys.disposeAll();
+    mcpServer.stop();
     app.quit();
   });
 });

@@ -83,3 +83,14 @@ Verified 2026-10-23 against `@openai/codex@0.163.0` (`codex-cli 0.163.0`, macOS 
 | `resume.jsonl`        | Server restart + `thread/resume`, the model recalls a codeword                   |
 
 Ids are scrubbed to `<idN>` placeholders (consistent within a file, and thread ids come out as `<id2>` in every file), paths to `<cwd>` / `<home>`, emails to `user@example.com`.
+
+## MCP servers and instructions (verified 2026-10-23, codex-cli 0.164.0)
+
+- `thread/start` and `thread/resume` take `config` (the same keys as `config.toml`) and `developerInstructions`. Latis passes `config.mcp_servers.<name>` with:
+  - for HTTP servers: `url`, `http_headers`, `tool_timeout_sec`;
+  - for stdio servers: `command`, `args`, `env`, `tool_timeout_sec`.
+- Tool calls arrive as `mcpToolCall` items. The step is named `<server>.<tool>`.
+- **Approval:** Codex runs tools annotated `readOnlyHint` without asking. Before any other MCP tool it sends a server→client request `mcpServer/elicitation/request` (`{ serverName, threadId, mode: "form", message, requestedSchema }`). The answer is `{ action: "accept" | "decline" | "cancel", content }`. An unanswered or rejected request fails the call with "user rejected MCP tool call".
+  - Latis shows these elicitations as a normal permission request (kind `mcp`).
+  - For its own server, Latis sets `default_tools_approval_mode = "approve"` so the workspace tools never ask. That key was found in the 0.164 binary, alongside `approval_mode`, `enabled_tools` and `disabled_tools`.
+- Live (`e2e/live-m5.spec.ts`, LATIS_LIVE_ONLY=codex): after "Give workspace tools", Codex called `list_projects` and `create_note` over HTTP, and the note appeared on the canvas.

@@ -3,22 +3,23 @@ import * as RadixDialog from "@radix-ui/react-dialog";
 import { useReactFlow } from "@xyflow/react";
 import {
   ArchiveRestore,
-  GitBranch,
-  GitMerge,
-  History,
-  Square,
   Bot,
   File,
   FolderOpen,
+  GitBranch,
   GitCompare,
+  GitMerge,
+  History,
   LayoutGrid,
   MessageSquare,
   Moon,
+  Network,
   PanelLeft,
   RefreshCw,
   Search,
   Settings,
   Sparkles,
+  Square,
   SquareTerminal,
   StickyNote,
   Sun,
@@ -182,7 +183,20 @@ function PaletteBody({ close }: { close: () => void }) {
       if (chat.status === "working" || chat.status === "needs-you")
         action("stop", `Stop: ${chat.title}`, <Square size={14} />, () => void ws.interrupt(chat.id));
       action("compose", `Write to ${chat.title}`, <MessageSquare size={14} />, () => useWorkspace.setState({ focusComposer: chat.id }));
+      if (!chat.role && chat.agentId !== "fake" && ws.agents.find((a) => a.id === chat.agentId)?.kind === "structured")
+        action(
+          "tools",
+          `${chat.workspaceTools ? "Remove" : "Give"} workspace tools: ${chat.title}`,
+          <Network size={14} />,
+          () => void ws.setWorkspaceTools(chat.id, !chat.workspaceTools),
+        );
     }
+    const conductor = Object.values(ws.chats).find((c) => c.summary.role === "conductor")?.summary;
+    if (conductor)
+      action("conductor", "Ask the Conductor", <Network size={14} />, () => {
+        ws.focusChat(conductor.id);
+        useWorkspace.setState({ focusComposer: conductor.id });
+      });
     for (const a of ws.agents.filter((x) => x.installed && (x.id !== "fake" || ws.demoInProjects))) {
       action(`chat-${a.id}`, `New chat with ${a.displayName}`, <Bot size={14} />, () => void newChat(a.id));
     }
@@ -254,13 +268,13 @@ function PaletteBody({ close }: { close: () => void }) {
         });
       }
     }
-    for (const s of ["Agents", "Notifications"]) {
+    for (const s of ["Agents", "Conductor", "Connections", "Skills", "Appearance", "Notifications"] as const) {
       out.push({
         id: `s:${s}`,
         group: "Settings",
         label: `Settings: ${s}`,
         icon: <Settings size={14} />,
-        run: run(() => ws.setSettingsOpen(true)),
+        run: run(() => ws.setSettingsOpen(true, s)),
       });
     }
     for (const d of deleted) {

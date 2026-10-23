@@ -4,16 +4,27 @@ import type { Appearance, Theme } from "@latis/shared";
 import { ACCENTS } from "./useAppearance";
 import { Button, Dialog, cn } from "@latis/ui";
 import { latis } from "../api";
-import { useWorkspace } from "../stores/workspace";
+import { useWorkspace, type SettingsSection } from "../stores/workspace";
 import { AgentList } from "./AgentList";
+import { ConductorSection, ConnectionsSection, SkillsSection } from "./SettingsOrchestration";
 
-const sections = ["Agents", "Appearance", "Notifications"] as const;
+const sections: SettingsSection[] = ["Agents", "Conductor", "Connections", "Skills", "Appearance", "Notifications"];
+const BODY: Record<SettingsSection, () => React.ReactNode> = {
+  Agents: AgentsSection,
+  Conductor: ConductorSection,
+  Connections: ConnectionsSection,
+  Skills: SkillsSection,
+  Appearance: AppearanceSection,
+  Notifications: NotificationsSection,
+};
 
-/** Settings (§8.11): Agents, Appearance and Notifications so far; the rest come with their milestones. */
+/** Settings (§8.11). Permissions, accounts and the rest come with their milestones. */
 export function SettingsDialog() {
   const open = useWorkspace((s) => s.settingsOpen);
   const setOpen = useWorkspace((s) => s.setSettingsOpen);
-  const [section, setSection] = useState<(typeof sections)[number]>("Agents");
+  const section = useWorkspace((s) => s.settingsSection);
+  const setSection = (settingsSection: SettingsSection) => useWorkspace.setState({ settingsSection });
+  const Body = BODY[section];
   return (
     <Dialog open={open} onOpenChange={setOpen} title="Settings" width={720}>
       <div className="flex gap-4">
@@ -32,7 +43,7 @@ export function SettingsDialog() {
           ))}
         </nav>
         <div className="min-w-0 flex-1">
-          {section === "Agents" ? <AgentsSection /> : section === "Appearance" ? <AppearanceSection /> : <NotificationsSection />}
+          <Body />
         </div>
       </div>
     </Dialog>
