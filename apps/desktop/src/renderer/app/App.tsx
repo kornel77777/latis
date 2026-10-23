@@ -38,12 +38,16 @@ export function App() {
         // §8.8 command palette.
         e.preventDefault();
         useWorkspace.setState((s) => ({ paletteOpen: !s.paletteOpen }));
-      } else if (mod && e.key.toLowerCase() === "b") {
+      } else if (mod && !e.shiftKey && e.key.toLowerCase() === "b") {
         e.preventDefault();
         useWorkspace.getState().toggleSidebar();
       } else if (mod && e.code === "Backquote") {
         e.preventDefault();
         useWorkspace.getState().toggleDock();
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === "b") {
+        // §9.7 dock browser.
+        e.preventDefault();
+        useWorkspace.setState({ dockOpen: true, dockTab: "Browser" });
       } else if (mod && e.shiftKey && e.key.toLowerCase() === "f") {
         // §8.7 distraction-free.
         e.preventDefault();

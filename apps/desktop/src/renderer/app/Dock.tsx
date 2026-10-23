@@ -4,11 +4,13 @@ import { cn } from "@latis/ui";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkspace } from "../stores/workspace";
 import { TerminalView, type TerminalHandle } from "../terminal/TerminalView";
+import { BrowserPanel } from "./BrowserPanel";
 
 const tabs = ["Terminal", "Browser", "Files", "Diff"] as const;
 
 export function Dock() {
-  const [tab, setTab] = useState<(typeof tabs)[number]>("Terminal");
+  const tab = useWorkspace((s) => s.dockTab);
+  const setTab = (t: (typeof tabs)[number]) => useWorkspace.setState({ dockTab: t });
   return (
     <aside className="flex w-[480px] shrink-0 flex-col border-l border-line bg-bg-0" aria-label="Dock">
       <div role="tablist" className="flex gap-0.5 border-b border-line p-1.5">
@@ -27,7 +29,15 @@ export function Dock() {
           </button>
         ))}
       </div>
-      {tab === "Terminal" ? <Terminals /> : <div className="p-4 text-[12px] text-text-3">{tab} arrives in a later milestone.</div>}
+      {tab === "Terminal" ? (
+        <Terminals />
+      ) : tab === "Browser" ? (
+        <BrowserPanel />
+      ) : (
+        <div className="p-4 text-[12px] text-text-3">
+          {tab === "Diff" ? "Diffs open in the Review panel (Ctrl/⌘+Shift+R)." : "The file viewer comes later."}
+        </div>
+      )}
     </aside>
   );
 }

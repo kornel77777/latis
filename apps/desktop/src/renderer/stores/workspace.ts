@@ -6,6 +6,8 @@ import {
   type AgentModel,
   type AttentionItem,
   type FocusView,
+  type BrowserState,
+  type ImageAttachment,
   type Prefs,
   type PtyInfo,
   type QueuedMessage,
@@ -89,6 +91,10 @@ interface WorkspaceState {
   activeView: string | null;
   /** Distraction-free: no sidebar, tabs or status bar (Ctrl/⌘+Shift+F). */
   zen: boolean;
+  dockTab: "Terminal" | "Browser" | "Files" | "Diff";
+  browser: BrowserState | null;
+  /** Images waiting in a chat's composer (pasted, or from the element picker). */
+  attachments: Record<string, ImageAttachment[]>;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -106,7 +112,7 @@ interface WorkspaceState {
   }): Promise<string | null>;
   focusNode(nodeId: string): void;
   loadTranscript(chatId: string): Promise<void>;
-  send(chatId: string, text: string): Promise<void>;
+  send(chatId: string, text: string, images?: ImageAttachment[]): Promise<void>;
   respond(chatId: string, requestId: string, response: RespondPayload): Promise<void>;
   interrupt(chatId: string): Promise<void>;
   restart(chatId: string): Promise<void>;
@@ -119,7 +125,7 @@ interface WorkspaceState {
   toggleDock(): void;
   setSidebarTab(tab: WorkspaceState["sidebarTab"]): void;
   /** Composer submit while a turn runs: steer or queue (§9.9). */
-  steer(chatId: string, text: string): Promise<void>;
+  steer(chatId: string, text: string, images?: ImageAttachment[]): Promise<void>;
   editQueued(chatId: string, id: string, text: string): Promise<void>;
   removeQueued(chatId: string, id: string): Promise<void>;
   sendNow(chatId: string, id: string): Promise<void>;
@@ -298,6 +304,9 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   views: [],
   activeView: null,
   zen: false,
+  dockTab: "Terminal",
+  browser: null,
+  attachments: {},
 
   async load() {
     try {
@@ -462,10 +471,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     });
   },
 
-  async send(chatId, text) {
+  async send(chatId, text, images) {
     let turn: Turn;
     try {
-      turn = await latis.invoke("chat:send", { chatId, text });
+      turn = await latis.invoke("chat:send", { chatId, text, ...(images?.length && { images }) });
     } catch (err) {
       get().toast(`Message not sent: ${errorText(err)}`);
       return;
@@ -512,9 +521,9 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   toggleDock: () => set((s) => ({ dockOpen: !s.dockOpen })),
   setSidebarTab: (tab) => set({ sidebarTab: tab, sidebarOpen: true }),
 
-  async steer(chatId, text) {
+  async steer(chatId, text, images) {
     try {
-      const r = await latis.invoke("chat:steer", { chatId, text });
+      const r = await latis.invoke("chat:steer", { chatId, text, ...(images?.length && { images }) });
       set((s) => ({ queues: { ...s.queues, [chatId]: r.queue } }));
       if (r.delivered === "sent") await get().loadTranscript(chatId);
     } catch (err) {
@@ -571,6 +580,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       ptys: s.ptys.some((p) => p.id === info.id) ? s.ptys.map((p) => (p.id === info.id ? info : p)) : [...s.ptys, info],
       activePty: info.id,
       dockOpen: true,
+      dockTab: "Terminal",
     }));
   },
   async closePty(id) {
@@ -922,6 +932,10 @@ export function subscribeToMain(): void {
     if (!parsed.success) return console.warn("dropped invalid chat:queue payload");
     const { chatId, queue } = parsed.data;
     useWorkspace.setState((s) => ({ queues: { ...s.queues, [chatId]: queue } }));
+  });
+  latis.on("browser:state", (raw) => {
+    const parsed = eventContract["browser:state"].safeParse(raw);
+    if (parsed.success) useWorkspace.setState({ browser: parsed.data });
   });
   latis.on("reviews:changed", (raw) => {
     const parsed = eventContract["reviews:changed"].safeParse(raw);

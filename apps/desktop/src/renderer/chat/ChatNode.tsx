@@ -19,7 +19,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { QueuedMessage } from "@latis/shared";
+import type { ImageAttachment, QueuedMessage } from "@latis/shared";
 import { buildTranscript } from "@latis/shared";
 import { Button, Menu, MenuItem, MenuSeparator, StatusDot, cn } from "@latis/ui";
 import { useZoomLevel } from "../canvas/zoom";
@@ -57,9 +57,10 @@ export const FullChat = memo(function FullChat({
   const { send, steer, respond, interrupt, restart, setChatOptions, reveal, openAsTerminal, markSeen } = useWorkspace.getState();
   const items = useMemo(() => (chat ? buildTranscript(chat.turns, chat.events) : []), [chat]);
   // Drafts live in the store so they survive the card unmounting (zoom, off-screen virtualisation).
-  const [draft, setDraftState] = useState(() => useWorkspace.getState().drafts[chatId] ?? "");
+  // Draft and images live in the store: they survive unmounting, and the element picker can add to them.
+  const draft = useWorkspace((st) => st.drafts[chatId] ?? "");
+  const images = useWorkspace((st) => st.attachments[chatId]);
   const setDraft = (text: string) => {
-    setDraftState(text);
     useWorkspace.setState((st) => ({ drafts: { ...st.drafts, [chatId]: text } }));
   };
   const [editingTitle, setEditingTitle] = useState(false);
@@ -95,12 +96,15 @@ export const FullChat = memo(function FullChat({
   const terminalAgent = agent?.kind === "terminal";
   const unenforced = !terminalAgent && s.permissionMode === "full-auto" && (agent?.unenforceable ?? []).includes("full-auto");
 
+  const setImages = (list: ImageAttachment[]) => useWorkspace.setState((st) => ({ attachments: { ...st.attachments, [chatId]: list } }));
   const submit = () => {
     const text = draft.trim();
     if (!text) return;
+    const attached = images ?? [];
     setDraft("");
+    setImages([]);
     // Mid-turn messages steer the agent or wait in the queue (§9.9).
-    const sent = working ? steer(chatId, text) : send(chatId, text);
+    const sent = working ? steer(chatId, text, attached) : send(chatId, text, attached);
     void sent.then(() => list.current?.scrollToIndex({ index: "LAST", behavior: "auto" }));
   };
 
@@ -306,9 +310,36 @@ export const FullChat = memo(function FullChat({
             <footer className="nodrag shrink-0 border-t border-line p-2">
               {queue && queue.length > 0 && <QueueList chatId={chatId} queue={queue} />}
               <div className="rounded-control border border-line bg-bg-1 focus-within:border-line-strong">
+                {images && images.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 px-2 pt-2" aria-label="Attached images" data-testid="attachments">
+                    {images.map((img, i) => (
+                      <div key={i} className="group relative h-12 w-16 overflow-hidden rounded-[6px] border border-line">
+                        <img
+                          src={`data:${img.mime};base64,${img.dataBase64}`}
+                          alt={`Attachment ${i + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          aria-label={`Remove attachment ${i + 1}`}
+                          className="absolute right-0.5 top-0.5 rounded bg-bg-0/80 p-0.5 text-text-1 opacity-0 group-hover:opacity-100"
+                          onClick={() => setImages(images.filter((_, j) => j !== i))}
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <textarea
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
+                  onPaste={(e) => {
+                    // Pasted images become attachments (§8.5).
+                    const files = [...e.clipboardData.files].filter((f) => /^image\/(png|jpeg|gif|webp)$/.test(f.type));
+                    if (!files.length) return;
+                    e.preventDefault();
+                    void Promise.all(files.map(readImage)).then((list) => setImages([...(images ?? []), ...list]));
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
@@ -361,6 +392,15 @@ export const FullChat = memo(function FullChat({
     </>
   );
 });
+
+function readImage(file: File): Promise<ImageAttachment> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve({ mime: file.type as ImageAttachment["mime"], dataBase64: String(r.result).split(",")[1] ?? "" });
+    r.onerror = () => reject(r.error ?? new Error("couldn't read the image"));
+    r.readAsDataURL(file);
+  });
+}
 
 /** Messages waiting for the turn to end, pinned above the composer (§9.9 AC1, AC3). */
 function QueueList({ chatId, queue }: { chatId: string; queue: QueuedMessage[] }) {

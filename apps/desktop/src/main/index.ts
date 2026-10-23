@@ -8,6 +8,7 @@ import type { AttentionItem, FocusView, PermissionMode, Prefs, RequestResponse, 
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
 import { SessionSupervisor } from "./agents/supervisor";
+import { BrowserDock, detectDevPorts } from "./browser/browser-dock";
 import { Changes } from "./git/changes";
 import { git } from "./git/git";
 import { EventCoalescer } from "./ipc/coalescer";
@@ -86,6 +87,11 @@ const notifier = new Notifier({
     void supervisor.respond(item.chatId, item.refId, { kind: "permission", decision: allow ? "allow-once" : "deny" });
   },
 });
+
+const browserDock = new BrowserDock(
+  () => win,
+  (state) => emit(win?.webContents, "browser:state", state),
+);
 
 const changes = new Changes(store, dataDir, {
   reviews: (items) => emit(win?.webContents, "reviews:changed", items),
@@ -263,8 +269,8 @@ registerHandlers({
     eventLog.flush();
     return store.transcript(chatId);
   },
-  "chat:send": ({ chatId, text }) => supervisor.send(chatId, text),
-  "chat:steer": ({ chatId, text }) => supervisor.steer(chatId, text),
+  "chat:send": ({ chatId, text, images }) => supervisor.send(chatId, text, images),
+  "chat:steer": ({ chatId, text, images }) => supervisor.steer(chatId, text, images),
   "chat:queue": ({ chatId }) => supervisor.queueOf(chatId),
   "chat:queueEdit": ({ chatId, id, text }) => supervisor.editQueued(chatId, id, text),
   "chat:queueRemove": ({ chatId, id }) => supervisor.removeQueued(chatId, id),
@@ -451,6 +457,26 @@ registerHandlers({
     store.setSetting("focusViews", views);
     return { ok: true };
   },
+  "browser:bounds": ({ visible, ...b }) => {
+    browserDock.setBounds({ x: Math.round(b.x), y: Math.round(b.y), width: Math.round(b.width), height: Math.round(b.height) }, visible);
+    return { ok: true };
+  },
+  "browser:navigate": async ({ url }) => {
+    await browserDock.navigate(url);
+    return browserDock.state();
+  },
+  "browser:nav": (action) => {
+    if (action === "back") browserDock.back();
+    else if (action === "forward") browserDock.forward();
+    else browserDock.reload();
+    return { ok: true };
+  },
+  "browser:device": async (device) => {
+    await browserDock.setDevice(device);
+    return { ok: true };
+  },
+  "browser:detect": () => detectDevPorts(),
+  "browser:pick": () => browserDock.pick(),
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };

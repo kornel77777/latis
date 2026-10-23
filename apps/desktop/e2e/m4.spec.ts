@@ -206,3 +206,68 @@ test("focus mode: selected chats fill the screen in grid, stage and columns; sav
   await expect(page.getByLabel("Sidebar")).toHaveCount(1);
   await app.close();
 });
+
+test("browser dock: dev-server detection, nothing-running page, and the element picker into a chat", async () => {
+  const http = await import("node:http");
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(
+      `<!doctype html><title>Shop</title><body style="margin:0"><button id="buy" class="cta big" style="margin:40px;padding:12px 20px;background:#0f9f8f;color:white;border-radius:8px">Buy now</button></body>`,
+    );
+  });
+  // 3009: one of the ports Latis scans (§9.7 AC1); skip detection if something else already uses it.
+  const port = await new Promise<number>((resolve) => {
+    server.once("error", () => server.listen(0, "127.0.0.1", () => resolve((server.address() as { port: number }).port)));
+    server.listen(3009, "127.0.0.1", () => resolve(3009));
+  });
+  const { app, page } = await launch(tempDataDir());
+  await demoChats(page, 1);
+  await page.keyboard.press("ControlOrMeta+Shift+b");
+  const panel = page.getByTestId("browser-panel");
+  await expect(panel).toBeVisible();
+
+  // Nothing listening → a clear page with a way out (§9.7 AC4).
+  await panel.getByTestId("browser-url").fill("localhost:3999");
+  await panel.getByTestId("browser-url").press("Enter");
+  await expect(panel.getByTestId("browser-error")).toContainText("Nothing running on :3999");
+
+  await panel.getByTestId("browser-url").fill(`localhost:${port}`);
+  await panel.getByTestId("browser-url").press("Enter");
+  await expect(panel.getByTestId("browser-error")).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          document.querySelector("[data-testid=browser-url]")?.getAttribute("value") ??
+          (document.querySelector("[data-testid=browser-url]") as HTMLInputElement).value,
+      ),
+    )
+    .toContain(`${port}`);
+  if (port === 3009) await expect(panel).toContainText(":3009");
+
+  // Pick: start picking, then "click" the button inside the page through Electron's input events.
+  await panel.getByTestId("pick-element").click();
+  await expect(panel.getByTestId("pick-element")).toContainText("Click an element");
+  await app.evaluate(async ({ webContents }, p) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().includes(`:${p}`))!;
+    const r = (await wc.executeJavaScript(
+      `(() => { const b = document.getElementById("buy").getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`,
+    )) as { x: number; y: number };
+    wc.sendInputEvent({ type: "mouseMove", x: Math.round(r.x), y: Math.round(r.y) });
+    await new Promise((res) => setTimeout(res, 100));
+    wc.sendInputEvent({ type: "mouseDown", x: Math.round(r.x), y: Math.round(r.y), button: "left", clickCount: 1 });
+    wc.sendInputEvent({ type: "mouseUp", x: Math.round(r.x), y: Math.round(r.y), button: "left", clickCount: 1 });
+  }, port);
+  const picked = panel.getByTestId("picked");
+  await expect(picked).toContainText("#buy");
+  await expect(picked.locator("img")).toBeVisible();
+  await picked.getByTestId("send-picked").click();
+  await page.getByRole("menuitem", { name: "Demo chat" }).click();
+
+  // The chat's composer has the element's HTML, selector and styles, plus its screenshot.
+  const chat = page.getByTestId("chat-card").first();
+  await expect(chat.getByTestId("composer")).toHaveValue(/Selector: `#buy`[\s\S]*<button id="buy"[\s\S]*background-color/);
+  await expect(chat.getByTestId("attachments").locator("img")).toHaveCount(1);
+  await app.close();
+  server.close();
+});

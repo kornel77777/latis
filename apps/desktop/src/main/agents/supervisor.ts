@@ -13,6 +13,7 @@ import {
   type RequestResponse,
   type StoredEvent,
   type Turn,
+  type UserTurn,
 } from "@latis/shared";
 import type { EventLog } from "../store/event-log";
 import type { ChatOptionsPatch, WorkspaceStore } from "../store/workspace";
@@ -66,7 +67,7 @@ export class SessionSupervisor {
   /** Chats with an open permission/question/plan item; the next agent event means it was answered. */
   private openRequests = new Set<string>();
   /** "Send now": the message to send once the interrupted turn has ended. */
-  private sendAfterInterrupt = new Map<string, string>();
+  private sendAfterInterrupt = new Map<string, QueuedMessage>();
   /** The latest assistant text per chat, for the "finished" item. */
   private lastMessage = new Map<string, string>();
   private streamed = new Map<string, string>();
@@ -86,7 +87,7 @@ export class SessionSupervisor {
     this.notes.set(chatId, [...(this.notes.get(chatId) ?? []), text]);
   }
 
-  async send(chatId: string, text: string): Promise<Turn> {
+  async send(chatId: string, text: string, images?: UserTurn["images"]): Promise<Turn> {
     this.resolve(chatId, { kinds: ["finished", "error", "rate_limited"] });
     this.lastMessage.delete(chatId);
     this.streamed.delete(chatId);
@@ -114,7 +115,7 @@ export class SessionSupervisor {
     this.notes.delete(chatId);
     // Notes reach the agent but not the transcript, which shows what the user typed.
     const forAgent = notes?.length ? `${notes.map((n) => `[Note from Latis] ${n}`).join("\n")}\n\n${text}` : text;
-    await live.session.send({ text: forAgent });
+    await live.session.send({ text: forAgent, ...(images?.length && { images }) });
     return turn;
   }
 
@@ -122,13 +123,18 @@ export class SessionSupervisor {
    * A message typed while a turn runs (§9.9): delivered at the agent's next step when it
    * supports steering, otherwise queued until the turn ends. With no turn running it's a normal send.
    */
-  async steer(chatId: string, text: string): Promise<{ delivered: "steered" | "queued" | "sent"; queue: QueuedMessage[] }> {
+  async steer(
+    chatId: string,
+    text: string,
+    images?: UserTurn["images"],
+  ): Promise<{ delivered: "steered" | "queued" | "sent"; queue: QueuedMessage[] }> {
     const live = this.live.get(chatId);
     if (!live?.turnId) {
-      await this.send(chatId, text);
+      await this.send(chatId, text, images);
       return { delivered: "sent", queue: this.queueOf(chatId) };
     }
-    if (live.session.steer) {
+    // Steering carries text only; a message with images waits for the turn to end.
+    if (live.session.steer && !images?.length) {
       try {
         await live.session.steer(text);
         this.sinks.event(this.log.append(chatId, live.turnId, { type: "user.steered", text }));
@@ -137,7 +143,7 @@ export class SessionSupervisor {
         console.warn("[supervisor] steer failed; queueing instead", err);
       }
     }
-    const queue = [...this.queueOf(chatId), { id: randomUUID(), text, createdAt: Date.now() }];
+    const queue = [...this.queueOf(chatId), { id: randomUUID(), text, createdAt: Date.now(), ...(images?.length && { images }) }];
     this.setQueue(chatId, queue);
     return { delivered: "queued", queue };
   }
@@ -165,10 +171,10 @@ export class SessionSupervisor {
     this.removeQueued(chatId, id);
     const live = this.live.get(chatId);
     if (!live?.turnId) {
-      await this.send(chatId, item.text);
+      await this.send(chatId, item.text, item.images);
       return true;
     }
-    this.sendAfterInterrupt.set(chatId, item.text);
+    this.sendAfterInterrupt.set(chatId, item);
     await live.session.interrupt();
     return true;
   }
@@ -415,7 +421,7 @@ export class SessionSupervisor {
   /** Sends what's waiting once a turn is over: "Send now" first, then the queue (only after a clean finish). */
   private afterTurn(chatId: string, status: "ok" | "interrupted" | "error") {
     const now = this.sendAfterInterrupt.get(chatId);
-    let next: string | undefined;
+    let next: QueuedMessage | undefined;
     if (now !== undefined) {
       this.sendAfterInterrupt.delete(chatId);
       next = now;
@@ -423,12 +429,15 @@ export class SessionSupervisor {
       const [head, ...rest] = this.queueOf(chatId);
       if (head) {
         this.setQueue(chatId, rest);
-        next = head.text;
+        next = head;
       }
     }
     if (next !== undefined) {
-      const text = next;
-      setTimeout(() => void this.send(chatId, text).catch((err: unknown) => console.error("[supervisor] queued send failed", err)), 0);
+      const msg = next;
+      setTimeout(
+        () => void this.send(chatId, msg.text, msg.images).catch((err: unknown) => console.error("[supervisor] queued send failed", err)),
+        0,
+      );
     }
   }
 

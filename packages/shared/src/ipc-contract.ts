@@ -118,7 +118,13 @@ export const AttentionItem = z.object({
 export type AttentionItem = z.infer<typeof AttentionItem>;
 
 /** A message waiting for the running turn to end (§9.9). */
-export const QueuedMessage = z.object({ id: z.string(), text: z.string(), createdAt: z.number() });
+export const QueuedMessage = z.object({
+  id: z.string(),
+  text: z.string(),
+  createdAt: z.number(),
+  /** Images queued with the message (base64), sent when it goes out. */
+  images: z.array(z.object({ mime: z.string(), dataBase64: z.string() })).optional(),
+});
 export type QueuedMessage = z.infer<typeof QueuedMessage>;
 
 export const PtyInfo = z.object({
@@ -144,6 +150,23 @@ export const FocusView = z.object({
   stageId: z.string().optional(),
 });
 export type FocusView = z.infer<typeof FocusView>;
+
+export const BrowserState = z.object({
+  url: z.string(),
+  title: z.string(),
+  loading: z.boolean(),
+  canGoBack: z.boolean(),
+  canGoForward: z.boolean(),
+  error: z.object({ code: z.number(), description: z.string(), url: z.string() }).nullable(),
+});
+export type BrowserState = z.infer<typeof BrowserState>;
+
+export const ImageAttachment = z.object({
+  mime: z.enum(["image/png", "image/jpeg", "image/gif", "image/webp"]),
+  /** base64 without the data: prefix. ~10 MB cap. */
+  dataBase64: z.string().max(14_000_000),
+});
+export type ImageAttachment = z.infer<typeof ImageAttachment>;
 
 export const Prefs = z.object({
   onboarded: z.boolean(),
@@ -294,7 +317,10 @@ export const invokeContract = {
     res: z.object({ node: CanvasNode, chat: ChatSummary, frame: NodeGeometry.nullable() }),
   },
   "chat:transcript": { req: z.object({ chatId: z.string() }), res: Transcript },
-  "chat:send": { req: z.object({ chatId: z.string(), text: z.string().min(1) }), res: Turn },
+  "chat:send": {
+    req: z.object({ chatId: z.string(), text: z.string().min(1), images: z.array(ImageAttachment).max(8).optional() }),
+    res: Turn,
+  },
   "chat:respond": { req: z.object({ chatId: z.string(), requestId: z.string(), response: RespondPayload }), res: ok },
   "chat:interrupt": { req: z.object({ chatId: z.string() }), res: ok },
   "chat:restart": { req: z.object({ chatId: z.string() }), res: ok },
@@ -311,7 +337,7 @@ export const invokeContract = {
   "chat:reveal": { req: z.object({ chatId: z.string(), path: z.string().optional() }), res: ok },
   /** While a turn runs: steer it when the agent can take it mid-turn, otherwise queue for after the turn (§9.9). */
   "chat:steer": {
-    req: z.object({ chatId: z.string(), text: z.string().min(1) }),
+    req: z.object({ chatId: z.string(), text: z.string().min(1), images: z.array(ImageAttachment).max(8).optional() }),
     res: z.object({ delivered: z.enum(["steered", "queued", "sent"]), queue: z.array(QueuedMessage) }),
   },
   "chat:queue": { req: z.object({ chatId: z.string() }), res: z.array(QueuedMessage) },
@@ -426,6 +452,29 @@ export const invokeContract = {
   "project:openFile": { req: z.object({ projectId: z.string(), path: z.string() }), res: ok },
   "views:get": { req: none, res: z.array(FocusView) },
   "views:set": { req: z.array(FocusView).max(30), res: ok },
+  /** Where the dock's browser area is, in window coordinates; hidden under dialogs and other dock tabs. */
+  "browser:bounds": {
+    req: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number(), visible: z.boolean() }),
+    res: ok,
+  },
+  "browser:navigate": { req: z.object({ url: z.string().min(1).max(4000) }), res: BrowserState },
+  "browser:nav": { req: z.enum(["back", "forward", "reload"]), res: ok },
+  "browser:device": { req: z.enum(["responsive", "phone", "phone-landscape", "tablet", "tablet-landscape"]), res: ok },
+  /** Local dev servers that are listening (§9.7 AC1). */
+  "browser:detect": { req: none, res: z.array(z.number()) },
+  /** Waits for a click on an element in the page; null if cancelled (§9.7 AC3). */
+  "browser:pick": {
+    req: none,
+    res: z
+      .object({
+        html: z.string(),
+        selector: z.string(),
+        styles: z.record(z.string(), z.string()),
+        imageBase64: z.string().nullable(),
+        url: z.string(),
+      })
+      .nullable(),
+  },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   "settings:getTheme": { req: none, res: Theme },
@@ -448,6 +497,7 @@ export const eventContract = {
   "focus:chat": z.object({ chatId: z.string() }),
   "agents:changed": z.array(AgentInfo),
   "reviews:changed": z.array(ReviewItem),
+  "browser:state": BrowserState,
   "chat:timeline": z.object({ chatId: z.string(), entries: z.array(TimelineEntry) }),
 } as const;
 
