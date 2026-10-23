@@ -1,0 +1,80 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Usage dashboard</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .agent {
+        margin-bottom: 12px;
+      }
+      .bar {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--line);
+        overflow: hidden;
+        margin: 3px 0 2px;
+      }
+      .bar div {
+        height: 100%;
+        background: var(--accent);
+      }
+      .bar div.hot {
+        background: #f59e0b;
+      }
+      .lim {
+        color: #f87171;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Agent usage</h1>
+    <div id="list" class="muted">Loading…</div>
+    <p class="muted" style="font-size: 11px">As each agent last reported it. "—" means the agent doesn't say.</p>
+    <script>
+      const NAMES = { "claude-code": "Claude Code", codex: "Codex", gemini: "Gemini CLI" };
+      const at = (iso) => new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+      async function show() {
+        const u = await latis.usage();
+        const root = document.getElementById("list");
+        const ids = Object.keys(u);
+        if (!ids.length) {
+          root.textContent = "No agent has reported usage yet.";
+          return;
+        }
+        root.innerHTML = "";
+        root.className = "";
+        for (const id of ids) {
+          const a = u[id];
+          const el = document.createElement("div");
+          el.className = "agent";
+          const h = document.createElement("div");
+          h.textContent = NAMES[id] ?? id;
+          el.appendChild(h);
+          if (a.limited) {
+            const l = document.createElement("div");
+            l.className = "lim";
+            l.textContent = a.limited.message + (a.limited.resetsAt ? " Resets " + at(a.limited.resetsAt) : "");
+            el.appendChild(l);
+          }
+          for (const w of a.windows) {
+            const pct = w.usedPct;
+            const row = document.createElement("div");
+            row.innerHTML = `<div class="bar"><div style="width:${pct ?? 0}%" class="${(pct ?? 0) >= 80 ? "hot" : ""}"></div></div><div class="muted" style="font-size:11px"></div>`;
+            row.lastChild.textContent = `${w.label}: ${pct === undefined ? "—" : pct + "%"}${w.resetsAt ? " · resets " + at(w.resetsAt) : ""}`;
+            el.appendChild(row);
+          }
+          if (!a.windows.length && !a.limited) {
+            const m = document.createElement("div");
+            m.className = "muted";
+            m.textContent = "—";
+            el.appendChild(m);
+          }
+          root.appendChild(el);
+        }
+      }
+      show();
+      setInterval(show, 60000);
+    </script>
+  </body>
+</html>

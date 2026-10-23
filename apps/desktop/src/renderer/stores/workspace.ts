@@ -115,6 +115,8 @@ interface WorkspaceState {
   usage: UsageState;
   /** Chat whose "Continue with…" dialog is open (§9.11). */
   handoffFor: string | null;
+  /** Where the card library (§12.3) will put the card it opens for; null = closed. */
+  cardLibraryAt: { x: number; y: number } | null;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -131,6 +133,8 @@ interface WorkspaceState {
     isolate?: boolean;
   }): Promise<string | null>;
   focusNode(nodeId: string): void;
+  /** Adds a node main created (a card), selected, and brings it into view. */
+  addNode(node: CanvasNode): void;
   /** Puts a chat main created onto the canvas, selects it and focuses its composer. */
   addCreatedChat(node: CanvasNode, chat: ChatSummary, frame: NodeGeometry | null, draft?: string): void;
   loadTranscript(chatId: string): Promise<void>;
@@ -343,6 +347,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   scheduled: [],
   usage: {},
   handoffFor: null,
+  cardLibraryAt: null,
 
   async load() {
     try {
@@ -495,6 +500,24 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       ...(draft && { drafts: { ...s.drafts, [chat.id]: draft } }),
       focusComposer: chat.id,
     }));
+    get().focusNode(node.id);
+  },
+
+  addNode(node) {
+    set((s) => ({
+      nodes: sortNodes([
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        { ...toFlowNode(node), selected: true, className: "latis-appear" },
+      ]),
+    }));
+    pushUndo({
+      label: "New card",
+      undo: () =>
+        get()
+          .deleteNodes([node.id])
+          .then(() => undefined),
+      redo: () => get().restoreNodes([node.id]),
+    });
     get().focusNode(node.id);
   },
 
@@ -1090,6 +1113,10 @@ export function subscribeToMain(): void {
   latis.on("usage:changed", (raw) => {
     const parsed = eventContract["usage:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ usage: parsed.data });
+  });
+  latis.on("card:data", (raw) => {
+    const parsed = eventContract["card:data"].safeParse(raw);
+    if (parsed.success) window.dispatchEvent(new CustomEvent("latis-card-data", { detail: parsed.data.cardId }));
   });
   latis.on("canvas:command", (raw) => {
     const parsed = eventContract["canvas:command"].safeParse(raw);

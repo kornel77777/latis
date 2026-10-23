@@ -1,0 +1,8 @@
+{
+  "habits": { "title": "Habit tracker", "description": "Tick off habits each day and keep streaks." },
+  "countdown": { "title": "Countdown", "description": "Days, hours and minutes to a date." },
+  "kanban": { "title": "Kanban", "description": "To do, doing, done. Drag cards between columns." },
+  "repo": { "title": "Repo dashboard", "description": "Open PRs, issues and checks for a GitHub repo, via the gh CLI." },
+  "usage": { "title": "Usage dashboard", "description": "Your agents' usage windows, from Latis." },
+  "pomodoro": { "title": "Pomodoro", "description": "25-minute focus timer with breaks." }
+}

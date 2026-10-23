@@ -41,7 +41,7 @@ export function BrowserPanel() {
       s.settingsOpen ||
       s.reviewPanel.open ||
       s.onboardingOpen ||
-      Boolean(s.mergeFor || s.timelineFor || s.isolateOffer || s.handoffFor),
+      Boolean(s.mergeFor || s.timelineFor || s.isolateOffer || s.handoffFor || s.cardLibraryAt),
   );
   const area = useRef<HTMLDivElement>(null);
   /** What the user is typing in the address bar; null shows the page's URL. */

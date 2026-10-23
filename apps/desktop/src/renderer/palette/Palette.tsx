@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { useReactFlow } from "@xyflow/react";
 import {
+  AppWindow,
   ArchiveRestore,
   Bot,
   File,
@@ -207,6 +208,9 @@ function PaletteBody({ close }: { close: () => void }) {
       <StickyNote size={14} />,
       () => void ws.createNote(flow.screenToFlowPosition({ x: window.innerWidth / 2 - 170, y: window.innerHeight / 2 - 130 })),
       "N",
+    );
+    action("card", "New card…", <AppWindow size={14} />, () =>
+      useWorkspace.setState({ cardLibraryAt: flow.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }) }),
     );
     action("folder", "Open folder as project…", <FolderOpen size={14} />, () => void openFolder());
     action("terminal", "New terminal", <SquareTerminal size={14} />, () => void ws.newTerminal(activeProject ?? null), "Ctrl `");

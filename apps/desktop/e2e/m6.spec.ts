@@ -1,7 +1,7 @@
 /// <reference lib="dom" />
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { LatisApi } from "@latis/shared";
@@ -89,5 +89,84 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   const codexCard = again.page.locator("[data-testid='chat-card'][data-agent='codex']");
   await codexCard.getByRole("button", { name: "Cancel scheduled message" }).click();
   await expect(codexCard.getByTestId("scheduled")).toHaveCount(0);
+  await again.app.close();
+});
+
+test("cards: a starter card runs isolated (no network, no Latis access), keeps its data, and refreshes only after approval", async () => {
+  const dataDir = tempDataDir();
+  const { app, page } = await launch(dataDir);
+  await page.locator(".react-flow__pane").click({ button: "right", position: { x: 400, y: 300 } });
+  await page.getByTestId("menu-new-card").click();
+  await page.getByTestId("card-library").getByText("Habit tracker").click();
+  const card = page.getByTestId("card");
+  await expect(card).toHaveCount(1);
+  const frame = page.frameLocator("[data-testid='card-frame']");
+  await expect(frame.getByText("Read 20 minutes")).toBeVisible();
+  await page.waitForTimeout(500); // the canvas pans to the new card first
+  await frame.getByPlaceholder("New habit").fill("Stretch");
+  await frame.getByRole("button", { name: "Add" }).click();
+  await expect(frame.getByText("Stretch")).toBeVisible();
+
+  // Isolation (§12.1): opaque origin, no network, nothing of Latis reachable.
+  const f = page.frames().find((x) => x.url().startsWith("card://"))!;
+  const probe = await f.evaluate(async () => {
+    const tryIt = async (fn: () => unknown) => {
+      try {
+        await fn();
+        return "allowed";
+      } catch {
+        return "blocked";
+      }
+    };
+    return {
+      origin: self.origin, // the security origin; location.origin is the URL's
+      fetch: await tryIt(() => fetch("https://example.com")),
+      storage: await tryIt(() => localStorage.getItem("x")),
+      parentDom: await tryIt(() => (parent as unknown as { document: Document }).document.title),
+      latisApi: await tryIt(() => {
+        if (!(parent as unknown as { latis?: unknown }).latis) throw new Error("absent");
+      }),
+    };
+  });
+  expect(probe).toEqual({ origin: "null", fetch: "blocked", storage: "blocked", parentDom: "blocked", latisApi: "blocked" });
+
+  // Its data survives a restart.
+  await app.close();
+  const again = await launch(dataDir);
+  await expect(again.page.frameLocator("[data-testid='card-frame']").getByText("Stretch")).toBeVisible({ timeout: 10_000 });
+
+  // The repo dashboard's refresh script runs only after the user approves it, and its output lands in the card.
+  await again.page.locator(".react-flow__pane").click({ button: "right", position: { x: 900, y: 600 } });
+  await again.page.getByTestId("menu-new-card").click();
+  await again.page.getByTestId("card-library").getByText("Repo dashboard").click();
+  await again.page.waitForTimeout(500);
+  const asked: string[] = [];
+  await again.app.evaluate(({ dialog }) => {
+    (globalThis as unknown as { asked: string[] }).asked = [];
+    dialog.showMessageBox = (async (...a: unknown[]) => {
+      const o = a.find((x) => x && typeof x === "object" && "message" in (x as object)) as { message: string };
+      (globalThis as unknown as { asked: string[] }).asked.push(o.message);
+      return { response: 0, checkboxChecked: false };
+    }) as typeof dialog.showMessageBox;
+  });
+  const repo = again.page.frameLocator("[data-card-id] iframe").nth(1);
+  await repo.getByPlaceholder("owner/repo").fill("not a repo");
+  await repo.getByRole("button", { name: "Refresh" }).click();
+  await expect(repo.getByText("Type a repo as owner/name, then Refresh.")).toBeVisible({ timeout: 15_000 });
+  asked.push(...(await again.app.evaluate(() => (globalThis as unknown as { asked: string[] }).asked)));
+  expect(asked).toEqual(['Let "Repo dashboard" run its refresh script?']);
+  // Approved once: the same script doesn't ask again.
+  await repo.getByRole("button", { name: "Refresh" }).click();
+  await again.page.waitForTimeout(1500);
+  expect(await again.app.evaluate(() => (globalThis as unknown as { asked: string[] }).asked.length)).toBe(1);
+
+  // Export as PDF renders the card (with its data) to A4.
+  const pdf = join(dataDir, "repo.pdf");
+  await again.app.evaluate(({ dialog }, f) => {
+    dialog.showSaveDialog = (async () => ({ canceled: false, filePath: f })) as typeof dialog.showSaveDialog;
+  }, pdf);
+  await again.page.getByRole("button", { name: "Card menu" }).last().click();
+  await again.page.getByRole("menuitem", { name: "Export as PDF…" }).click();
+  await expect.poll(() => existsSync(pdf) && readFileSync(pdf).subarray(0, 5).toString(), { timeout: 15_000 }).toBe("%PDF-");
   await again.app.close();
 });

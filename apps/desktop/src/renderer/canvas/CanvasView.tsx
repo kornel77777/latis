@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { Background, BackgroundVariant, MiniMap, ReactFlow, useReactFlow, useViewport, type NodeTypes } from "@xyflow/react";
-import { FolderOpen, LayoutGrid, Sparkles, StickyNote } from "lucide-react";
+import { AppWindow, FolderOpen, LayoutGrid, Sparkles, StickyNote } from "lucide-react";
 import { Button, cn } from "@latis/ui";
 import { ChatNode } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
 import { Checklist } from "../app/Checklist";
 import { NoteNode } from "./NoteNode";
+import { CardNode } from "./CardNode";
 import { ProjectFrame } from "./ProjectFrame";
 import { useCanvasActions } from "./useCanvasActions";
 
-const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame, note: NoteNode };
+const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame, note: NoteNode, card: CardNode };
 
 let visibleTimer: ReturnType<typeof setTimeout> | null = null;
 /** Tells main which chats are on screen, so it can skip their notifications while Latis is focused (§8.6). */
@@ -216,6 +217,17 @@ export function CanvasView() {
             data-testid="menu-new-note"
           >
             <StickyNote size={13} /> New note <kbd className="ml-auto font-mono text-[11px] text-text-3">N</kbd>
+          </button>
+          <button
+            role="menuitem"
+            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            onClick={() => {
+              useWorkspace.setState({ cardLibraryAt: flow.screenToFlowPosition(menu) });
+              setMenu(null);
+            }}
+            data-testid="menu-new-card"
+          >
+            <AppWindow size={13} /> New card…
           </button>
           <button
             role="menuitem"

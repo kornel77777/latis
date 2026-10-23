@@ -653,6 +653,18 @@ export const invokeContract = {
     req: z.object({ chatId: z.string(), agentId: z.string(), brief: z.string().min(1) }),
     res: z.object({ node: CanvasNode, chat: ChatSummary, frame: NodeGeometry.nullable() }),
   },
+  /** A card's bridge call (§12.2), relayed by the renderer after checking which frame sent it. */
+  "card:call": {
+    req: z.object({
+      cardId: z.string(),
+      method: z.enum(["data.get", "data.set", "data.list", "refresh", "sendToFlow", "exportPdf", "requestNetwork", "usage"]),
+      args: z.array(z.unknown()).max(4),
+    }),
+    res: z.unknown(),
+  },
+  "card:library": { req: none, res: z.array(z.object({ id: z.string(), title: z.string(), description: z.string() })) },
+  "card:create": { req: z.object({ canvasId: z.string(), starter: z.string(), x: z.number(), y: z.number() }), res: CanvasNode },
+  "card:openFolder": { req: z.object({ cardId: z.string() }), res: ok },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */
@@ -688,6 +700,8 @@ export const eventContract = {
     reveal: z.string().nullable(),
   }),
   "schedule:changed": z.array(ScheduledMessage),
+  /** A card's data changed outside the card (refresh, flows); the card is told to re-read it. */
+  "card:data": z.object({ cardId: z.string() }),
   "usage:changed": UsageState,
   /** The workspace tools opened a focus view or asked for a canvas action. */
   "canvas:command": z.discriminatedUnion("type", [

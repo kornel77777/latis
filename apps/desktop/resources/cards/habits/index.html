@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Habit tracker</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 8px;
+      }
+      th,
+      td {
+        padding: 4px;
+        text-align: center;
+        border-bottom: 1px solid var(--line);
+      }
+      th:first-child,
+      td:first-child {
+        text-align: left;
+      }
+      td button {
+        width: 22px;
+        height: 22px;
+        padding: 0;
+      }
+      td button.on {
+        background: var(--accent);
+        border-color: transparent;
+      }
+      .streak {
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Habits</h1>
+    <form id="add" class="row"><input id="name" placeholder="New habit" style="flex: 1" /><button class="primary">Add</button></form>
+    <table>
+      <thead id="head"></thead>
+      <tbody id="body"></tbody>
+    </table>
+    <script>
+      const days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - 6 + i);
+        return d.toISOString().slice(0, 10);
+      });
+      let habits = [];
+      const save = () => latis.data.set("habits", habits);
+      function streak(h) {
+        let n = 0;
+        const d = new Date();
+        while (h.done.includes(d.toISOString().slice(0, 10))) {
+          n++;
+          d.setDate(d.getDate() - 1);
+        }
+        return n;
+      }
+      function render() {
+        document.getElementById("head").innerHTML =
+          "<tr><th></th>" +
+          days.map((d) => `<th class="muted">${new Date(d).toLocaleDateString([], { weekday: "narrow" })}</th>`).join("") +
+          "<th>🔥</th><th></th></tr>";
+        const body = document.getElementById("body");
+        body.innerHTML = "";
+        habits.forEach((h, i) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            `<td></td>` +
+            days
+              .map((d) => `<td><button data-d="${d}" class="${h.done.includes(d) ? "on" : ""}" aria-label="${d}"></button></td>`)
+              .join("") +
+            `<td class="streak">${streak(h)}</td><td><button class="del" aria-label="Remove">×</button></td>`;
+          tr.firstChild.textContent = h.name;
+          tr.querySelectorAll("button[data-d]").forEach(
+            (b) =>
+              (b.onclick = () => {
+                const d = b.dataset.d;
+                h.done = h.done.includes(d) ? h.done.filter((x) => x !== d) : [...h.done, d];
+                save();
+                render();
+              }),
+          );
+          tr.querySelector(".del").onclick = () => {
+            habits.splice(i, 1);
+            save();
+            render();
+          };
+          body.appendChild(tr);
+        });
+      }
+      document.getElementById("add").onsubmit = (e) => {
+        e.preventDefault();
+        const n = document.getElementById("name");
+        if (!n.value.trim()) return;
+        habits.push({ name: n.value.trim(), done: [] });
+        n.value = "";
+        save();
+        render();
+      };
+      latis.data.get("habits").then((v) => {
+        habits = v ?? [{ name: "Read 20 minutes", done: [] }];
+        render();
+      });
+    </script>
+  </body>
+</html>

@@ -196,3 +196,27 @@ export const scheduled = sqliteTable(
   },
   (t) => [index("scheduled_fire").on(t.fireAt)],
 );
+
+// Cards (§12): the HTML lives in <dataDir>/cards/<id>/; this row holds what Latis decides about it.
+export const cards = sqliteTable("cards", {
+  id: text("id").primaryKey(),
+  nodeId: text("node_id").notNull(),
+  title: text("title").notNull(),
+  /** Origins the user allowed the card to reach (§12.1). */
+  networkJson: text("network_json").notNull().default("[]"),
+  /** sha256 of the refresh script the user approved; a changed script asks again. */
+  refreshHash: text("refresh_hash"),
+  /** Set for flow gate cards (§11.4): pick | review | shortlist | form | results. */
+  gate: text("gate"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const cardData = sqliteTable(
+  "card_data",
+  {
+    cardId: text("card_id").notNull(),
+    key: text("key").notNull(),
+    valueJson: text("value_json").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.cardId, t.key] })],
+);

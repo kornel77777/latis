@@ -8,6 +8,7 @@ import type { AgentAdapter, AgentEvent, AgentSession, CanvasNode, ChatSummary, F
 import { SessionSupervisor } from "../../src/main/agents/supervisor";
 import { WorkspaceMcpServer } from "../../src/main/mcp/server";
 import { WorkspaceService } from "../../src/main/mcp/workspace";
+import { Cards, cardCsp } from "../../src/main/cards/cards";
 import { openDb } from "../../src/main/store/db";
 import { EventLog } from "../../src/main/store/event-log";
 import { WorkspaceStore } from "../../src/main/store/workspace";
@@ -60,11 +61,13 @@ afterEach(() => servers.splice(0).forEach((s) => s.stop()));
 
 async function setup(opts: { confirm?: boolean; maxSpawned?: number } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "latis-mcp-"));
+  mkdirSync(join(dir, "cards"));
   const repo = join(dir, "shop");
   mkdirSync(repo);
   const store = new WorkspaceStore(openDb(join(dir, "latis.db")));
   const canvasId = store.ensureDefaultCanvas();
   const supervisor = new SessionSupervisor(store, new EventLog(store), new Map([["stub", replyAdapter()]]), noSinks);
+  const cards = new Cards(store, join(dir, "cards"), { confirm: async () => true });
   const upserts: { nodes: CanvasNode[]; chats: ChatSummary[]; projects: Project[] }[] = [];
   const focused: FocusView[] = [];
   const ws = new WorkspaceService({
@@ -84,6 +87,10 @@ async function setup(opts: { confirm?: boolean; maxSpawned?: number } = {}) {
     confirm: async () => opts.confirm ?? true,
     ui: { upsert: (p) => upserts.push(p), focus: (v) => focused.push(v), tidy: () => undefined },
     maxSpawned: () => opts.maxSpawned ?? 6,
+    cards: {
+      create: (input) => cards.create({ canvasId, ...input }),
+      update: (id, patch) => cards.update(id, patch),
+    },
   });
   const server = new WorkspaceMcpServer(ws);
   await server.start();
@@ -113,7 +120,7 @@ async function setup(opts: { confirm?: boolean; maxSpawned?: number } = {}) {
     const text = (r.content as { text: string }[]).map((c) => c.text).join("");
     return { text, isError: Boolean(r.isError), json: () => JSON.parse(text) as Record<string, unknown> };
   };
-  return { store, server, conductor, call, repo, upserts, focused, client };
+  return { store, server, conductor, call, repo, upserts, focused, client, cards };
 }
 
 describe("Workspace MCP server", () => {
@@ -136,6 +143,7 @@ describe("Workspace MCP server", () => {
       [
         "append_note",
         "close_chat",
+        "create_card",
         "create_note",
         "focus",
         "get_diff",
@@ -145,6 +153,7 @@ describe("Workspace MCP server", () => {
         "send_message",
         "spawn_chat",
         "tidy_canvas",
+        "update_card",
         "wait_for_chats",
       ].sort(),
     );
@@ -213,6 +222,28 @@ describe("Workspace MCP server", () => {
     const no = await setup({ confirm: false });
     const kept = (await no.call("spawn_chat", { agent: "stub", cwd: no.repo, prompt: "x" })).json().chat_id as string;
     expect((await no.call("close_chat", { chat_id: kept })).json()).toMatchObject({ closed: false });
+  });
+
+  it("creates and updates cards, served offline from their own origin with the bridge", async () => {
+    const { call, cards, store } = await setup();
+    const r = await call("create_card", { title: "Tracker", html: "<html><head><title>t</title></head><body>v1</body></html>" });
+    const id = r.json().card_id as string;
+    const res = cards.serve(`card://${id}/index.html`);
+    expect(res.headers.get("content-security-policy")).toBe(cardCsp([]));
+    expect(res.headers.get("content-security-policy")).toContain("connect-src 'none'");
+    const html = await res.text();
+    expect(html).toContain(`<head><script src="card://${id}/__latis.js"></script><title>`);
+    expect(html).toContain("v1");
+    expect(await cards.serve(`card://${id}/__latis.js`).text()).toContain('Object.defineProperty(window, "latis"');
+    // No escaping the folder, no serving the refresh script, no unknown cards.
+    expect(cards.serve(`card://${id}/..%2F..%2Flatis.db`).status).toBe(404);
+    expect(cards.serve(`card://nope/index.html`).status).toBe(404);
+    await call("update_card", { card_id: id, html: "<p>v2</p>" });
+    expect(await cards.serve(`card://${id}/`).text()).toContain("v2");
+    const node = store.getNode(cards.row(id)!.nodeId)!;
+    expect(node.type).toBe("card");
+    expect(node.data.rev).toBe(2);
+    expect((await call("update_card", { card_id: "nope", html: "x" })).isError).toBe(true);
   });
 
   it("opens focus views and keeps the Conductor undeletable", async () => {

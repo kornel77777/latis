@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, nativeTheme, safeStorage, shell } from "electron";
+import { app, BrowserWindow, dialog, nativeTheme, protocol, safeStorage, shell } from "electron";
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -35,6 +35,8 @@ import { Connections } from "./mcp/connections";
 import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer } from "./mcp/server";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
+import { CARD_SIZE, Cards } from "./cards/cards";
+import { starters } from "./cards/library";
 import { buildBrief } from "./handoff";
 import { Scheduler } from "./scheduler";
 import { UsageMeter } from "./usage";
@@ -47,6 +49,9 @@ let win: BrowserWindow | null = null;
 const dataDir = resolveDataDir();
 mkdirSync(dataDir, { recursive: true });
 app.setPath("userData", join(dataDir, "electron"));
+
+// Cards get their own origin each (§12.1). Must be registered before the app is ready.
+protocol.registerSchemesAsPrivileged([{ scheme: "card", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
 if (!app.requestSingleInstanceLock() && !process.env.LATIS_DATA_DIR) app.quit();
 
@@ -208,6 +213,43 @@ function ensureConductorDir() {
     );
 }
 
+async function confirmDialog(message: string, detail: string, yes: string): Promise<boolean> {
+  const options = { type: "question" as const, buttons: [yes, "Cancel"], defaultId: 1, cancelId: 1, message, detail };
+  const r = win ? await dialog.showMessageBox(win, options) : await dialog.showMessageBox(options);
+  return r.response === 0;
+}
+
+const cards = new Cards(store, join(dataDir, "cards"), { confirm: confirmDialog });
+
+/** Renders a card to an A4 PDF with a read-only copy of its data (§12.2 exportPdf). */
+async function exportCardPdf(cardId: string, theme: unknown) {
+  const row = cards.row(cardId);
+  if (!row) throw new Error("That card no longer exists.");
+  const token = cards.snapshot(cardId, { theme, usage: usage.get() });
+  const w = new BrowserWindow({ show: false, width: 794, height: 1123, webPreferences: { sandbox: true, contextIsolation: true } });
+  try {
+    await w.loadURL(`card://${cardId}/index.html?snapshot=${token}`);
+    await new Promise((r) => setTimeout(r, 400)); // let the card render its data
+    const pdf = await w.webContents.printToPDF({ pageSize: "A4", printBackground: true });
+    const options = {
+      title: "Export card as PDF",
+      defaultPath: `${row.title.replace(/[^\w\- ]+/g, "").slice(0, 60) || "card"}.pdf`,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    };
+    const r = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+    if (r.canceled || !r.filePath) return { saved: false };
+    writeFileSync(r.filePath, pdf);
+    return { saved: true };
+  } finally {
+    w.destroy();
+  }
+}
+
+/** Puts a new card on the canvas and tells the renderer. */
+function showCard(node: import("@latis/shared").CanvasNode, reveal = true) {
+  emit(win?.webContents, "canvas:upsert", { nodes: [node], chats: [], projects: [], reveal: reveal ? node.id : null });
+}
+
 const workspace = new WorkspaceService({
   store,
   canvasId,
@@ -234,6 +276,18 @@ const workspace = new WorkspaceService({
     tidy: () => emit(win?.webContents, "canvas:command", { type: "tidy" }),
   },
   maxSpawned: () => prefs().maxSpawned,
+  cards: {
+    create: (input) => {
+      const node = cards.create({ canvasId, ...input });
+      showCard(node);
+      return node;
+    },
+    update: (id, patch) => {
+      const node = cards.update(id, patch);
+      showCard(node, false);
+      return node;
+    },
+  },
 });
 const mcpServer = new WorkspaceMcpServer(workspace);
 const mcpReady = mcpServer.start().catch((err: unknown) => console.error("[mcp] the workspace server didn't start", err));
@@ -317,6 +371,8 @@ async function signInAccount(id: string) {
 
 /** Asks agents that can tell without spending tokens how much of their usage is left (Codex). */
 async function probeUsage() {
+  // Recorded agents (tests) have no account to ask.
+  if (replayRoot) return;
   for (const a of await agents.list()) {
     const adapter = agents.get(a.id);
     if (!a.installed || !a.signedIn || !adapter?.usage) continue;
@@ -811,6 +867,53 @@ registerHandlers({
     await supervisor.send(created.chat.id, brief);
     return { ...created, chat: store.getChat(created.chat.id)!, frame: place.frame };
   },
+  "card:call": async ({ cardId, method, args }) => {
+    if (!cards.row(cardId)) throw new Error("That card no longer exists.");
+    switch (method) {
+      case "data.get":
+        return cards.dataGet(cardId, String(args[0]));
+      case "data.set":
+        cards.dataSet(cardId, String(args[0]), args[1]);
+        return null;
+      case "data.list":
+        return cards.dataList(cardId);
+      case "refresh": {
+        const r = await cards.refresh(cardId);
+        emit(win?.webContents, "card:data", { cardId });
+        return r;
+      }
+      case "requestNetwork": {
+        const ok = await cards.requestNetwork(cardId, args[0]);
+        // The card reloads so its new CSP applies.
+        if (ok) showCard(cards.update(cardId, {}), false);
+        return ok;
+      }
+      case "usage":
+        return usage.get();
+      case "exportPdf":
+        return exportCardPdf(cardId, args[0]);
+      case "sendToFlow":
+        throw new Error("Only a flow's gate cards can send items to the flow.");
+    }
+  },
+  "card:library": () => starters.map(({ id, title, description }) => ({ id, title, description })),
+  "card:create": ({ canvasId: id, starter, x, y }) => {
+    const s = starters.find((x) => x.id === starter);
+    if (!s) throw new Error("There's no such starter card.");
+    return cards.create({
+      canvasId: id,
+      title: s.title,
+      html: s.html,
+      files: s.files,
+      ...(s.refreshScript && { refreshScript: s.refreshScript }),
+      x: x - CARD_SIZE.w / 2,
+      y: y - CARD_SIZE.h / 2,
+    });
+  },
+  "card:openFolder": async ({ cardId }) => {
+    if (!cards.row(cardId)) return { ok: false };
+    return { ok: (await shell.openPath(cards.dir(cardId))) === "" };
+  },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };
@@ -939,6 +1042,7 @@ function createWindow() {
 }
 
 void app.whenReady().then(() => {
+  protocol.handle("card", (req) => cards.serve(req.url));
   createWindow();
   void ensureConductor().catch((err: unknown) => console.error("[conductor] couldn't create the Conductor", err));
   scheduler.start();

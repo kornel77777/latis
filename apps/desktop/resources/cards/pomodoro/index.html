@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pomodoro</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .time {
+        font-size: 56px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.03em;
+      }
+      .phase {
+        color: var(--accent);
+        text-transform: uppercase;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="phase" id="phase">Focus</div>
+    <div class="time" id="time">25:00</div>
+    <div class="row"><button class="primary" id="go">Start</button><button id="reset">Reset</button></div>
+    <p class="muted" id="done"></p>
+    <script>
+      const LEN = { Focus: 25 * 60, Break: 5 * 60 };
+      let phase = "Focus",
+        left = LEN.Focus,
+        timer = null,
+        sessions = 0;
+      const $ = (id) => document.getElementById(id);
+      function show() {
+        $("time").textContent = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+        $("phase").textContent = phase;
+        $("go").textContent = timer ? "Pause" : "Start";
+        $("done").textContent = sessions ? `${sessions} focus session${sessions === 1 ? "" : "s"} today` : "";
+      }
+      function step() {
+        if (--left > 0) return show();
+        if (phase === "Focus") {
+          sessions++;
+          latis.data.set("today", { date: new Date().toDateString(), sessions });
+        }
+        phase = phase === "Focus" ? "Break" : "Focus";
+        left = LEN[phase];
+        show();
+      }
+      $("go").onclick = () => {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        } else timer = setInterval(step, 1000);
+        show();
+      };
+      $("reset").onclick = () => {
+        clearInterval(timer);
+        timer = null;
+        phase = "Focus";
+        left = LEN.Focus;
+        show();
+      };
+      latis.data.get("today").then((t) => {
+        if (t && t.date === new Date().toDateString()) sessions = t.sessions;
+        show();
+      });
+    </script>
+  </body>
+</html>

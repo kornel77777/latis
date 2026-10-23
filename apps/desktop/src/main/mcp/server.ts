@@ -142,6 +142,38 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
     (a) => run(() => ws.focus(a.node_ids, a.layout, a.name)),
   );
   server.registerTool(
+    "create_card",
+    {
+      description:
+        "Put a small HTML app (a card) on the canvas: a tracker, dashboard, calculator… One self-contained index.html (inline CSS/JS). " +
+        "It runs sandboxed with NO network. Inside it, window.latis gives: data.get(key), data.set(key, value), data.list() (persisted), " +
+        "refresh() (runs refresh_script, a Node .mjs that prints a JSON object merged into the data; the user approves it first), " +
+        "ask(prompt), exportPdf(), theme.tokens (CSS vars --latis-surface, --latis-text, --latis-muted, --latis-accent, --latis-line are set for you).",
+      inputSchema: {
+        title: z.string().min(1).max(80),
+        html: z.string().min(1).max(500_000),
+        refresh_script: z.string().max(200_000).optional(),
+        near_chat_id: z.string().optional(),
+      },
+      annotations: { openWorldHint: false },
+    },
+    (a) => run(() => ws.createCard(caller, a)),
+  );
+  server.registerTool(
+    "update_card",
+    {
+      description: "Replace a card's HTML, refresh script or title. The card reloads; its data is kept.",
+      inputSchema: {
+        card_id: z.string(),
+        html: z.string().max(500_000).optional(),
+        refresh_script: z.string().max(200_000).optional(),
+        title: z.string().max(80).optional(),
+      },
+      annotations: { openWorldHint: false },
+    },
+    (a) => run(() => ws.updateCard(a.card_id, a)),
+  );
+  server.registerTool(
     "tidy_canvas",
     { description: "Arrange the chats inside every project frame into tidy rows.", inputSchema: {}, annotations: { openWorldHint: false } },
     () => run(() => ws.tidy()),

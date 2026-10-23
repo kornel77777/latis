@@ -14,6 +14,7 @@ import { Onboarding } from "./Onboarding";
 import { PerfOverlay } from "./PerfOverlay";
 import { Palette } from "../palette/Palette";
 import { HandoffDialog } from "../chat/Later";
+import { CardLibrary } from "../canvas/CardLibrary";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
 import { useAppearance } from "./useAppearance";
@@ -99,6 +100,7 @@ export function App() {
         <MergeDialog />
         <TimelineDialog />
         <HandoffDialog />
+        <CardLibrary />
         <ReviewPanel />
         <Onboarding />
         <PerfOverlay />

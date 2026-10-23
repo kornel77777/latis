@@ -1,0 +1,76 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Countdown</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .big {
+        font-size: 40px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+      }
+      .units {
+        display: flex;
+        gap: 18px;
+        margin: 18px 0;
+      }
+      .units div {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <input id="label" placeholder="What are you counting down to?" style="width: 100%" />
+    <div class="units">
+      <div>
+        <div class="big" id="d">–</div>
+        <div class="muted">days</div>
+      </div>
+      <div>
+        <div class="big" id="h">–</div>
+        <div class="muted">hours</div>
+      </div>
+      <div>
+        <div class="big" id="m">–</div>
+        <div class="muted">minutes</div>
+      </div>
+    </div>
+    <div class="row"><input id="when" type="datetime-local" /><span class="muted" id="note"></span></div>
+    <script>
+      let state = { label: "", when: "" };
+      const $ = (id) => document.getElementById(id);
+      function tick() {
+        const t = Date.parse(state.when);
+        if (!t) {
+          $("note").textContent = "Pick a date";
+          return;
+        }
+        let ms = Math.max(0, t - Date.now());
+        $("d").textContent = Math.floor(ms / 864e5);
+        ms %= 864e5;
+        $("h").textContent = Math.floor(ms / 36e5);
+        ms %= 36e5;
+        $("m").textContent = Math.floor(ms / 6e4);
+        $("note").textContent = t < Date.now() ? "It's here." : "";
+      }
+      $("label").oninput = () => {
+        state.label = $("label").value;
+        latis.data.set("countdown", state);
+      };
+      $("when").onchange = () => {
+        state.when = $("when").value;
+        latis.data.set("countdown", state);
+        tick();
+      };
+      latis.data.get("countdown").then((v) => {
+        state = v ?? state;
+        $("label").value = state.label;
+        $("when").value = state.when;
+        tick();
+      });
+      setInterval(tick, 30000);
+    </script>
+  </body>
+</html>

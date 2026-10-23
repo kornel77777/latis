@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Kanban</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      .cols {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        height: calc(100% - 36px);
+      }
+      .col {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px;
+        overflow: auto;
+      }
+      .col.over {
+        border-color: var(--accent);
+      }
+      .col h2 {
+        font-size: 12px;
+        margin: 0 0 6px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .item {
+        background: color-mix(in srgb, var(--fg) 6%, transparent);
+        border-radius: 6px;
+        padding: 6px;
+        margin-bottom: 6px;
+        cursor: grab;
+        display: flex;
+        gap: 4px;
+      }
+      .item span {
+        flex: 1;
+      }
+      .item button {
+        border: 0;
+        padding: 0 4px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <form id="add" class="row" style="margin-bottom: 8px">
+      <input id="t" placeholder="Add a task" style="flex: 1" /><button class="primary">Add</button>
+    </form>
+    <div class="cols" id="cols"></div>
+    <script>
+      const COLS = ["To do", "Doing", "Done"];
+      let items = [];
+      const save = () => latis.data.set("items", items);
+      function render() {
+        const root = document.getElementById("cols");
+        root.innerHTML = "";
+        COLS.forEach((name, c) => {
+          const col = document.createElement("div");
+          col.className = "col";
+          col.innerHTML = `<h2>${name}</h2>`;
+          col.ondragover = (e) => {
+            e.preventDefault();
+            col.classList.add("over");
+          };
+          col.ondragleave = () => col.classList.remove("over");
+          col.ondrop = (e) => {
+            const i = items.find((x) => x.id === e.dataTransfer.getData("text"));
+            if (i) {
+              i.col = c;
+              save();
+              render();
+            }
+          };
+          items
+            .filter((i) => i.col === c)
+            .forEach((i) => {
+              const el = document.createElement("div");
+              el.className = "item";
+              el.draggable = true;
+              el.ondragstart = (e) => e.dataTransfer.setData("text", i.id);
+              el.innerHTML = "<span></span><button aria-label='Remove'>×</button>";
+              el.firstChild.textContent = i.text;
+              el.querySelector("button").onclick = () => {
+                items = items.filter((x) => x !== i);
+                save();
+                render();
+              };
+              col.appendChild(el);
+            });
+          root.appendChild(col);
+        });
+      }
+      document.getElementById("add").onsubmit = (e) => {
+        e.preventDefault();
+        const t = document.getElementById("t");
+        if (!t.value.trim()) return;
+        items.push({ id: crypto.randomUUID(), text: t.value.trim(), col: 0 });
+        t.value = "";
+        save();
+        render();
+      };
+      latis.data.get("items").then((v) => {
+        items = v ?? [];
+        render();
+      });
+    </script>
+  </body>
+</html>

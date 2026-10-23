@@ -52,6 +52,10 @@ export interface WorkspaceDeps {
   };
   /** Max chats a caller may have running at once (§10.1 guardrails). */
   maxSpawned(): number;
+  cards: {
+    create(input: { title: string; html: string; refreshScript?: string; x: number; y: number }): CanvasNode;
+    update(id: string, patch: { html?: string; refreshScript?: string; title?: string }): CanvasNode;
+  };
 }
 
 export class ToolError extends Error {}
@@ -302,6 +306,37 @@ export class WorkspaceService {
     this.d.store.updateNodeData(noteId, { text });
     this.d.ui.upsert({ nodes: [this.d.store.getNode(noteId)!], chats: [], projects: [], reveal: null });
     return { note_id: noteId };
+  }
+
+  /** A card (§12) next to the caller: HTML the agent wrote, isolated and offline unless the user allows more. */
+  createCard(callerId: string, a: { title: string; html: string; refresh_script?: string; near_chat_id?: string }) {
+    const near = a.near_chat_id ? this.chat(a.near_chat_id) : this.d.store.getChat(callerId);
+    const p = this.placeNear(near);
+    const node = this.d.cards.create({
+      title: a.title,
+      html: a.html,
+      ...(a.refresh_script && { refreshScript: a.refresh_script }),
+      x: p.x,
+      y: p.y,
+    });
+    return {
+      card_id: String(node.data.cardId),
+      note: "The card has no network access and talks to Latis only through window.latis (data.get/set/list, refresh, ask, exportPdf, theme).",
+    };
+  }
+
+  updateCard(cardId: string, a: { html?: string; refresh_script?: string; title?: string }) {
+    if (a.html === undefined && a.refresh_script === undefined && !a.title) throw new ToolError("Pass html, refresh_script or title.");
+    try {
+      this.d.cards.update(cardId, {
+        ...(a.html !== undefined && { html: a.html }),
+        ...(a.refresh_script !== undefined && { refreshScript: a.refresh_script }),
+        ...(a.title && { title: a.title }),
+      });
+    } catch (err) {
+      throw new ToolError(err instanceof Error ? err.message : String(err));
+    }
+    return { card_id: cardId, updated: true };
   }
 
   /** Opens a focus view with these chats (chat ids or node ids). */

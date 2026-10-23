@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Repo dashboard</title>
+    <link rel="stylesheet" href="base.css" />
+    <style>
+      ul {
+        list-style: none;
+        margin: 4px 0 10px;
+        padding: 0;
+      }
+      li {
+        padding: 3px 0;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        gap: 6px;
+      }
+      li span:first-child {
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      h2 {
+        font-size: 12px;
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .err {
+        color: #f87171;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="f" class="row"><input id="repo" placeholder="owner/repo" style="flex: 1" /><button class="primary">Refresh</button></form>
+    <p class="muted" id="status">Uses the gh CLI on this computer. The first refresh asks you to approve the script.</p>
+    <h2>Open pull requests</h2>
+    <ul id="prs"></ul>
+    <h2>Open issues</h2>
+    <ul id="issues"></ul>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      function list(el, rows) {
+        el.innerHTML = "";
+        (rows ?? []).slice(0, 8).forEach((r) => {
+          const li = document.createElement("li");
+          li.innerHTML = "<span></span><span></span>";
+          li.children[0].textContent = "#" + r.number;
+          li.children[1].textContent = r.title;
+          el.appendChild(li);
+        });
+        if (!rows?.length) el.innerHTML = "<li class='muted'>None</li>";
+      }
+      async function show() {
+        const d = await latis.data.list();
+        $("repo").value = d.repo ?? "";
+        list($("prs"), d.prs);
+        list($("issues"), d.issues);
+        $("status").textContent = d.error
+          ? d.error
+          : d.fetchedAt
+            ? "Updated " + new Date(d.fetchedAt).toLocaleTimeString()
+            : $("status").textContent;
+        $("status").className = d.error ? "err" : "muted";
+      }
+      $("f").onsubmit = async (e) => {
+        e.preventDefault();
+        await latis.data.set("repo", $("repo").value.trim());
+        $("status").textContent = "Refreshing…";
+        try {
+          await latis.refresh();
+        } catch (err) {
+          $("status").textContent = err.message;
+          $("status").className = "err";
+          return;
+        }
+        show();
+      };
+      latis.data.onChange(show);
+      show();
+    </script>
+  </body>
+</html>
