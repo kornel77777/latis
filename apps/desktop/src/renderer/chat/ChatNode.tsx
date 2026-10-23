@@ -40,7 +40,16 @@ export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<Flo
   return <FullChat chatId={chatId} selected={selected} />;
 });
 
-const FullChat = memo(function FullChat({ chatId, selected }: { chatId: string; selected: boolean }) {
+/** The full chat card; also used outside the canvas by focus mode (`inCanvas={false}`). */
+export const FullChat = memo(function FullChat({
+  chatId,
+  selected,
+  inCanvas = true,
+}: {
+  chatId: string;
+  selected: boolean;
+  inCanvas?: boolean;
+}) {
   const chat = useWorkspace((s) => s.chats[chatId]);
   const agent = useWorkspace((s) => s.agents.find((a) => a.id === chat?.summary.agentId));
   const queue = useWorkspace((s) => s.queues[chatId]);
@@ -97,7 +106,7 @@ const FullChat = memo(function FullChat({ chatId, selected }: { chatId: string; 
 
   return (
     <>
-      <NodeResizer isVisible={selected} minWidth={360} minHeight={300} />
+      {inCanvas && <NodeResizer isVisible={selected} minWidth={360} minHeight={300} />}
       <article
         aria-label={`Chat: ${s.title}`}
         data-testid="chat-card"

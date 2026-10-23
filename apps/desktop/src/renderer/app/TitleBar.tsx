@@ -1,5 +1,5 @@
-import { FolderOpen, Moon, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Sparkles, Sun, SunMoon } from "lucide-react";
-import { Button, Menu, MenuItem, MenuSeparator } from "@latis/ui";
+import { FolderOpen, Moon, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Sparkles, Sun, SunMoon, X } from "lucide-react";
+import { Button, Menu, MenuItem, MenuSeparator, cn } from "@latis/ui";
 import type { Theme } from "@latis/shared";
 import { AgentMenuItems } from "../canvas/AgentMenuItems";
 import { useCanvasActions } from "../canvas/useCanvasActions";
@@ -10,6 +10,10 @@ export function TitleBar() {
   const setTheme = useWorkspace((s) => s.setTheme);
   const loadAgents = useWorkspace((s) => s.loadAgents);
   const { openFolder, newChat } = useCanvasActions();
+  const zen = useWorkspace((s) => s.zen);
+  const views = useWorkspace((s) => s.views);
+  const activeView = useWorkspace((s) => s.activeView);
+  const { openView, closeView, focusSelection } = useWorkspace.getState();
   const isMac = window.latis.platform === "darwin";
   const themes: { id: Theme; label: string; icon: typeof Sun }[] = [
     { id: "dark", label: "Dark", icon: Moon },
@@ -23,14 +27,47 @@ export function TitleBar() {
       style={{ paddingLeft: isMac ? 84 : 12 }}
     >
       <span className="text-[13px] font-semibold tracking-wide text-text-1">Latis</span>
-      <nav className="no-drag ml-3 flex items-center gap-1" aria-label="Canvases">
-        <div className="flex h-7 items-center rounded-control border border-line bg-surface px-3 text-[12px] font-medium text-text-1">
-          Main canvas
-        </div>
-        <Button variant="ghost" size="icon" aria-label="New canvas (coming later)" disabled>
-          <Plus size={14} />
-        </Button>
-      </nav>
+      {!zen && (
+        <nav className="no-drag ml-3 flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Canvases and focus views" role="tablist">
+          <button
+            role="tab"
+            aria-selected={!activeView}
+            onClick={() => openView(null)}
+            className={cn(
+              "flex h-7 shrink-0 items-center rounded-control border px-3 text-[12px] font-medium",
+              !activeView ? "border-line bg-surface text-text-1" : "border-transparent text-text-3 hover:text-text-1",
+            )}
+          >
+            Main canvas
+          </button>
+          {views.map((v) => (
+            <div
+              key={v.id}
+              role="tab"
+              aria-selected={activeView === v.id}
+              className={cn(
+                "group flex h-7 shrink-0 items-center gap-1 rounded-control border pl-3 pr-1 text-[12px] font-medium",
+                activeView === v.id ? "border-line bg-surface text-text-1" : "border-transparent text-text-3 hover:text-text-1",
+              )}
+              data-testid="view-tab"
+            >
+              <button onClick={() => openView(v.id)} className="max-w-40 truncate">
+                Focus: {v.name}
+              </button>
+              <button
+                aria-label={`Close ${v.name}`}
+                className="rounded p-0.5 opacity-60 hover:bg-surface-2 hover:opacity-100"
+                onClick={() => closeView(v.id)}
+              >
+                <X size={11} />
+              </button>
+            </div>
+          ))}
+          <Button variant="ghost" size="icon" aria-label="Focus the selected chats (F)" onClick={() => focusSelection()}>
+            <Plus size={14} />
+          </Button>
+        </nav>
+      )}
       <div className="flex-1" />
       <div className="no-drag flex items-center gap-1" style={{ marginRight: isMac ? 0 : 140 }}>
         <Button variant="ghost" size="sm" onClick={() => void openFolder()} data-testid="open-folder">

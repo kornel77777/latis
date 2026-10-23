@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
 import { CanvasView } from "../canvas/CanvasView";
+import { FocusView } from "../canvas/FocusView";
 import { subscribeToMain, useWorkspace } from "../stores/workspace";
 import { Dock } from "./Dock";
 import { Sidebar } from "./Sidebar";
@@ -21,6 +22,8 @@ export function App() {
   const theme = useWorkspace((s) => s.theme);
   const sidebarOpen = useWorkspace((s) => s.sidebarOpen);
   const dockOpen = useWorkspace((s) => s.dockOpen);
+  const zen = useWorkspace((s) => s.zen);
+  const view = useWorkspace((s) => s.views.find((v) => v.id === s.activeView));
   useResolvedTheme(theme);
 
   useEffect(() => {
@@ -41,6 +44,10 @@ export function App() {
       } else if (mod && e.code === "Backquote") {
         e.preventDefault();
         useWorkspace.getState().toggleDock();
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === "f") {
+        // §8.7 distraction-free.
+        e.preventDefault();
+        useWorkspace.setState((s) => ({ zen: !s.zen }));
       } else if (mod && e.shiftKey && e.key.toLowerCase() === "r") {
         // §8.9: Review Inbox.
         e.preventDefault();
@@ -62,9 +69,11 @@ export function App() {
       <div className="flex h-full flex-col">
         <TitleBar />
         <div className="flex min-h-0 flex-1">
-          {sidebarOpen && <Sidebar />}
+          {sidebarOpen && !zen && <Sidebar />}
           {loadError ? (
             <div className="m-auto max-w-md text-center text-[13px] text-text-2">Latis couldn't load your workspace: {loadError}</div>
+          ) : ready && view ? (
+            <FocusView view={view} />
           ) : ready ? (
             <CanvasView />
           ) : (
@@ -72,7 +81,7 @@ export function App() {
           )}
           {dockOpen && <Dock />}
         </div>
-        <StatusBar />
+        {!zen && <StatusBar />}
         <Toasts />
         <SettingsDialog />
         <IsolateDialog />

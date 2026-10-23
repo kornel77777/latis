@@ -60,12 +60,22 @@ export function CanvasView() {
         void (e.shiftKey ? ws.redo() : ws.undo());
         return;
       }
+      if (mod && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        useWorkspace.setState((st) => ({ nodes: st.nodes.map((n) => ({ ...n, selected: n.type !== "frame" })) }));
+        return;
+      }
       if (!mod && (e.key === "Delete" || e.key === "Backspace")) {
         const ids = ws.nodes.filter((n) => n.selected).map((n) => n.id);
         if (ids.length) {
           e.preventDefault();
           void ws.deleteNodes(ids);
         }
+        return;
+      }
+      if (!mod && !e.shiftKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        ws.focusSelection();
         return;
       }
       if (!mod && !e.shiftKey && e.key.toLowerCase() === "n") {

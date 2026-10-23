@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import type { AttentionItem, PermissionMode, Prefs, RequestResponse, Theme } from "@latis/shared";
+import type { AttentionItem, FocusView, PermissionMode, Prefs, RequestResponse, Theme } from "@latis/shared";
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
 import { SessionSupervisor } from "./agents/supervisor";
@@ -445,6 +445,11 @@ registerHandlers({
     const target = resolve(p.folderPath, path);
     if (!target.startsWith(p.folderPath + sep)) return { ok: false };
     return { ok: (await shell.openPath(target)) === "" };
+  },
+  "views:get": () => store.getSetting<FocusView[]>("focusViews") ?? [],
+  "views:set": (views) => {
+    store.setSetting("focusViews", views);
+    return { ok: true };
   },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {

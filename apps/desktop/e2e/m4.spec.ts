@@ -166,3 +166,43 @@ test("command palette: run actions, find chats by what was said, files, and rest
   await expect(page.getByTestId("note")).toHaveCount(1);
   await app.close();
 });
+
+test("focus mode: selected chats fill the screen in grid, stage and columns; saved as a tab; distraction-free", async () => {
+  const dataDir = tempDataDir();
+  let { app, page } = await launch(dataDir);
+  await demoChats(page, 3);
+  await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("f");
+  const view = page.getByTestId("focus-view");
+  await expect(view).toHaveAttribute("data-layout", "columns");
+  await expect(view.getByTestId("chat-card")).toHaveCount(3);
+  if (shots) await page.screenshot({ path: `${shots}/m4-focus.png` });
+  await view.getByTestId("layout-stage").click();
+  await expect(view).toHaveAttribute("data-layout", "stage");
+  await view.getByTestId("layout-grid").click();
+  await expect(view).toHaveAttribute("data-layout", "grid");
+
+  // A chat is usable in focus mode.
+  await view.getByTestId("composer").first().fill("from focus mode");
+  await view.getByTestId("composer").first().press("Enter");
+  await expect(view.getByTestId("chat-card").first()).toHaveAttribute("data-status", "needs-you", { timeout: 15_000 });
+
+  // Esc back to the canvas; the view stays as a tab and survives a restart.
+  await page.keyboard.press("Escape"); // leaves the composer
+  await page.keyboard.press("Escape"); // leaves focus mode
+  await expect(page.getByTestId("focus-view")).toHaveCount(0);
+  await expect(page.getByTestId("view-tab")).toHaveCount(1);
+  await app.close();
+  ({ app, page } = await launch(dataDir));
+  await page.getByTestId("view-tab").getByRole("button").first().click();
+  await expect(page.getByTestId("focus-view")).toHaveAttribute("data-layout", "grid");
+
+  // Distraction-free hides the sidebar, tabs and status bar.
+  await page.keyboard.press("ControlOrMeta+Shift+f");
+  await expect(page.getByLabel("Sidebar")).toHaveCount(0);
+  await expect(page.getByLabel("Status")).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+Shift+f");
+  await expect(page.getByLabel("Sidebar")).toHaveCount(1);
+  await app.close();
+});

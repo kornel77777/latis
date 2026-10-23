@@ -5,6 +5,7 @@ import {
   type AgentInfo,
   type AgentModel,
   type AttentionItem,
+  type FocusView,
   type Prefs,
   type PtyInfo,
   type QueuedMessage,
@@ -83,6 +84,11 @@ interface WorkspaceState {
   /** Note being edited (one at a time). */
   editingNote: string | null;
   paletteOpen: boolean;
+  /** Saved focus views (§8.7) and the one showing (null = the canvas). */
+  views: FocusView[];
+  activeView: string | null;
+  /** Distraction-free: no sidebar, tabs or status bar (Ctrl/⌘+Shift+F). */
+  zen: boolean;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -151,6 +157,11 @@ interface WorkspaceState {
   locateProject(projectId: string): Promise<void>;
   /** Re-lays out the selected frame's contents (or every frame) in tidy columns. */
   tidyUp(): void;
+  /** Selected chats → a new focus view (F). */
+  focusSelection(): void;
+  openView(id: string | null): void;
+  updateView(id: string, patch: Partial<Omit<FocusView, "id">>): void;
+  closeView(id: string): void;
 }
 
 function toFlowNode(n: CanvasNode): FlowNode {
@@ -222,6 +233,11 @@ interface UndoEntry {
 const undoStack: UndoEntry[] = [];
 const redoStack: UndoEntry[] = [];
 let undoing = false;
+function saveViews(views: FocusView[]) {
+  useWorkspace.setState({ views });
+  latis.invoke("views:set", views).catch((err: unknown) => console.error("saving focus views failed", err));
+}
+
 /** Records an action; steps taken by undo/redo themselves aren't recorded again. */
 function pushUndo(entry: UndoEntry) {
   if (undoing) return;
@@ -279,16 +295,20 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   timelineFor: null,
   editingNote: null,
   paletteOpen: false,
+  views: [],
+  activeView: null,
+  zen: false,
 
   async load() {
     try {
-      const [canvas, theme, attention, ptys, prefs, reviews] = await Promise.all([
+      const [canvas, theme, attention, ptys, prefs, reviews, views] = await Promise.all([
         latis.invoke("canvas:load"),
         latis.invoke("settings:getTheme"),
         latis.invoke("attention:list"),
         latis.invoke("pty:list"),
         latis.invoke("prefs:get"),
         latis.invoke("reviews:list"),
+        latis.invoke("views:get"),
       ]);
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
@@ -305,6 +325,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         activePty: ptys.find((p) => p.place === "dock")?.id ?? null,
         prefs,
         reviews,
+        views,
         // First run: nothing on the canvas and onboarding never finished (§8.10).
         onboardingOpen: !prefs.onboarded && canvas.nodes.length === 0,
       });
@@ -786,6 +807,34 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
     void applyGeometry(moved);
     pushUndo({ label: "Tidy up", undo: () => applyGeometry(before), redo: () => applyGeometry(moved) });
+  },
+
+  focusSelection() {
+    const s = get();
+    const chatIds = s.nodes.filter((n) => n.selected && n.data.chatId).map((n) => n.data.chatId!);
+    if (!chatIds.length) {
+      s.toast("Select one or more chats first (click, Shift-click or drag a box), then press F.");
+      return;
+    }
+    const titles = chatIds.map((id) => s.chats[id]?.summary.title ?? "Chat");
+    const view: FocusView = {
+      id: crypto.randomUUID(),
+      name: titles.length === 1 ? titles[0]! : `${titles[0]} +${titles.length - 1}`,
+      chatIds,
+      layout: chatIds.length === 1 ? "stage" : chatIds.length <= 3 ? "columns" : "grid",
+    };
+    saveViews([...s.views, view]);
+    set({ activeView: view.id });
+  },
+  openView(id) {
+    set({ activeView: id });
+  },
+  updateView(id, patch) {
+    saveViews(get().views.map((v) => (v.id === id ? { ...v, ...patch } : v)));
+  },
+  closeView(id) {
+    saveViews(get().views.filter((v) => v.id !== id));
+    if (get().activeView === id) set({ activeView: null });
   },
 
   async createSandbox() {

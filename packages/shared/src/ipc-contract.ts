@@ -134,6 +134,17 @@ export const PtyInfo = z.object({
 });
 export type PtyInfo = z.infer<typeof PtyInfo>;
 
+/** A saved focus view (§8.7), shown as a title-bar tab. */
+export const FocusView = z.object({
+  id: z.string(),
+  name: z.string(),
+  chatIds: z.array(z.string()),
+  layout: z.enum(["grid", "stage", "columns"]),
+  /** The chat on stage in the Stage layout. */
+  stageId: z.string().optional(),
+});
+export type FocusView = z.infer<typeof FocusView>;
+
 export const Prefs = z.object({
   onboarded: z.boolean(),
   notifyNeedsYou: z.boolean(),
@@ -413,6 +424,8 @@ export const invokeContract = {
   /** Files in a project (git-tracked and untracked-but-not-ignored, or a bounded walk), for the palette. */
   "project:files": { req: z.object({ projectId: z.string() }), res: z.array(z.string()) },
   "project:openFile": { req: z.object({ projectId: z.string(), path: z.string() }), res: ok },
+  "views:get": { req: none, res: z.array(FocusView) },
+  "views:set": { req: z.array(FocusView).max(30), res: ok },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   "settings:getTheme": { req: none, res: Theme },
