@@ -25,6 +25,7 @@ import {
   StickyNote,
   Sun,
   TextSearch,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@latis/ui";
 import { latis } from "../api";
@@ -211,6 +212,9 @@ function PaletteBody({ close }: { close: () => void }) {
     );
     action("card", "New card…", <AppWindow size={14} />, () =>
       useWorkspace.setState({ cardLibraryAt: flow.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }) }),
+    );
+    action("flow", "New flow…", <Workflow size={14} />, () =>
+      useWorkspace.setState({ flowTemplatesAt: flow.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }) }),
     );
     action("folder", "Open folder as project…", <FolderOpen size={14} />, () => void openFolder());
     action("terminal", "New terminal", <SquareTerminal size={14} />, () => void ws.newTerminal(activeProject ?? null), "Ctrl `");

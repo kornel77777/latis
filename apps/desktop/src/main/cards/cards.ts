@@ -120,7 +120,7 @@ export class Cards {
           y: input.y,
           w: CARD_SIZE.w,
           h: CARD_SIZE.h,
-          dataJson: JSON.stringify({ cardId: id, title: input.title, rev: 1 }),
+          dataJson: JSON.stringify({ cardId: id, title: input.title, rev: 1, ...(input.gate && { gate: input.gate }) }),
           createdAt: now,
         })
         .run();

@@ -1,0 +1,41 @@
+.items {
+  display: grid;
+  gap: 8px;
+}
+.items.side {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+.item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.from {
+  font-size: 11px;
+  color: var(--muted);
+}
+.text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow: auto;
+}
+textarea {
+  width: 100%;
+  min-height: 140px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px;
+}
+.empty {
+  color: var(--muted);
+  padding: 20px 0;
+  text-align: center;
+}

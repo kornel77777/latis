@@ -5,6 +5,11 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, max } from "drizzle-orm
 import {
   AgentEvent,
   AttentionKind,
+  EdgeMode,
+  type FlowEdge,
+  type FlowInfo,
+  type FlowRunInfo,
+  type FlowSchedule,
   ChatStatus,
   Viewport,
   type AttentionItem,
@@ -34,6 +39,9 @@ import {
   projects,
   reviews,
   scheduled,
+  flows,
+  edges,
+  flowRuns,
   settings,
   turns,
   worktrees,
@@ -103,7 +111,110 @@ export class WorkspaceStore {
       nodes: nodeRows.map(toCanvasNode),
       chats: chatRows.map((r) => toChatSummary(r, projectOf.get(r.nodeId) ?? null, wtOf.get(r.worktreeId ?? ""))),
       projects: projectRows.map((p) => toProject(p, frames.find((f) => f.projectId === p.id)!.id)),
+      ...this.flowsOn(nodeRows.filter((n) => n.type === "flow").map((n) => n.id)),
     };
+  }
+
+  // ── Flows (§11) ────────────────────────────────────────────────────────────
+
+  private flowsOn(frameIds: string[]): { flows: FlowInfo[]; edges: FlowEdge[] } {
+    if (!frameIds.length) return { flows: [], edges: [] };
+    const rows = this.db.select().from(flows).where(inArray(flows.nodeId, frameIds)).all();
+    return { flows: rows.map((r) => this.flowInfoOf(r)), edges: rows.flatMap((r) => this.edgesOf(r.id)) };
+  }
+
+  private flowInfoOf(r: typeof flows.$inferSelect): FlowInfo {
+    const run = this.latestRun(r.id);
+    return {
+      id: r.id,
+      nodeId: r.nodeId,
+      name: r.name,
+      brief: r.brief,
+      schedule: r.scheduleJson ? (JSON.parse(r.scheduleJson) as FlowSchedule) : null,
+      nextRunAt: r.nextRunAt,
+      loopLimit: r.loopLimit,
+      run: run ? runInfo(run) : null,
+    };
+  }
+
+  flowInfo(flowId: string): FlowInfo | undefined {
+    const r = this.flowRow(flowId);
+    return r && this.flowInfoOf(r);
+  }
+
+  flowRow(flowId: string): typeof flows.$inferSelect | undefined {
+    return this.db.select().from(flows).where(eq(flows.id, flowId)).get();
+  }
+
+  flowByNode(nodeId: string): typeof flows.$inferSelect | undefined {
+    return this.db.select().from(flows).where(eq(flows.nodeId, nodeId)).get();
+  }
+
+  /** Flows whose frame isn't deleted. */
+  liveFlows(): (typeof flows.$inferSelect)[] {
+    return this.db
+      .select({ f: flows })
+      .from(flows)
+      .innerJoin(nodes, eq(nodes.id, flows.nodeId))
+      .where(isNull(nodes.deletedAt))
+      .all()
+      .map((r) => r.f);
+  }
+
+  insertFlow(row: typeof flows.$inferInsert): void {
+    this.db.insert(flows).values(row).run();
+  }
+
+  updateFlow(flowId: string, patch: Partial<Omit<typeof flows.$inferInsert, "id">>): void {
+    this.db.update(flows).set(patch).where(eq(flows.id, flowId)).run();
+  }
+
+  edgesOf(flowId: string): FlowEdge[] {
+    return this.db
+      .select()
+      .from(edges)
+      .where(eq(edges.flowId, flowId))
+      .all()
+      .map((e) => ({ ...e, mode: EdgeMode.parse(e.mode) }));
+  }
+
+  addEdge(e: Omit<FlowEdge, "id">): FlowEdge {
+    const row = { id: randomUUID(), ...e };
+    this.db.insert(edges).values(row).run();
+    return row;
+  }
+
+  edge(id: string): FlowEdge | undefined {
+    const e = this.db.select().from(edges).where(eq(edges.id, id)).get();
+    return e && { ...e, mode: EdgeMode.parse(e.mode) };
+  }
+
+  setEdgeMode(id: string, mode: EdgeMode): void {
+    this.db.update(edges).set({ mode }).where(eq(edges.id, id)).run();
+  }
+
+  removeEdge(id: string): void {
+    this.db.delete(edges).where(eq(edges.id, id)).run();
+  }
+
+  latestRun(flowId: string): typeof flowRuns.$inferSelect | undefined {
+    return this.db.select().from(flowRuns).where(eq(flowRuns.flowId, flowId)).orderBy(desc(flowRuns.startedAt)).limit(1).get();
+  }
+
+  run(runId: string): typeof flowRuns.$inferSelect | undefined {
+    return this.db.select().from(flowRuns).where(eq(flowRuns.id, runId)).get();
+  }
+
+  runsWithStatus(status: string[]): (typeof flowRuns.$inferSelect)[] {
+    return this.db.select().from(flowRuns).where(inArray(flowRuns.status, status)).all();
+  }
+
+  insertRun(row: typeof flowRuns.$inferInsert): void {
+    this.db.insert(flowRuns).values(row).run();
+  }
+
+  saveRun(runId: string, patch: Partial<Omit<typeof flowRuns.$inferInsert, "id">>): void {
+    this.db.update(flowRuns).set(patch).where(eq(flowRuns.id, runId)).run();
   }
 
   saveNodeGeometry(list: NodeGeometry[]): void {
@@ -561,6 +672,37 @@ export class WorkspaceStore {
     return toCanvasNode(row);
   }
 
+  /** A plain node (flow frames, Start nodes). */
+  createNode(input: {
+    canvasId: string;
+    parentId: string | null;
+    type: CanvasNode["type"];
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    data: Record<string, unknown>;
+  }): CanvasNode {
+    const row = this.db
+      .insert(nodes)
+      .values({
+        id: randomUUID(),
+        canvasId: input.canvasId,
+        projectId: null,
+        parentId: input.parentId,
+        type: input.type,
+        x: input.x,
+        y: input.y,
+        w: input.w,
+        h: input.h,
+        dataJson: JSON.stringify(input.data),
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+    return toCanvasNode(row);
+  }
+
   getNode(nodeId: string): CanvasNode | undefined {
     const row = this.db.select().from(nodes).where(eq(nodes.id, nodeId)).get();
     return row && toCanvasNode(row);
@@ -927,4 +1069,32 @@ function toStoredEvent(r: typeof events.$inferSelect): StoredEvent[] {
     return [];
   }
   return [{ chatId: r.chatId, seq: r.seq, ts: r.ts, turnId: r.turnId, event: parsed.data }];
+}
+
+/** The renderer's view of a run: its status, what waits on the user, and the log. */
+function runInfo(r: {
+  id: string;
+  status: string;
+  trigger: string;
+  stateJson: string;
+  logJson: string;
+  startedAt: number;
+  endedAt: number | null;
+}): FlowRunInfo {
+  const st = JSON.parse(r.stateJson) as {
+    approvals?: { id: string; edgeId: string; item: { text: string; label: string }; to: string }[];
+    loopCheck?: boolean;
+    handoffs?: number;
+  };
+  return {
+    id: r.id,
+    status: r.status as FlowRunInfo["status"],
+    trigger: r.trigger,
+    startedAt: r.startedAt,
+    endedAt: r.endedAt,
+    approvals: (st.approvals ?? []).map((a) => ({ id: a.id, edgeId: a.edgeId, from: a.item.label, to: a.to, text: a.item.text })),
+    loopCheck: Boolean(st.loopCheck),
+    handoffs: st.handoffs ?? 0,
+    log: (JSON.parse(r.logJson) as { at: number; text: string }[]).slice(-200),
+  };
 }

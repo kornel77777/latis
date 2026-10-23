@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Review</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="gate.css" />
+  </head>
+  <body>
+    <h1>Review</h1>
+    <div id="box"></div>
+    <script>
+      async function show() {
+        const inbox = (await latis.data.get("inbox")) ?? [];
+        const box = document.getElementById("box");
+        const it = inbox[0];
+        if (!it) {
+          box.innerHTML = "<div class='empty'>Text to review appears here when the flow reaches this card.</div>";
+          return;
+        }
+        box.innerHTML =
+          "<div class='from'></div><textarea aria-label='Text to send on'></textarea><div class='row' style='margin-top:6px'><button class='primary'>Send on</button><span class='muted'></span></div>";
+        box.querySelector(".from").textContent = `From ${it.label}`;
+        box.querySelector("textarea").value = it.text;
+        box.querySelector(".muted").textContent = inbox.length > 1 ? `${inbox.length - 1} more waiting` : "";
+        box.querySelector("button").onclick = async () => {
+          await latis.sendToFlow({ text: box.querySelector("textarea").value });
+          await latis.data.set("inbox", inbox.slice(1));
+          show();
+        };
+      }
+      latis.data.onChange(show);
+      show();
+    </script>
+  </body>
+</html>

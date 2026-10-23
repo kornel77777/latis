@@ -1,6 +1,48 @@
 # Progress
 
-## Current: M5 Orchestration: done 2026-10-23
+## Current: M6 Power features: done 2026-10-23
+
+Exit criteria: **S5** and **S6** pass. The e2e runs use the demo and replayed agents; the live runs used Claude Code and Codex (`e2e/live-m6.spec.ts`). Details are in `docs/qa/M6.md`.
+
+### Done
+
+- **Send later (§9.10):**
+  - Right-click Send or press the clock: 30 min / 1 h / 3 h / tomorrow 09:00 / a time / when the limit resets, with repeats.
+  - A countdown list sits above the composer.
+  - Messages survive restarts; missed ones go out once with a note.
+- **Limits and handoff (§9.10–9.11):**
+  - The limit banner offers "Send when it resets", "Continue with another agent…" and Dismiss.
+  - The handoff brief has the goal, the last report, the changed files and the TODOs, and can be edited. The new chat starts beside the old one in the same folder or worktree, linked "Continued from".
+  - The model picker has "Continue with…" too.
+- **Usage meter (§9.12):**
+  - Status-bar windows per agent: Claude 5h/7d, Codex 5h/7d (probed without tokens), Gemini "—".
+  - Limited agents show in red with their reset time.
+  - Multiple accounts per agent as separate CLI homes: add, label, switch (waits for running turns), forget.
+- **Cards (§12):**
+  - `card://` origin per card in a sandboxed iframe, no network unless granted per origin.
+  - The `window.latis` bridge: data, refresh, ask, exportPdf, theme, usage.
+  - Refresh scripts are approved per version and run without secrets.
+  - PDF export.
+  - Six bundled starters: Habit tracker, Countdown, Kanban, Repo dashboard, Usage dashboard, Pomodoro.
+  - `create_card`/`update_card` for agents.
+- **Flows (§11):**
+  - Start / chat (with a job) / note / card nodes; every / free / wait_all / approval edges.
+  - Brief, loop guard, `[flow done]`, pause / resume / stop, run log, persisted runs that resume after a restart.
+  - Hourly, daily and weekly schedules.
+  - Five gate cards.
+  - Five templates: Council, Review ×3, Pipeline, Team, Daily digest.
+  - `create_flow`/`start_flow` for the Conductor.
+  - Edges and connect handles on the canvas.
+- **Tests:** 102 unit, 45 native, 24 e2e (+ live M5/M6, opt-in).
+
+### Not done / known issues
+
+- A second account per agent hasn't been signed in live.
+- Flow chats raise "finished" Inbox items (noisy in big flows).
+- The handoff link is a header chip, not a canvas edge.
+- Gemini still isn't verified live as a workspace-tools caller (its free quota ran out).
+
+## M5 Orchestration: done 2026-10-23
 
 Exit criterion: **S4 with a real agent as Conductor** passes (`e2e/live-m5.spec.ts`). Claude Code conducted Claude Code, Codex and Gemini reviewers and wrote the "where they agree" note in 49 s. The same flow runs in CI with the demo agent (`e2e/m5.spec.ts`). Details are in `docs/qa/M5.md`.
 

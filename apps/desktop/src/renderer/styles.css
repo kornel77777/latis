@@ -194,3 +194,17 @@ body {
   opacity: 0.55;
   pointer-events: none;
 }
+
+/* Flow connect handles (§11): small accent dots on the sides of nodes inside a flow. */
+.react-flow__handle.latis-handle {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface);
+  background: var(--accent);
+}
+.react-flow__handle.latis-handle:hover {
+  transform: translate(-50%, -50%) scale(1.3);
+}
+.react-flow__handle-right.latis-handle:hover {
+  transform: translate(50%, -50%) scale(1.3);
+}

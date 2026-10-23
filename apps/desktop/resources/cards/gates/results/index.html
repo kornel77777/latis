@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Results</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="gate.css" />
+  </head>
+  <body>
+    <div class="row" style="justify-content: space-between">
+      <h1>Results</h1>
+      <button id="clear">Clear</button>
+    </div>
+    <div id="list" class="items"></div>
+    <script>
+      async function show() {
+        const items = (await latis.data.get("items")) ?? [];
+        const list = document.getElementById("list");
+        list.innerHTML = items.length ? "" : "<div class='empty'>Results collect here as the flow runs.</div>";
+        for (const it of items.slice().reverse()) {
+          const el = document.createElement("div");
+          el.className = "item";
+          el.innerHTML = "<div class='from'></div><div class='text'></div>";
+          el.children[0].textContent = `${it.label} · ${new Date(it.at).toLocaleTimeString()}`;
+          el.children[1].textContent = it.text;
+          list.appendChild(el);
+        }
+      }
+      document.getElementById("clear").onclick = async () => {
+        await latis.data.set("items", []);
+        show();
+      };
+      latis.data.onChange(show);
+      show();
+    </script>
+  </body>
+</html>

@@ -170,3 +170,58 @@ test("cards: a starter card runs isolated (no network, no Latis access), keeps i
   await expect.poll(() => existsSync(pdf) && readFileSync(pdf).subarray(0, 5).toString(), { timeout: 15_000 }).toBe("%PDF-");
   await again.app.close();
 });
+
+test("S6: the Daily digest flow runs on a schedule; watchers feed the writer; the digest waits for approval, then lands in the note", async () => {
+  const dataDir = tempDataDir();
+  const { app, page } = await launch(dataDir, { LATIS_DEMO_IN_PROJECTS: "1", LATIS_FLOW_AGENT: "fake" });
+  await page.locator(".react-flow__pane").click({ button: "right", position: { x: 300, y: 200 } });
+  await page.getByTestId("menu-new-flow").click();
+  await page.getByTestId("flow-templates").getByText("Daily digest").click();
+  const frame = page.getByTestId("flow-frame");
+  await expect(frame).toContainText("Daily digest");
+  await expect(page.getByTestId("flow-schedule")).toHaveText("Daily at 08:00");
+  const state = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const flow = state.flows[0]!;
+  expect(new Date(flow.nextRunAt!).getHours()).toBe(8);
+  expect(state.edges.map((e) => e.mode).sort()).toEqual(["approval", "every", "every", "wait_all", "wait_all"]);
+  expect(state.chats.map((c) => c.title).sort()).toEqual(["Watcher 1", "Watcher 2", "Writer"]);
+
+  // Run it now (the demo agent's /review script answers each message).
+  await page.evaluate(
+    async (id) =>
+      (globalThis as unknown as Api).latis.invoke("flow:start", { flowId: id, input: "Check dependency updates for shop /review" }),
+    flow.id,
+  );
+  await expect(page.getByTestId("flow-approvals")).toHaveText(/1 to approve/, { timeout: 30_000 });
+  const t = await page.evaluate(async () => {
+    const api = (globalThis as unknown as Api).latis;
+    const c = await api.invoke("canvas:load");
+    return api.invoke("chat:transcript", { chatId: c.chats.find((x) => x.title === "Writer")!.id });
+  });
+  // The writer got both watchers' output in one message, with the brief and its job.
+  expect(t.turns).toHaveLength(1);
+  expect(t.turns[0]!.userText).toContain("Your job: Write a short morning digest");
+  expect(t.turns[0]!.userText).toMatch(/## From Watcher 1[\s\S]*## From Watcher 2/);
+
+  await page.getByTestId("flow-approvals").click();
+  const approvals = page.getByTestId("approvals");
+  await approvals.getByLabel("Output to approve").fill("Digest: two packages have updates.");
+  await approvals.getByTestId("approve-keep").click();
+  await expect(page.getByTestId("flow-status")).toHaveText("Done", { timeout: 10_000 });
+  const after = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const note = after.nodes.find((n) => n.type === "note")!;
+  expect(String(note.data.text)).toMatch(/^# Digest\n\n### From Writer · .+\n\nDigest: two packages have updates\./);
+  expect(after.flows[0]!.run!.log.map((l) => l.text)).toEqual(
+    expect.arrayContaining(["Started.", "You kept Writer's output for Digest.", "Done."]),
+  );
+
+  // The schedule can change; the next run follows it.
+  await page.getByTestId("flow-schedule").click();
+  await page.getByTestId("schedule-form").getByLabel("Repeat").selectOption("hourly");
+  await page.getByTestId("schedule-form").getByLabel("Time").fill("00:15");
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByTestId("flow-schedule")).toHaveText("Hourly at :15");
+  const sched = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  expect(new Date(sched.flows[0]!.nextRunAt!).getMinutes()).toBe(15);
+  await app.close();
+});

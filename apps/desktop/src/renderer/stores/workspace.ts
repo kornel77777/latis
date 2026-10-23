@@ -9,6 +9,8 @@ import {
   type BrowserState,
   type ImageAttachment,
   type McpConnection,
+  type FlowEdge,
+  type FlowInfo,
   type Prefs,
   type ScheduledMessage,
   type Skill,
@@ -117,6 +119,11 @@ interface WorkspaceState {
   handoffFor: string | null;
   /** Where the card library (§12.3) will put the card it opens for; null = closed. */
   cardLibraryAt: { x: number; y: number } | null;
+  /** Flows (§11) by id, and all their edges. */
+  flows: Record<string, FlowInfo>;
+  flowEdges: FlowEdge[];
+  flowDialog: { flowId: string; kind: "log" | "approvals" | "schedule" | "brief" } | null;
+  flowTemplatesAt: { x: number; y: number } | null;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -135,6 +142,7 @@ interface WorkspaceState {
   focusNode(nodeId: string): void;
   /** Adds a node main created (a card), selected, and brings it into view. */
   addNode(node: CanvasNode): void;
+  addFlow(r: { flow: FlowInfo; nodes: CanvasNode[]; chats: ChatSummary[]; edges: FlowEdge[] }): void;
   /** Puts a chat main created onto the canvas, selects it and focuses its composer. */
   addCreatedChat(node: CanvasNode, chat: ChatSummary, frame: NodeGeometry | null, draft?: string): void;
   loadTranscript(chatId: string): Promise<void>;
@@ -211,7 +219,7 @@ function toFlowNode(n: CanvasNode): FlowNode {
     height: n.h,
     zIndex: n.z,
     data: n.data as FlowNode["data"],
-    dragHandle: n.type === "frame" ? ".latis-frame-drag" : ".latis-drag",
+    dragHandle: n.type === "frame" || n.type === "flow" ? ".latis-frame-drag" : ".latis-drag",
     ...(n.parentId && { parentId: n.parentId }),
   };
 }
@@ -348,6 +356,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   usage: {},
   handoffFor: null,
   cardLibraryAt: null,
+  flows: {},
+  flowEdges: [],
+  flowDialog: null,
+  flowTemplatesAt: null,
 
   async load() {
     try {
@@ -372,6 +384,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         nodes: sortNodes(canvas.nodes.map(toFlowNode)),
         chats,
         projects: Object.fromEntries(canvas.projects.map((p) => [p.id, p])),
+        flows: Object.fromEntries(canvas.flows.map((f) => [f.id, f])),
+        flowEdges: canvas.edges,
         theme,
         attention,
         ptys: ptys.filter((p) => p.place === "dock"),
@@ -501,6 +515,22 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       focusComposer: chat.id,
     }));
     get().focusNode(node.id);
+  },
+
+  addFlow({ flow, nodes, chats, edges }) {
+    set((s) => ({
+      nodes: sortNodes([
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        ...nodes.map((n) => ({ ...toFlowNode(n), className: "latis-appear" })),
+      ]),
+      chats: {
+        ...s.chats,
+        ...Object.fromEntries(chats.map((c) => [c.id, { summary: c, turns: [], events: [], lastSeq: -1, loaded: true }])),
+      },
+      flows: { ...s.flows, [flow.id]: flow },
+      flowEdges: [...s.flowEdges, ...edges],
+    }));
+    get().focusNode(flow.nodeId);
   },
 
   addNode(node) {
@@ -1113,6 +1143,15 @@ export function subscribeToMain(): void {
   latis.on("usage:changed", (raw) => {
     const parsed = eventContract["usage:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ usage: parsed.data });
+  });
+  latis.on("flow:changed", (raw) => {
+    const parsed = eventContract["flow:changed"].safeParse(raw);
+    if (parsed.success) useWorkspace.setState((s) => ({ flows: { ...s.flows, [parsed.data.id]: parsed.data } }));
+  });
+  latis.on("flow:edges", (raw) => {
+    const parsed = eventContract["flow:edges"].safeParse(raw);
+    if (parsed.success)
+      useWorkspace.setState((s) => ({ flowEdges: [...s.flowEdges.filter((e) => e.flowId !== parsed.data.flowId), ...parsed.data.edges] }));
   });
   latis.on("card:data", (raw) => {
     const parsed = eventContract["card:data"].safeParse(raw);

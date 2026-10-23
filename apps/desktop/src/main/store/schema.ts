@@ -220,3 +220,46 @@ export const cardData = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.cardId, t.key] })],
 );
+
+// Flows (§11). The flow is a frame node (type "flow"); its members are nodes parented to it.
+export const flows = sqliteTable("flows", {
+  id: text("id").primaryKey(),
+  nodeId: text("node_id").notNull(),
+  name: text("name").notNull(),
+  brief: text("brief").notNull().default(""),
+  /** { every: "hourly" | "daily" | "weekly", at: "08:00", weekday?: 0-6 } or null */
+  scheduleJson: text("schedule_json"),
+  nextRunAt: integer("next_run_at"),
+  loopLimit: integer("loop_limit").notNull().default(10),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const edges = sqliteTable(
+  "edges",
+  {
+    id: text("id").primaryKey(),
+    flowId: text("flow_id").notNull(),
+    source: text("source").notNull(),
+    target: text("target").notNull(),
+    /** every | free | wait_all | approval */
+    mode: text("mode").notNull().default("every"),
+  },
+  (t) => [index("edges_flow").on(t.flowId)],
+);
+
+// One row per run: what's in flight, waiting gates and the run log, so runs resume after a restart.
+export const flowRuns = sqliteTable(
+  "flow_runs",
+  {
+    id: text("id").primaryKey(),
+    flowId: text("flow_id").notNull(),
+    /** running | paused | done | stopped | error */
+    status: text("status").notNull(),
+    trigger: text("trigger").notNull(),
+    stateJson: text("state_json").notNull(),
+    logJson: text("log_json").notNull().default("[]"),
+    startedAt: integer("started_at").notNull(),
+    endedAt: integer("ended_at"),
+  },
+  (t) => [index("flow_runs_flow").on(t.flowId, t.startedAt)],
+);

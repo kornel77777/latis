@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { PermissionModeSchema } from "@latis/shared";
+import { FlowSpec, PermissionModeSchema } from "@latis/shared";
 import { ToolError, type WorkspaceService } from "./workspace";
 
 // Workspace MCP server (SPEC §10.1): Streamable HTTP on 127.0.0.1, a random port, and a bearer
@@ -172,6 +172,28 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
       annotations: { openWorldHint: false },
     },
     (a) => run(() => ws.updateCard(a.card_id, a)),
+  );
+  server.registerTool(
+    "create_flow",
+    {
+      description:
+        "Build a flow on the canvas: a Start node, chats with jobs, notes and cards, connected by edges. When a node produces output it goes " +
+        "along its edges. Edge modes: every (default), free (first idle target), wait_all (target gets all inputs together), approval (user keeps, " +
+        "sends back or drops). Chats get the brief and their job with every message; a chat can end its answer with [flow done] to finish the run. " +
+        'Card gates: pick, review, shortlist, form (with fields), results. Optional schedule: {"every":"daily","at":"08:00"}. Returns the flow id.',
+      inputSchema: { spec: FlowSpec },
+      annotations: { openWorldHint: false },
+    },
+    (a) => run(() => ws.createFlow(caller, a.spec)),
+  );
+  server.registerTool(
+    "start_flow",
+    {
+      description: "Run a flow now with this input (or its Start node's saved input).",
+      inputSchema: { flow_id: z.string(), input: z.string().max(20_000).optional() },
+      annotations: { openWorldHint: false },
+    },
+    (a) => run(() => ws.startFlow(a.flow_id, a.input)),
   );
   server.registerTool(
     "tidy_canvas",

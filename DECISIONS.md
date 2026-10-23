@@ -328,3 +328,20 @@ An extra account is a folder under `<dataDir>/accounts/<agent>/<id>`. While it's
 - **PDF export:** the card is loaded in a hidden window with a one-time snapshot token, which makes the bridge answer from a read-only copy of the card's data and theme. It's printed to A4 and saved where the user picks.
 - **Library and tools:** the six starters are bundled from `resources/cards` and copied into the card's folder, with a shared `base.css`. The Conductor's `create_card`/`update_card` write the same folder layout.
 - **Not done:** §12.3's "unloaded after 30 s on non-visible canvases". There's only one canvas, and off-screen nodes are already unmounted by the virtualised canvas.
+
+### 2026-10-23: Flows engine
+
+- **What a flow is:** a frame node of type `flow` with a `flows` row (name, brief, schedule, next run, loop limit). Its members are the nodes parented to the frame: a new `start` node type, chats (their job is in the node's data), notes and cards (a gate card's kind is in the node's data and its card row). Edges live in `edges`, run state in `flow_runs`.
+- **Outputs:** a chat's output is its final message for a turn the flow started, reported by a new supervisor hook (`turnEnded`). Turns the user starts in a flow chat don't route anywhere. A note passes what it receives on along its own edges. A gate card holds items in its data (`inbox`) until the user sends one on (`sendToFlow`). A results card collects (`items`).
+- **Edge modes:** `free` gives an item to the first target that's idle (not busy, nothing in flight from this run), otherwise it queues until a turn ends. `wait_all` buffers one item per incoming `wait_all` edge, then delivers them together, each under a "## From <sender>" header.
+- **Approval:** "Keep" can edit the text first. "Send back" re-runs the source chat with the feedback and its previous answer. "Drop" discards it.
+- **Run controls:**
+  - The loop guard counts every handoff in a run; "Continue" resets the count.
+  - `[flow done]` in a chat's answer ends the run.
+  - A run is done when nothing is in flight, waiting on approval or in a gate, queued or held.
+  - Pause holds handoffs; Stop interrupts the run's chats and drops what's waiting.
+- **Restarts:** after a restart, items that were in flight to chats are sent again, since those turns can't still be running.
+- **Schedules:** checked every 15 s. A run due while Latis was closed happens once on launch, with a note in the run log, and the next run is the next slot after now. A scheduled run uses the Start node's saved input.
+- **Building flows:** the builder lays nodes out by longest path from the Start node (cycles fall back to spec order). A spec can set `cwd` and `permissionMode`; without `cwd` the chats work in `<dataDir>/flows/<id>/`. `agent: "auto"` spreads chats across ready agents in the order Claude Code, Codex, Gemini.
+- **Added beyond the spec:** a `start_flow` tool, so the Conductor can run what it builds. `LATIS_FLOW_AGENT=<id>` makes every flow chat use one agent (tests).
+- **Not done:** flow chats raise "finished" Inbox items like any chat, which is noisy for big flows.

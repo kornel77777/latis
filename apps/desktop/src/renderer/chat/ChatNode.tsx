@@ -34,6 +34,7 @@ import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { ChatCondensed, ChatTile } from "./ChatCompact";
 import { Item, type ItemActions } from "./items";
 import { ModelPicker, PermissionPicker, ReasoningPicker } from "./pickers";
+import { ChatJob, FlowHandles } from "../canvas/flows";
 import { LimitBanner, ScheduledList, SendLaterDialog } from "./Later";
 import { SkillSuggestions, useSkillSuggestions } from "./SkillSuggestions";
 import { TerminalChatBody } from "./TerminalChatBody";
@@ -48,12 +49,23 @@ const CONDUCTOR_STARTERS = [
 const FALLBACK_HUE: Record<string, string> = { "claude-code": "amber-sand", codex: "slate-blue", gemini: "sky", fake: "violet" };
 
 /** A chat on the canvas: full card, condensed card or status tile depending on zoom (§8.4). */
-export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<FlowNode>) {
+export const ChatNode = memo(function ChatNode({ id, data, selected }: NodeProps<FlowNode>) {
   const level = useZoomLevel();
   const chatId = data.chatId ?? "";
-  if (level === "tile") return <ChatTile chatId={chatId} selected={selected} />;
-  if (level === "condensed") return <ChatCondensed chatId={chatId} selected={selected} />;
-  return <FullChat chatId={chatId} selected={selected} />;
+  const body =
+    level === "tile" ? (
+      <ChatTile chatId={chatId} selected={selected} />
+    ) : level === "condensed" ? (
+      <ChatCondensed chatId={chatId} selected={selected} />
+    ) : (
+      <FullChat chatId={chatId} selected={selected} />
+    );
+  return (
+    <>
+      {body}
+      <FlowHandles nodeId={id} />
+    </>
+  );
 });
 
 /** The full chat card; also used outside the canvas by focus mode (`inCanvas={false}`). */
@@ -336,6 +348,7 @@ export const FullChat = memo(function FullChat({
           </div>
         </header>
 
+        {inCanvas && <ChatJob nodeId={s.nodeId} />}
         {s.continuedFrom && (
           <button
             className="nodrag flex shrink-0 items-center gap-1.5 border-b border-line bg-bg-1 px-3 py-1 text-left text-[11.5px] text-text-3 hover:text-text-1"

@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Pick one</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="gate.css" />
+  </head>
+  <body>
+    <h1>Pick one</h1>
+    <div id="list" class="items side"></div>
+    <script>
+      async function show() {
+        const inbox = (await latis.data.get("inbox")) ?? [];
+        const list = document.getElementById("list");
+        list.innerHTML = inbox.length ? "" : "<div class='empty'>Options appear here when the flow reaches this card.</div>";
+        for (const it of inbox) {
+          const el = document.createElement("div");
+          el.className = "item";
+          el.innerHTML = "<div class='from'></div><div class='text'></div><button class='primary'>Pick this</button>";
+          el.children[0].textContent = it.label;
+          el.children[1].textContent = it.text;
+          el.querySelector("button").onclick = async () => {
+            await latis.sendToFlow({ text: it.text });
+            await latis.data.set("inbox", []);
+            show();
+          };
+          list.appendChild(el);
+        }
+      }
+      latis.data.onChange(show);
+      show();
+    </script>
+  </body>
+</html>

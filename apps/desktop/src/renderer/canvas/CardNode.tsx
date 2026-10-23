@@ -4,6 +4,7 @@ import { AppWindow, FileDown, FolderOpen, MoreHorizontal, RefreshCw, Trash2 } fr
 import { Button, Dialog, Menu, MenuItem, MenuSeparator } from "@latis/ui";
 import { latis } from "../api";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
+import { FlowHandles } from "./flows";
 import { useZoomLevel } from "./zoom";
 
 // Cards (§12): a sandboxed iframe on its own card:// origin. This component is the only way a
@@ -97,20 +98,24 @@ export const CardNode = memo(function CardNode({ id, data, selected }: NodeProps
 
   if (level === "tile") {
     return (
-      <article
-        data-testid="card"
-        data-zoom="tile"
-        className="latis-drag flex h-full w-full flex-col rounded-card border-2 border-line bg-surface p-8"
-      >
-        <AppWindow size={40} className="text-text-3" />
-        <h3 className="mt-4 line-clamp-3 text-[44px] font-semibold leading-tight text-text-1">{d.title}</h3>
-      </article>
+      <>
+        <article
+          data-testid="card"
+          data-zoom="tile"
+          className="latis-drag flex h-full w-full flex-col rounded-card border-2 border-line bg-surface p-8"
+        >
+          <AppWindow size={40} className="text-text-3" />
+          <h3 className="mt-4 line-clamp-3 text-[44px] font-semibold leading-tight text-text-1">{d.title}</h3>
+        </article>
+        <FlowHandles nodeId={id} />
+      </>
     );
   }
 
   return (
     <>
       <NodeResizer isVisible={selected} minWidth={240} minHeight={160} />
+      <FlowHandles nodeId={id} />
       <article
         aria-label={`Card: ${d.title ?? "Card"}`}
         data-testid="card"

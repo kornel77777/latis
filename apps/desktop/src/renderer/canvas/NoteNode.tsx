@@ -5,6 +5,7 @@ import { Button, Menu, MenuItem, MenuSeparator, cn } from "@latis/ui";
 import { latis } from "../api";
 import { Markdown } from "../markdown/Markdown";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
+import { FlowHandles } from "./flows";
 import { useZoomLevel } from "./zoom";
 
 // Markdown notes on the canvas (§9.13): rendered preview, double-click or Enter to edit.
@@ -29,20 +30,24 @@ export const NoteNode = memo(function NoteNode({ id, data, selected }: NodeProps
 
   if (level === "tile") {
     return (
-      <article
-        data-testid="note"
-        data-zoom="tile"
-        className="latis-drag flex h-full w-full flex-col rounded-card border-2 border-line bg-surface p-8"
-      >
-        <StickyNote size={40} className="text-text-3" />
-        <h3 className="mt-4 line-clamp-3 text-[44px] font-semibold leading-tight text-text-1">{titleOf(text)}</h3>
-      </article>
+      <>
+        <article
+          data-testid="note"
+          data-zoom="tile"
+          className="latis-drag flex h-full w-full flex-col rounded-card border-2 border-line bg-surface p-8"
+        >
+          <StickyNote size={40} className="text-text-3" />
+          <h3 className="mt-4 line-clamp-3 text-[44px] font-semibold leading-tight text-text-1">{titleOf(text)}</h3>
+        </article>
+        <FlowHandles nodeId={id} />
+      </>
     );
   }
 
   return (
     <>
       <NodeResizer isVisible={selected} minWidth={220} minHeight={140} />
+      <FlowHandles nodeId={id} />
       <article
         aria-label={`Note: ${titleOf(text)}`}
         data-testid="note"

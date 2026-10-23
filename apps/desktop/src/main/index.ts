@@ -36,7 +36,10 @@ import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer } from "./mcp/server";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
 import { CARD_SIZE, Cards } from "./cards/cards";
-import { starters } from "./cards/library";
+import { gateCard, starters } from "./cards/library";
+import { FlowEngine, nextRun } from "./flows/engine";
+import { buildFlow } from "./flows/build";
+import { TEMPLATES } from "./flows/templates";
 import { buildBrief } from "./handoff";
 import { Scheduler } from "./scheduler";
 import { UsageMeter } from "./usage";
@@ -184,6 +187,13 @@ const supervisor = new SessionSupervisor(
   },
   {
     sessionOptions: (chat) => sessionOptions(chat),
+    turnEnded: (chatId, status, final) => {
+      try {
+        flows.turnEnded(chatId, status, final);
+      } catch (err) {
+        console.error("[flows] routing a turn's output failed", err);
+      }
+    },
     expand: (chatId, text) => {
       const chat = store.getChat(chatId);
       const project = chat?.projectId ? store.getProject(chat.projectId) : undefined;
@@ -250,6 +260,65 @@ function showCard(node: import("@latis/shared").CanvasNode, reveal = true) {
   emit(win?.webContents, "canvas:upsert", { nodes: [node], chats: [], projects: [], reveal: reveal ? node.id : null });
 }
 
+// ── Flows (§11) ───────────────────────────────────────────────────────────────
+
+const flows = new FlowEngine({
+  store,
+  send: (chatId, text) => supervisor.enqueue(chatId, text),
+  interrupt: (chatId) => supervisor.interrupt(chatId),
+  busy: (chatId) => supervisor.busy(chatId),
+  appendNote: (nodeId, markdown) => {
+    const n = store.getNode(nodeId);
+    if (!n) return;
+    store.updateNodeData(nodeId, { text: `${String(n.data.text ?? "").trimEnd()}\n\n${markdown}\n` });
+    emit(win?.webContents, "canvas:upsert", { nodes: [store.getNode(nodeId)!], chats: [], projects: [], reveal: null });
+  },
+  cardReceive: (nodeId, items, mode) => {
+    const cardId = String(store.getNode(nodeId)?.data.cardId ?? "");
+    if (!cards.row(cardId)) return;
+    const key = mode === "gate" ? "inbox" : "items";
+    const prev = (cards.dataGet(cardId, key) as unknown[] | null) ?? [];
+    const add = items.map((i) => ({ id: i.id, text: i.text, label: i.label, at: Date.now() }));
+    cards.dataSet(cardId, key, [...prev, ...add].slice(-200));
+    emit(win?.webContents, "card:data", { cardId });
+  },
+  changed: (flowId) => {
+    const info = store.flowInfo(flowId);
+    if (info) emit(win?.webContents, "flow:changed", info);
+  },
+});
+
+async function readyAgents(): Promise<string[]> {
+  const list = await agents.list();
+  const ok = (id: string) => list.some((a) => a.id === id && a.installed && a.signedIn && a.kind === "structured");
+  const order = ["claude-code", "codex", "gemini", ...list.map((a) => a.id)];
+  const ids = [...new Set(order)].filter((id) => ok(id) && (id !== "fake" || process.env.LATIS_DEMO_IN_PROJECTS === "1"));
+  // The demo agent stands in for everything in tests.
+  return process.env.LATIS_FLOW_AGENT ? [process.env.LATIS_FLOW_AGENT] : ids;
+}
+
+function createFlowFrom(spec: import("@latis/shared").FlowSpec, x: number, y: number) {
+  return buildFlow(
+    {
+      store,
+      dataDir,
+      canvasId,
+      readyAgents,
+      defaultMode: () => store.getSetting<PermissionMode>("defaultPermissionMode") ?? "auto-edit",
+      createCard: ({ title, gate, fields, x: cx, y: cy, parentId }) => {
+        const g = gateCard(gate);
+        if (!g) throw new Error(`There's no "${gate}" gate card.`);
+        const node = cards.create({ canvasId, title, html: g.html, files: g.files, gate, x: cx, y: cy, parentId });
+        if (fields) cards.dataSet(String(node.data.cardId), "fields", fields);
+        return node;
+      },
+    },
+    spec,
+    x,
+    y,
+  );
+}
+
 const workspace = new WorkspaceService({
   store,
   canvasId,
@@ -276,6 +345,14 @@ const workspace = new WorkspaceService({
     tidy: () => emit(win?.webContents, "canvas:command", { type: "tidy" }),
   },
   maxSpawned: () => prefs().maxSpawned,
+  createFlow: async (spec, x, y) => {
+    const r = await createFlowFrom(spec, x, y);
+    emit(win?.webContents, "canvas:upsert", { nodes: r.nodes, chats: r.chats, projects: [], reveal: r.nodes[0]!.id });
+    emit(win?.webContents, "flow:changed", r.flow);
+    emit(win?.webContents, "flow:edges", { flowId: r.flow.id, edges: r.edges });
+    return r.flow;
+  },
+  startFlow: (flowId, input) => flows.start(flowId, input, "the Conductor"),
   cards: {
     create: (input) => {
       const node = cards.create({ canvasId, ...input });
@@ -892,8 +969,12 @@ registerHandlers({
         return usage.get();
       case "exportPdf":
         return exportCardPdf(cardId, args[0]);
-      case "sendToFlow":
-        throw new Error("Only a flow's gate cards can send items to the flow.");
+      case "sendToFlow": {
+        const row = cards.row(cardId)!;
+        if (!row.gate || row.gate === "results") throw new Error("Only a flow's gate cards can send items to the flow.");
+        flows.fromCard(row.nodeId, args[0]);
+        return null;
+      }
     }
   },
   "card:library": () => starters.map(({ id, title, description }) => ({ id, title, description })),
@@ -913,6 +994,68 @@ registerHandlers({
   "card:openFolder": async ({ cardId }) => {
     if (!cards.row(cardId)) return { ok: false };
     return { ok: (await shell.openPath(cards.dir(cardId))) === "" };
+  },
+  "flow:templates": () => TEMPLATES.map(({ id, title, description }) => ({ id, title, description })),
+  "flow:create": async ({ template, spec, x, y }) => {
+    const t = template ? TEMPLATES.find((x) => x.id === template) : undefined;
+    const s = spec ?? t?.spec;
+    if (!s) throw new Error("Pick a template.");
+    return createFlowFrom(s, x, y);
+  },
+  "flow:start": ({ flowId, input }) => {
+    flows.start(flowId, input, "you");
+    return store.flowInfo(flowId)!;
+  },
+  "flow:control": ({ flowId, action }) => {
+    flows.control(flowId, action);
+    return store.flowInfo(flowId)!;
+  },
+  "flow:approve": ({ flowId, approvalId, action, feedback, text }) => {
+    flows.approve(flowId, approvalId, action, feedback, text);
+    return store.flowInfo(flowId)!;
+  },
+  "flow:loop": ({ flowId, continue: go }) => {
+    flows.loop(flowId, go);
+    return store.flowInfo(flowId)!;
+  },
+  "flow:update": ({ flowId, name, brief, schedule, loopLimit }) => {
+    const f = store.flowRow(flowId);
+    if (!f) throw new Error("That flow no longer exists.");
+    store.updateFlow(flowId, {
+      ...(name !== undefined && { name }),
+      ...(brief !== undefined && { brief }),
+      ...(loopLimit !== undefined && { loopLimit }),
+      ...(schedule !== undefined && {
+        scheduleJson: schedule ? JSON.stringify(schedule) : null,
+        nextRunAt: schedule ? nextRun(schedule, Date.now()) : null,
+      }),
+    });
+    if (name) store.updateNodeData(f.nodeId, { name });
+    return store.flowInfo(flowId)!;
+  },
+  "flow:connect": ({ flowId, source, target, mode }) => {
+    const f = store.flowRow(flowId);
+    const [a, b] = [store.getNode(source), store.getNode(target)];
+    if (!f || !a || !b || a.parentId !== f.nodeId || b.parentId !== f.nodeId) throw new Error("Connect two things inside the same flow.");
+    if (source === target) throw new Error("A node can't feed itself.");
+    if (b.type === "start") throw new Error("Nothing goes into a Start node.");
+    if (store.edgesOf(flowId).some((e) => e.source === source && e.target === target)) throw new Error("They're already connected.");
+    const e = store.addEdge({ flowId, source, target, mode: mode ?? "every" });
+    return e;
+  },
+  "flow:edge": ({ edgeId, mode }) => {
+    if (!store.edge(edgeId)) return { ok: false };
+    if (mode === null) store.removeEdge(edgeId);
+    else store.setEdgeMode(edgeId, mode);
+    return { ok: true };
+  },
+  "flow:setJob": ({ nodeId, job }) => {
+    store.updateNodeData(nodeId, { job });
+    return { ok: true };
+  },
+  "flow:setStart": ({ nodeId, input, oneTaskPerLine }) => {
+    store.updateNodeData(nodeId, { input, oneTaskPerLine });
+    return { ok: true };
   },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
@@ -1046,6 +1189,9 @@ void app.whenReady().then(() => {
   createWindow();
   void ensureConductor().catch((err: unknown) => console.error("[conductor] couldn't create the Conductor", err));
   scheduler.start();
+  flows.resumeAll();
+  setInterval(() => flows.tick(), 15_000);
+  flows.tick();
   void probeUsage();
   setInterval(() => void probeUsage(), 15 * 60_000);
   app.on("activate", () => {

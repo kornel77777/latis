@@ -7,6 +7,8 @@ import {
   type ChatStatus,
   type ChatSummary,
   type FileDiff,
+  type FlowInfo,
+  type FlowSpec,
   type FocusView,
   type PermissionMode,
   type Project,
@@ -52,6 +54,8 @@ export interface WorkspaceDeps {
   };
   /** Max chats a caller may have running at once (§10.1 guardrails). */
   maxSpawned(): number;
+  createFlow(spec: FlowSpec, x: number, y: number): Promise<FlowInfo>;
+  startFlow(flowId: string, input?: string): void;
   cards: {
     create(input: { title: string; html: string; refreshScript?: string; x: number; y: number }): CanvasNode;
     update(id: string, patch: { html?: string; refreshScript?: string; title?: string }): CanvasNode;
@@ -306,6 +310,26 @@ export class WorkspaceService {
     this.d.store.updateNodeData(noteId, { text });
     this.d.ui.upsert({ nodes: [this.d.store.getNode(noteId)!], chats: [], projects: [], reveal: null });
     return { note_id: noteId };
+  }
+
+  /** A flow from a spec (§11.6), placed to the right of the caller. */
+  async createFlow(callerId: string, spec: FlowSpec) {
+    const p = this.placeNear(this.d.store.getChat(callerId));
+    try {
+      const f = await this.d.createFlow(spec, p.x, p.y);
+      return { flow_id: f.id, schedule: f.schedule, next_run: f.nextRunAt ? new Date(f.nextRunAt).toISOString() : null };
+    } catch (err) {
+      throw new ToolError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  startFlow(flowId: string, input?: string) {
+    try {
+      this.d.startFlow(flowId, input);
+    } catch (err) {
+      throw new ToolError(err instanceof Error ? err.message : String(err));
+    }
+    return { started: true };
   }
 
   /** A card (§12) next to the caller: HTML the agent wrote, isolated and offline unless the user allows more. */

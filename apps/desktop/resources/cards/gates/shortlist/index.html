@@ -1,0 +1,45 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Shortlist</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="gate.css" />
+  </head>
+  <body>
+    <h1>Shortlist</h1>
+    <div id="list" class="items"></div>
+    <div class="row" style="margin-top: 8px"><button class="primary" id="send" disabled>Send the ticked ones on</button></div>
+    <script>
+      let inbox = [];
+      const picked = new Set();
+      async function show() {
+        inbox = (await latis.data.get("inbox")) ?? [];
+        picked.clear();
+        const list = document.getElementById("list");
+        list.innerHTML = inbox.length ? "" : "<div class='empty'>Items appear here when the flow reaches this card.</div>";
+        inbox.forEach((it) => {
+          const el = document.createElement("label");
+          el.className = "item";
+          el.innerHTML = "<span class='row'><input type='checkbox'><span class='from'></span></span><span class='text'></span>";
+          el.querySelector(".from").textContent = it.label;
+          el.querySelector(".text").textContent = it.text;
+          el.querySelector("input").onchange = (e) => {
+            e.target.checked ? picked.add(it.id) : picked.delete(it.id);
+            document.getElementById("send").disabled = !picked.size;
+          };
+          list.appendChild(el);
+        });
+        document.getElementById("send").disabled = true;
+      }
+      document.getElementById("send").onclick = async () => {
+        const chosen = inbox.filter((i) => picked.has(i.id));
+        await latis.sendToFlow({ text: chosen.map((i) => `- ${i.text.trim()}`).join("\n") });
+        await latis.data.set("inbox", []);
+        show();
+      };
+      latis.data.onChange(show);
+      show();
+    </script>
+  </body>
+</html>

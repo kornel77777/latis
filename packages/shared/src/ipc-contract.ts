@@ -10,7 +10,7 @@ export type Theme = z.infer<typeof Theme>;
 export const Viewport = z.object({ x: z.number(), y: z.number(), zoom: z.number().min(0.1).max(4) });
 export type Viewport = z.infer<typeof Viewport>;
 
-export const NodeType = z.enum(["chat", "terminal", "browser", "card", "note", "frame", "image", "flow"]);
+export const NodeType = z.enum(["chat", "terminal", "browser", "card", "note", "frame", "image", "flow", "start"]);
 
 export const CanvasNode = z.object({
   id: z.string(),
@@ -149,6 +149,86 @@ export const PtyInfo = z.object({
   running: z.boolean(),
 });
 export type PtyInfo = z.infer<typeof PtyInfo>;
+
+// ── Flows (§11) ──────────────────────────────────────────────────────────────
+
+export const EdgeMode = z.enum(["every", "free", "wait_all", "approval"]);
+export type EdgeMode = z.infer<typeof EdgeMode>;
+
+export const FlowEdge = z.object({ id: z.string(), flowId: z.string(), source: z.string(), target: z.string(), mode: EdgeMode });
+export type FlowEdge = z.infer<typeof FlowEdge>;
+
+export const FlowSchedule = z.object({
+  every: z.enum(["hourly", "daily", "weekly"]),
+  /** "HH:MM", local time (minutes past the hour for hourly). */
+  at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+  /** 0 = Sunday, for weekly. */
+  weekday: z.number().int().min(0).max(6).optional(),
+});
+export type FlowSchedule = z.infer<typeof FlowSchedule>;
+
+export const GateKind = z.enum(["pick", "review", "shortlist", "form", "results"]);
+export type GateKind = z.infer<typeof GateKind>;
+
+/** What `create_flow` and the templates build from (§11.6). */
+export const FlowSpec = z.object({
+  name: z.string().min(1).max(80),
+  brief: z.string().max(4000).optional(),
+  /** Folder the flow's chats work in; a scratch folder if left out. */
+  cwd: z.string().optional(),
+  permissionMode: PermissionModeSchema.optional(),
+  schedule: FlowSchedule.nullable().optional(),
+  nodes: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(40),
+        type: z.enum(["start", "chat", "note", "card"]),
+        title: z.string().max(80).optional(),
+        agent: z.string().optional(),
+        job: z.string().max(4000).optional(),
+        oneTaskPerLine: z.boolean().optional(),
+        gate: GateKind.optional(),
+        /** Form gate: the fields to fill in. */
+        fields: z.array(z.string().max(60)).max(12).optional(),
+        /** Start: what a scheduled run starts with. */
+        input: z.string().max(4000).optional(),
+      }),
+    )
+    .min(1)
+    .max(24),
+  edges: z.array(z.object({ from: z.string(), to: z.string(), mode: EdgeMode.optional() })).max(60),
+});
+export type FlowSpec = z.infer<typeof FlowSpec>;
+
+export const FlowApproval = z.object({ id: z.string(), edgeId: z.string(), from: z.string(), to: z.string(), text: z.string() });
+export type FlowApproval = z.infer<typeof FlowApproval>;
+
+export const FlowRunInfo = z.object({
+  id: z.string(),
+  status: z.enum(["running", "paused", "done", "stopped", "error"]),
+  trigger: z.string(),
+  startedAt: z.number(),
+  endedAt: z.number().nullable(),
+  /** Items waiting on approval edges (§11.2). */
+  approvals: z.array(FlowApproval),
+  /** The loop guard tripped: Continue or Stop (§11.3). */
+  loopCheck: z.boolean(),
+  handoffs: z.number(),
+  log: z.array(z.object({ at: z.number(), text: z.string() })),
+});
+export type FlowRunInfo = z.infer<typeof FlowRunInfo>;
+
+export const FlowInfo = z.object({
+  id: z.string(),
+  nodeId: z.string(),
+  name: z.string(),
+  brief: z.string(),
+  schedule: FlowSchedule.nullable(),
+  nextRunAt: z.number().nullable(),
+  loopLimit: z.number(),
+  run: FlowRunInfo.nullable(),
+});
+export type FlowInfo = z.infer<typeof FlowInfo>;
 
 /** A message waiting to be sent later (§9.10). */
 export const ScheduledMessage = z.object({
@@ -393,6 +473,8 @@ export const CanvasState = z.object({
   nodes: z.array(CanvasNode),
   chats: z.array(ChatSummary),
   projects: z.array(Project),
+  flows: z.array(FlowInfo),
+  edges: z.array(FlowEdge),
 });
 export type CanvasState = z.infer<typeof CanvasState>;
 
@@ -665,6 +747,43 @@ export const invokeContract = {
   "card:library": { req: none, res: z.array(z.object({ id: z.string(), title: z.string(), description: z.string() })) },
   "card:create": { req: z.object({ canvasId: z.string(), starter: z.string(), x: z.number(), y: z.number() }), res: CanvasNode },
   "card:openFolder": { req: z.object({ cardId: z.string() }), res: ok },
+  "flow:templates": { req: none, res: z.array(z.object({ id: z.string(), title: z.string(), description: z.string() })) },
+  /** A flow from a template or a spec (§11.5, §11.6), laid out left to right at x, y. */
+  "flow:create": {
+    req: z.object({ canvasId: z.string(), template: z.string().optional(), spec: FlowSpec.optional(), x: z.number(), y: z.number() }),
+    res: z.object({ flow: FlowInfo, nodes: z.array(CanvasNode), chats: z.array(ChatSummary), edges: z.array(FlowEdge) }),
+  },
+  "flow:start": { req: z.object({ flowId: z.string(), input: z.string().max(20_000).optional() }), res: FlowInfo },
+  "flow:control": { req: z.object({ flowId: z.string(), action: z.enum(["pause", "resume", "stop"]) }), res: FlowInfo },
+  "flow:approve": {
+    req: z.object({
+      flowId: z.string(),
+      approvalId: z.string(),
+      action: z.enum(["keep", "sendBack", "drop"]),
+      feedback: z.string().max(4000).optional(),
+      /** Keep with an edited text. */
+      text: z.string().max(100_000).optional(),
+    }),
+    res: FlowInfo,
+  },
+  "flow:loop": { req: z.object({ flowId: z.string(), continue: z.boolean() }), res: FlowInfo },
+  "flow:update": {
+    req: z.object({
+      flowId: z.string(),
+      name: z.string().min(1).max(80).optional(),
+      brief: z.string().max(4000).optional(),
+      schedule: FlowSchedule.nullable().optional(),
+      loopLimit: z.number().int().min(1).max(100).optional(),
+    }),
+    res: FlowInfo,
+  },
+  "flow:connect": {
+    req: z.object({ flowId: z.string(), source: z.string(), target: z.string(), mode: EdgeMode.optional() }),
+    res: FlowEdge,
+  },
+  "flow:edge": { req: z.object({ edgeId: z.string(), mode: EdgeMode.nullable() }), res: ok },
+  "flow:setJob": { req: z.object({ nodeId: z.string(), job: z.string().max(4000) }), res: ok },
+  "flow:setStart": { req: z.object({ nodeId: z.string(), input: z.string().max(20_000), oneTaskPerLine: z.boolean() }), res: ok },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */
@@ -700,6 +819,8 @@ export const eventContract = {
     reveal: z.string().nullable(),
   }),
   "schedule:changed": z.array(ScheduledMessage),
+  "flow:changed": FlowInfo,
+  "flow:edges": z.object({ flowId: z.string(), edges: z.array(FlowEdge) }),
   /** A card's data changed outside the card (refresh, flows); the card is told to re-read it. */
   "card:data": z.object({ cardId: z.string() }),
   "usage:changed": UsageState,

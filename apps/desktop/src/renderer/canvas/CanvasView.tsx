@@ -1,16 +1,31 @@
-import { useEffect, useRef, useState } from "react";
-import { Background, BackgroundVariant, MiniMap, ReactFlow, useReactFlow, useViewport, type NodeTypes } from "@xyflow/react";
-import { AppWindow, FolderOpen, LayoutGrid, Sparkles, StickyNote } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Background,
+  BackgroundVariant,
+  MarkerType,
+  MiniMap,
+  ReactFlow,
+  useReactFlow,
+  useViewport,
+  type Connection,
+  type Edge,
+  type EdgeTypes,
+  type NodeTypes,
+} from "@xyflow/react";
+import { latis } from "../api";
+import { AppWindow, FolderOpen, LayoutGrid, Sparkles, StickyNote, Workflow } from "lucide-react";
 import { Button, cn } from "@latis/ui";
 import { ChatNode } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
 import { Checklist } from "../app/Checklist";
 import { NoteNode } from "./NoteNode";
 import { CardNode } from "./CardNode";
+import { FlowEdgeView, FlowFrame, StartNode } from "./flows";
 import { ProjectFrame } from "./ProjectFrame";
 import { useCanvasActions } from "./useCanvasActions";
 
-const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame, note: NoteNode, card: CardNode };
+const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame, note: NoteNode, card: CardNode, flow: FlowFrame, start: StartNode };
+const edgeTypes: EdgeTypes = { flow: FlowEdgeView };
 
 let visibleTimer: ReturnType<typeof setTimeout> | null = null;
 /** Tells main which chats are on screen, so it can skip their notifications while Latis is focused (§8.6). */
@@ -42,6 +57,33 @@ export function CanvasView() {
   const grid = useWorkspace((s) => s.prefs?.appearance.grid ?? "dots");
   const wallpaper = useWorkspace((s) => s.prefs?.appearance.wallpaper ?? null);
   const nodeCount = nodes.length;
+  const flowEdges = useWorkspace((s) => s.flowEdges);
+  // Flow edges (§11.2), only between nodes that are on the canvas.
+  const edges = useMemo<Edge[]>(() => {
+    const ids = new Set(nodes.map((n) => n.id));
+    return flowEdges
+      .filter((e) => ids.has(e.source) && ids.has(e.target))
+      .map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        type: "flow",
+        data: { mode: e.mode },
+        markerEnd: { type: MarkerType.ArrowClosed, color: "var(--accent)" },
+      }));
+  }, [flowEdges, nodes]);
+  const onConnect = (c: Connection) => {
+    const ws = useWorkspace.getState();
+    const parent = ws.nodes.find((n) => n.id === c.source)?.parentId;
+    const flowId = String((ws.nodes.find((n) => n.id === parent)?.data as { flowId?: string } | undefined)?.flowId ?? "");
+    if (!flowId) return;
+    void latis
+      .invoke("flow:connect", { flowId, source: c.source, target: c.target })
+      .then((e) => useWorkspace.setState((s) => ({ flowEdges: [...s.flowEdges, e] })))
+      .catch((err: unknown) =>
+        ws.toast(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(err)),
+      );
+  };
   // The Conductor alone doesn't make the canvas non-empty; the welcome moves aside for it.
   const conductorNode = useWorkspace((s) => Object.values(s.chats).find((c) => c.summary.role === "conductor")?.summary.nodeId);
   const empty = nodes.every((n) => n.id === conductorNode);
@@ -121,6 +163,9 @@ export function CanvasView() {
       <ReactFlow
         nodes={nodes}
         nodeTypes={nodeTypes}
+        edges={edges}
+        edgeTypes={edgeTypes}
+        onConnect={onConnect}
         onNodesChange={onNodesChange}
         defaultViewport={initialViewport ?? { x: 80, y: 60, zoom: 1 }}
         onMoveEnd={(_e, v) => {
@@ -228,6 +273,17 @@ export function CanvasView() {
             data-testid="menu-new-card"
           >
             <AppWindow size={13} /> New card…
+          </button>
+          <button
+            role="menuitem"
+            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            onClick={() => {
+              useWorkspace.setState({ flowTemplatesAt: flow.screenToFlowPosition(menu) });
+              setMenu(null);
+            }}
+            data-testid="menu-new-flow"
+          >
+            <Workflow size={13} /> New flow…
           </button>
           <button
             role="menuitem"

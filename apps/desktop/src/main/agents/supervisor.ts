@@ -57,6 +57,8 @@ export interface SessionExtras {
   sessionOptions?(chat: ChatSummary): Promise<Partial<SessionOptions>>;
   /** What the agent receives for what the user typed (skills, §9.14). The transcript keeps the typed text. */
   expand?(chatId: string, text: string): string;
+  /** A turn ended, with the agent's final message (flows, §11). */
+  turnEnded?(chatId: string, status: "ok" | "interrupted" | "error", finalMessage: string | undefined): void;
 }
 
 const TITLE_MAX = 48;
@@ -137,6 +139,7 @@ export class SessionSupervisor {
       this.log.flush();
       this.setStatus(chatId, "error");
       this.raise(chatId, "error", null, message);
+      this.extras.turnEnded?.(chatId, "error", undefined);
       return { ...turn, endedAt: Date.now(), status: "error" };
     }
     const turn = this.store.createTurn(chatId, text);
@@ -424,6 +427,7 @@ export class SessionSupervisor {
         if (e.status === "ok") this.autoTitle(chatId);
         live.turnId = null;
         this.afterTurn(chatId, e.status);
+        this.extras.turnEnded?.(chatId, e.status, this.lastMessage.get(chatId));
       }
     } catch (err) {
       console.error("[supervisor] event handling failed", err);
@@ -523,6 +527,7 @@ export class SessionSupervisor {
     this.setStatus(chatId, "error");
     this.resolve(chatId, { kinds: [...REQUEST_KINDS] });
     this.raise(chatId, "error", null, message);
+    if (live.turnId) this.extras.turnEnded?.(chatId, "error", undefined);
   }
 
   private setStatus(chatId: string, status: ChatStatus) {

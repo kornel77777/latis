@@ -87,6 +87,10 @@ async function setup(opts: { confirm?: boolean; maxSpawned?: number } = {}) {
     confirm: async () => opts.confirm ?? true,
     ui: { upsert: (p) => upserts.push(p), focus: (v) => focused.push(v), tidy: () => undefined },
     maxSpawned: () => opts.maxSpawned ?? 6,
+    createFlow: async () => {
+      throw new Error("not in this test");
+    },
+    startFlow: () => undefined,
     cards: {
       create: (input) => cards.create({ canvasId, ...input }),
       update: (id, patch) => cards.update(id, patch),
@@ -144,6 +148,7 @@ describe("Workspace MCP server", () => {
         "append_note",
         "close_chat",
         "create_card",
+        "create_flow",
         "create_note",
         "focus",
         "get_diff",
@@ -152,6 +157,7 @@ describe("Workspace MCP server", () => {
         "read_chat",
         "send_message",
         "spawn_chat",
+        "start_flow",
         "tidy_canvas",
         "update_card",
         "wait_for_chats",

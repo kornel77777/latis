@@ -15,6 +15,7 @@ import { PerfOverlay } from "./PerfOverlay";
 import { Palette } from "../palette/Palette";
 import { HandoffDialog } from "../chat/Later";
 import { CardLibrary } from "../canvas/CardLibrary";
+import { FlowDialogs, FlowTemplates } from "../canvas/flows";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
 import { useAppearance } from "./useAppearance";
@@ -101,6 +102,8 @@ export function App() {
         <TimelineDialog />
         <HandoffDialog />
         <CardLibrary />
+        <FlowDialogs />
+        <FlowTemplates />
         <ReviewPanel />
         <Onboarding />
         <PerfOverlay />

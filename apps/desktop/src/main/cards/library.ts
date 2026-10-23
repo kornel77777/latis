@@ -21,3 +21,9 @@ export const starters: Starter[] = Object.entries(meta).map(([id, m]) => ({
   ...(byPath[`${id}/refresh.mjs`] && { refreshScript: byPath[`${id}/refresh.mjs`] }),
   files: { "base.css": byPath["base.css"] ?? "" },
 }));
+
+/** The built-in gate cards for flows (§11.4). */
+export function gateCard(kind: string): { html: string; files: Record<string, string> } | undefined {
+  const html = byPath[`gates/${kind}/index.html`];
+  return html ? { html, files: { "base.css": byPath["base.css"] ?? "", "gate.css": byPath["gates/gate.css"] ?? "" } } : undefined;
+}
