@@ -9,11 +9,13 @@ import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
 import { IsolateDialog, MergeDialog, TimelineDialog } from "../changes/ChangeDialogs";
 import { ReviewPanel } from "../changes/ReviewPanel";
+import { Announcer } from "./Announcer";
 import { Onboarding } from "./Onboarding";
 import { PerfOverlay } from "./PerfOverlay";
 import { Palette } from "../palette/Palette";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
+import { useAppearance } from "./useAppearance";
 import { useResolvedTheme } from "./useResolvedTheme";
 
 export function App() {
@@ -24,7 +26,11 @@ export function App() {
   const dockOpen = useWorkspace((s) => s.dockOpen);
   const zen = useWorkspace((s) => s.zen);
   const view = useWorkspace((s) => s.views.find((v) => v.id === s.activeView));
-  useResolvedTheme(theme);
+  const resolved = useResolvedTheme(theme);
+  useAppearance(
+    useWorkspace((s) => s.prefs?.appearance),
+    resolved,
+  );
 
   useEffect(() => {
     subscribeToMain();
@@ -94,6 +100,7 @@ export function App() {
         <ReviewPanel />
         <Onboarding />
         <PerfOverlay />
+        <Announcer />
         <Palette />
       </div>
     </ReactFlowProvider>

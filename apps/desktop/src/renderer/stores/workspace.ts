@@ -165,6 +165,8 @@ interface WorkspaceState {
   tidyUp(): void;
   /** Selected chats → a new focus view (F). */
   focusSelection(): void;
+  /** Ticks a getting-started step (§8.10 step 4). */
+  markStep(step: "send" | "approve" | "diff" | "zoom" | "palette"): void;
   openView(id: string | null): void;
   updateView(id: string, patch: Partial<Omit<FocusView, "id">>): void;
   closeView(id: string): void;
@@ -480,10 +482,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       return;
     }
     addTurn(turn);
+    get().markStep("send");
   },
 
   async respond(chatId, requestId, response) {
     const r = await latis.invoke("chat:respond", { chatId, requestId, response });
+    if (response.kind === "permission" && response.decision !== "deny") get().markStep("approve");
     if (!r.ok) get().toast("That request is no longer waiting. The agent may have been restarted.");
   },
   async interrupt(chatId) {
@@ -677,6 +681,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   openReview(target) {
     set({ reviewPanel: { open: true, ...target } });
+    get().markStep("diff");
   },
   closeReview: () => set({ reviewPanel: { open: false } }),
   updateReview(item) {
@@ -819,6 +824,11 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     pushUndo({ label: "Tidy up", undo: () => applyGeometry(before), redo: () => applyGeometry(moved) });
   },
 
+  markStep(step) {
+    const list = get().prefs?.checklist;
+    if (!list || list.includes(step)) return;
+    void get().setPrefs({ checklist: [...list, step] });
+  },
   focusSelection() {
     const s = get();
     const chatIds = s.nodes.filter((n) => n.selected && n.data.chatId).map((n) => n.data.chatId!);

@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 import { expect, test, type Page } from "@playwright/test";
 import type { LatisApi } from "@latis/shared";
 import { launch, tempDataDir } from "./helpers";
@@ -270,4 +272,48 @@ test("browser dock: dev-server detection, nothing-running page, and the element 
   await expect(chat.getByTestId("attachments").locator("img")).toHaveCount(1);
   await app.close();
   server.close();
+});
+
+test("appearance, the getting-started checklist, and accessibility announcements", async () => {
+  const { app, page } = await launch(tempDataDir());
+  await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("prefs:set", { checklist: [] }));
+  await demoChats(page, 1);
+  const checklist = page.getByTestId("checklist");
+  await expect(checklist).toContainText("0 of 5");
+
+  // Appearance: accent, chat text size, glass cards, no grid.
+  await page.getByRole("button", { name: "Settings" }).click();
+  await page.getByRole("menuitem", { name: /Settings…/ }).click();
+  await page.getByRole("button", { name: "Appearance" }).click();
+  const appearance = page.getByTestId("appearance");
+  await appearance.getByRole("radio", { name: "Ember" }).click();
+  await appearance.getByRole("radio", { name: "Glass" }).click();
+  await appearance.getByRole("radio", { name: "None" }).click();
+  await appearance.getByLabel("Chat text size").fill("17");
+  const root = (prop: string) => page.evaluate((p) => getComputedStyle(document.documentElement).getPropertyValue(p).trim(), prop);
+  await expect.poll(() => root("--accent")).toBe("#fb923c");
+  await expect.poll(() => root("--chat-text")).toBe("17px");
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.cardStyle)).toBe("glass");
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".react-flow__background")).toHaveCount(0);
+
+  // A permission request is announced to screen readers and ticks nothing until approved.
+  const chat = page.getByTestId("chat-card").first();
+  await chat.getByTestId("composer").fill("go");
+  await chat.getByTestId("composer").press("Enter");
+  await expect(page.getByTestId("announcer")).toContainText("needs you", { timeout: 15_000 });
+  await chat.getByTestId("allow-once").click();
+  await expect(checklist).toContainText("2 of 5");
+
+  // Keyboard: Enter on a focused chat goes to its composer; the palette ticks its step.
+  await page.locator(".react-flow__node").first().focus();
+  await page.keyboard.press("Enter");
+  await expect(chat.getByTestId("composer")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.keyboard.press("Escape");
+  await expect(checklist).toContainText("3 of 5");
+  await checklist.getByRole("button", { name: "Dismiss getting started" }).click();
+  await expect(checklist).toHaveCount(0);
+  await app.close();
 });

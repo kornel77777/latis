@@ -4,6 +4,7 @@ import { FolderOpen, LayoutGrid, Sparkles, StickyNote } from "lucide-react";
 import { Button } from "@latis/ui";
 import { ChatNode } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
+import { Checklist } from "../app/Checklist";
 import { NoteNode } from "./NoteNode";
 import { ProjectFrame } from "./ProjectFrame";
 import { useCanvasActions } from "./useCanvasActions";
@@ -37,6 +38,8 @@ export function CanvasView() {
   const { openFolder, newDemoChat } = useCanvasActions();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
+  const grid = useWorkspace((s) => s.prefs?.appearance.grid ?? "dots");
+  const wallpaper = useWorkspace((s) => s.prefs?.appearance.wallpaper ?? null);
   const nodeCount = nodes.length;
   useEffect(() => reportVisibleChats(container.current), [nodeCount, focusRequest]);
 
@@ -59,6 +62,16 @@ export function CanvasView() {
         e.preventDefault();
         void (e.shiftKey ? ws.redo() : ws.undo());
         return;
+      }
+      // Enter on a focused chat jumps into its composer (keyboard-only use, §8.12).
+      if (!mod && e.key === "Enter") {
+        const node = (e.target as HTMLElement).closest(".react-flow__node");
+        const composer = node?.querySelector<HTMLTextAreaElement>("[data-testid=composer]");
+        if (composer) {
+          e.preventDefault();
+          composer.focus();
+          return;
+        }
       }
       if (mod && e.key.toLowerCase() === "a") {
         e.preventDefault();
@@ -99,7 +112,8 @@ export function CanvasView() {
   }, [flow]);
 
   return (
-    <div ref={container} className="relative min-w-0 flex-1" onClick={() => setMenu(null)}>
+    <div ref={container} className="relative min-w-0 flex-1 bg-bg-1" onClick={() => setMenu(null)}>
+      {wallpaper && <div className="latis-wallpaper" style={{ backgroundImage: `url(${wallpaper})` }} data-testid="wallpaper" />}
       <ReactFlow
         nodes={nodes}
         nodeTypes={nodeTypes}
@@ -126,12 +140,22 @@ export function CanvasView() {
         }}
         proOptions={{ hideAttribution: true }}
         aria-label="Canvas"
+        // A wallpaper shows through the canvas background.
+        style={wallpaper ? ({ "--xy-background-color": "transparent" } as React.CSSProperties) : undefined}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--grid-dot)" />
+        {grid !== "none" && (
+          <Background
+            variant={grid === "lines" ? BackgroundVariant.Lines : BackgroundVariant.Dots}
+            gap={grid === "lines" ? 40 : 20}
+            size={1.2}
+            color="var(--grid-dot)"
+          />
+        )}
         <MiniMap pannable zoomable position="bottom-right" nodeBorderRadius={6} />
         <ZoomBadge />
       </ReactFlow>
 
+      <Checklist />
       {nodes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="pointer-events-auto flex max-w-sm flex-col items-center gap-3 text-center">

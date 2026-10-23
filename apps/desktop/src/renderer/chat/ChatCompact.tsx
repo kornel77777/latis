@@ -57,6 +57,8 @@ export const ChatTile = memo(function ChatTile({ chatId, selected }: { chatId: s
   const working = chat?.summary.status === "working" || chat?.summary.status === "needs-you";
   const now = useNow(working);
   const click = useClickToFocus(chat?.summary.nodeId);
+  const markStep = useWorkspace((st) => st.markStep);
+  useEffect(() => markStep("zoom"), [markStep]);
   if (!chat || !activity) return null;
   const s = chat.summary;
   const hue = agent?.hue ?? FALLBACK_HUE[s.agentId] ?? "violet";

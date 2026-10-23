@@ -159,3 +159,38 @@ body {
     animation: none;
   }
 }
+
+/* Appearance (§8.11). */
+[data-card-style="glass"] [data-testid="chat-card"],
+[data-card-style="glass"] [data-testid="note"] {
+  background: color-mix(in srgb, var(--surface) calc(var(--card-opacity, 0.85) * 100%), transparent);
+  backdrop-filter: blur(20px);
+}
+[data-density="compact"] .latis-item {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+[data-reduce-motion="true"] *,
+[data-reduce-motion="true"] *::before,
+[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.latis-wallpaper {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.55;
+  pointer-events: none;
+}

@@ -260,7 +260,11 @@ export const FullChat = memo(function FullChat({
           <TerminalChatBody chatId={chatId} />
         ) : (
           <>
-            <div className="nowheel nodrag selectable min-h-0 flex-1 cursor-auto text-[14px] leading-relaxed" data-testid="transcript">
+            <div
+              className="nowheel nodrag selectable min-h-0 flex-1 cursor-auto leading-relaxed"
+              style={{ fontSize: "var(--chat-text, 14px)" }}
+              data-testid="transcript"
+            >
               {chat.loaded && items.length === 0 ? (
                 <p className="px-3.5 py-3 text-[13px] text-text-3">
                   {s.agentId === "fake" ? (
@@ -285,7 +289,7 @@ export const FullChat = memo(function FullChat({
                   increaseViewportBy={{ top: 400, bottom: 400 }}
                   computeItemKey={(_i, it) => it.key}
                   itemContent={(_i, it) => (
-                    <div className="px-3.5 py-1.25">
+                    <div className="latis-item px-3.5 py-1.25">
                       <Item item={it} actions={actions} />
                     </div>
                   )}

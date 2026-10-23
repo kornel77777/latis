@@ -168,10 +168,33 @@ export const ImageAttachment = z.object({
 });
 export type ImageAttachment = z.infer<typeof ImageAttachment>;
 
+export const Accent = z.enum(["aurora", "nova", "ember", "bloom", "moss", "mono"]);
+export type Accent = z.infer<typeof Accent>;
+
+/** Appearance settings (§8.1, §8.11). */
+export const Appearance = z.object({
+  accent: Accent,
+  density: z.enum(["comfortable", "compact"]),
+  /** Interface size (whole window zoom). */
+  uiScale: z.number().min(0.8).max(1.4),
+  chatTextSize: z.number().min(12).max(20),
+  cardStyle: z.enum(["solid", "glass"]),
+  /** Card opacity in glass mode ("see-through"). */
+  cardOpacity: z.number().min(0.5).max(1),
+  grid: z.enum(["dots", "lines", "none"]),
+  /** An image as a data: URL, or null. */
+  wallpaper: z.string().max(12_000_000).nullable(),
+  reduceMotion: z.boolean(),
+});
+export type Appearance = z.infer<typeof Appearance>;
+
 export const Prefs = z.object({
   onboarded: z.boolean(),
   notifyNeedsYou: z.boolean(),
   notifyFinished: z.boolean(),
+  appearance: Appearance,
+  /** Getting-started checklist steps done (§8.10 step 4), or null once dismissed. */
+  checklist: z.array(z.enum(["send", "approve", "diff", "zoom", "palette"])).nullable(),
 });
 export type Prefs = z.infer<typeof Prefs>;
 
@@ -477,6 +500,8 @@ export const invokeContract = {
   },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
+  /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */
+  "appearance:pickWallpaper": { req: none, res: z.string().nullable() },
   "settings:getTheme": { req: none, res: Theme },
   "settings:setTheme": { req: Theme, res: Theme },
 } as const;

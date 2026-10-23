@@ -112,6 +112,7 @@ function PaletteBody({ close }: { close: () => void }) {
   const ws = useWorkspace();
   const { openFolder, newChat } = useCanvasActions();
   const flow = useReactFlow();
+  useEffect(() => useWorkspace.getState().markStep("palette"), []);
 
   // The active project: the selected node's, else the only one.
   const activeProject = useMemo(() => {

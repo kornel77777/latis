@@ -1,10 +1,10 @@
 import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
-import { mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
-import type { AttentionItem, FocusView, PermissionMode, Prefs, RequestResponse, Theme } from "@latis/shared";
+import type { Appearance, AttentionItem, FocusView, PermissionMode, Prefs, RequestResponse, Theme } from "@latis/shared";
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
 import { SessionSupervisor } from "./agents/supervisor";
@@ -55,9 +55,32 @@ const agents = new AgentRegistry({
 });
 
 // LATIS_SKIP_ONBOARDING=1 (e2e) starts as if the first-run tour was done.
-const DEFAULT_PREFS: Prefs = { onboarded: process.env.LATIS_SKIP_ONBOARDING === "1", notifyNeedsYou: true, notifyFinished: true };
+const DEFAULT_APPEARANCE: Appearance = {
+  accent: "aurora",
+  density: "comfortable",
+  uiScale: 1,
+  chatTextSize: 14,
+  cardStyle: "solid",
+  cardOpacity: 0.85,
+  grid: "dots",
+  wallpaper: null,
+  reduceMotion: false,
+};
+const DEFAULT_PREFS: Prefs = {
+  onboarded: process.env.LATIS_SKIP_ONBOARDING === "1",
+  notifyNeedsYou: true,
+  notifyFinished: true,
+  appearance: DEFAULT_APPEARANCE,
+  // Tests skip the tour, and with it the checklist.
+  checklist: process.env.LATIS_SKIP_ONBOARDING === "1" ? null : [],
+};
 function prefs(): Prefs {
-  return { ...DEFAULT_PREFS, ...store.getSetting<Partial<Prefs>>("prefs") };
+  const saved = store.getSetting<Partial<Prefs>>("prefs") ?? {};
+  return { ...DEFAULT_PREFS, ...saved, appearance: { ...DEFAULT_APPEARANCE, ...saved.appearance } };
+}
+/** Interface size is the window's zoom factor, so everything (canvas maths included) scales together. */
+function applyUiScale() {
+  win?.webContents.setZoomFactor(prefs().appearance.uiScale);
 }
 
 function sandboxDir(): string {
@@ -481,7 +504,23 @@ registerHandlers({
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };
     store.setSetting("prefs", next);
+    if (patch.appearance) applyUiScale();
     return next;
+  },
+  "appearance:pickWallpaper": async () => {
+    const options = {
+      title: "Choose a wallpaper",
+      properties: ["openFile"] as "openFile"[],
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+    };
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+    const file = r.filePaths[0];
+    if (r.canceled || !file) return null;
+    const buf = readFileSync(file);
+    if (buf.length > 8 * 1024 * 1024) throw new Error("That image is over 8 MB. Pick a smaller one.");
+    const ext = file.split(".").pop()!.toLowerCase();
+    const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+    return `data:${mime};base64,${buf.toString("base64")}`;
   },
   "settings:getTheme": () => store.getSetting<Theme>("theme") ?? "dark",
   "settings:setTheme": (theme) => {
@@ -511,6 +550,7 @@ function createWindow() {
     },
   });
   win.once("ready-to-show", () => win?.show());
+  win.webContents.on("did-finish-load", applyUiScale);
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^(https?:|mailto:)/.test(url)) void shell.openExternal(url);
     return { action: "deny" };
