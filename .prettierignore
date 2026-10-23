@@ -1,0 +1,6 @@
+out
+dist
+release
+pnpm-lock.yaml
+**/migrations/meta
+SPEC.md

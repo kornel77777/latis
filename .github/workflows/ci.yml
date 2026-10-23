@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && corepack prepare pnpm@10.34.7 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: e2e (FakeAdapter)
+        run: |
+          sudo apt-get update && sudo apt-get install -y xvfb
+          pnpm --filter @latis/desktop exec playwright install-deps
+          xvfb-run -a pnpm e2e
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && corepack prepare pnpm@10.34.7 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @latis/desktop package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: latis-${{ matrix.os }}
+          path: apps/desktop/release/
+          retention-days: 7
