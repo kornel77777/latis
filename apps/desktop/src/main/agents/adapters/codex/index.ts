@@ -4,6 +4,7 @@ import type {
   AuthStatus,
   DetectResult,
   LoginHandle,
+  McpServerConfig,
   ModelInfo,
   PermissionMode,
   RequestResponse,
@@ -47,6 +48,17 @@ export interface CodexAdapterOptions {
   transport?: (cwd: string) => LineTransport;
   /** Overrides binary discovery (tests). */
   executable?: string | null;
+}
+
+/** Codex's `mcp_servers.<name>` config table (docs/adapters/codex.md → MCP). */
+function codexMcp(m: McpServerConfig): Record<string, unknown> {
+  const timeout = {
+    ...(m.toolTimeoutSec && { tool_timeout_sec: m.toolTimeoutSec }),
+    ...(m.trusted && { default_tools_approval_mode: "approve" }),
+  };
+  return m.transport === "http"
+    ? { url: m.url, ...(m.headers && { http_headers: m.headers }), ...timeout }
+    : { command: m.command, args: m.args ?? [], ...(m.env && { env: m.env }), ...timeout };
 }
 
 const CLIENT_INFO = { name: "latis", title: "Latis", version: "0.1.0" };
@@ -180,6 +192,8 @@ export class CodexAdapter implements AgentAdapter {
   }
 }
 
+const cancelled = (req: CodexRequest) => (req.elicitation ? { action: "cancel", content: null } : { decision: "cancel" });
+
 interface PendingRequest {
   req: CodexRequest;
   resolve: (result: unknown) => void;
@@ -215,7 +229,7 @@ class CodexSession extends SessionBase implements AgentSession {
     const s = new CodexSession(transport, opts);
     transport.onExit((info) => {
       if (s.disposed) return;
-      for (const p of s.pending.values()) p.resolve({ decision: "cancel" });
+      for (const p of s.pending.values()) p.resolve(cancelled(p.req));
       s.pending.clear();
       s.peer?.close("Codex exited");
       s.exit(info);
@@ -225,7 +239,13 @@ class CodexSession extends SessionBase implements AgentSession {
         request: (method, params) => s.onRequest(method, params),
         notification: (method, params) => s.onNotification(method, params),
       });
-      const base = { cwd: opts.cwd, ...MODES[opts.permissionMode], ...(s.model && { model: s.model }) };
+      const base = {
+        cwd: opts.cwd,
+        ...MODES[opts.permissionMode],
+        ...(s.model && { model: s.model }),
+        ...(opts.systemPromptAppend && { developerInstructions: opts.systemPromptAppend }),
+        ...(opts.mcpServers?.length && { config: { mcp_servers: Object.fromEntries(opts.mcpServers.map((m) => [m.name, codexMcp(m)])) } }),
+      };
       const res = resume
         ? await s.peer.request<{ thread: { id: string }; model: string }>("thread/resume", {
             threadId: resume,
@@ -260,8 +280,12 @@ class CodexSession extends SessionBase implements AgentSession {
   private onRequest(method: string, params: Params): Promise<unknown> {
     const req = this.mapper.request(method, params);
     if (!req) return Promise.reject(new RpcError(`Latis doesn't support ${method} yet`, -32601));
+    if (req.elicitation) {
+      if (this.mode === "full-auto") return Promise.resolve({ action: "accept", content: {} });
+      if (this.mode === "read-only") return Promise.resolve({ action: "decline", content: null });
+    }
     // Latis-side auto-answers that make the modes behave as documented (codex.md → Permission modes).
-    if (req.event.type === "permission.requested") {
+    else if (req.event.type === "permission.requested") {
       if (req.pureRead && this.mode !== "read-only") return Promise.resolve({ decision: "accept" });
       if (req.editInsideCwd && this.mode === "auto-edit") return Promise.resolve({ decision: "accept" });
       if (this.mode === "full-auto") return Promise.resolve({ decision: "accept" });
@@ -308,7 +332,7 @@ class CodexSession extends SessionBase implements AgentSession {
   }
 
   async interrupt(): Promise<void> {
-    for (const p of this.pending.values()) p.resolve({ decision: "cancel" });
+    for (const p of this.pending.values()) p.resolve(cancelled(p.req));
     this.pending.clear();
     if (!this.activeTurn) return;
     this.interrupting = true;
@@ -319,6 +343,11 @@ class CodexSession extends SessionBase implements AgentSession {
     const p = this.pending.get(requestId);
     if (!p) return;
     this.pending.delete(requestId);
+    if (p.req.elicitation) {
+      const allow = response.kind === "permission" ? response.decision !== "deny" : true;
+      p.resolve(allow ? { action: "accept", content: {} } : { action: "decline", content: null });
+      return;
+    }
     if (response.kind === "permission") {
       const decision = response.decision === "deny" ? "decline" : response.decision === "allow-once" ? "accept" : "acceptForSession";
       p.resolve({ decision });
@@ -346,7 +375,7 @@ class CodexSession extends SessionBase implements AgentSession {
 
   async dispose(): Promise<void> {
     this.disposed = true;
-    for (const p of this.pending.values()) p.resolve({ decision: "cancel" });
+    for (const p of this.pending.values()) p.resolve(cancelled(p.req));
     this.pending.clear();
     this.peer?.close();
     this.transport.kill();

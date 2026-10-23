@@ -22,7 +22,20 @@ import {
   type Turn,
 } from "@latis/shared";
 import type { Db } from "./db";
-import { attention, canvases, chats, checkpoints, events, nodes, projects, reviews, settings, turns, worktrees } from "./schema";
+import {
+  attention,
+  canvases,
+  chats,
+  checkpoints,
+  events,
+  mcpServers,
+  nodes,
+  projects,
+  reviews,
+  settings,
+  turns,
+  worktrees,
+} from "./schema";
 
 const DEFAULT_CANVAS = "main";
 const PROJECT_COLORS = ["teal", "indigo", "amber", "pink", "green", "sky"];
@@ -215,6 +228,9 @@ export class WorkspaceStore {
     cwd: string;
     title: string;
     worktreeId?: string | null;
+    role?: "conductor" | null;
+    spawnedBy?: string | null;
+    workspaceTools?: boolean;
   }): { node: CanvasNode; chat: ChatSummary } {
     const now = Date.now();
     const nodeId = randomUUID();
@@ -251,6 +267,9 @@ export class WorkspaceStore {
           title: input.title,
           createdAt: now,
           lastActivityAt: now,
+          role: input.role ?? null,
+          spawnedBy: input.spawnedBy ?? null,
+          workspaceTools: input.workspaceTools ?? false,
         })
         .returning()
         .get();
@@ -282,6 +301,84 @@ export class WorkspaceStore {
       .set({ ...patch, lastActivityAt: Date.now() })
       .where(eq(chats.id, chatId))
       .run();
+  }
+
+  /** Orchestration settings (§10): workspace tools, attached connections, the Conductor's agent. */
+  setChatFlags(
+    chatId: string,
+    patch: { workspaceTools?: boolean; connections?: string[]; agentId?: string; model?: string | null; reasoning?: string | null },
+  ): void {
+    const { connections, ...rest } = patch;
+    this.db
+      .update(chats)
+      .set({ ...rest, ...(connections && { connectionsJson: JSON.stringify(connections) }) })
+      .where(eq(chats.id, chatId))
+      .run();
+  }
+
+  /** The Conductor chat, if it exists and isn't deleted. */
+  conductor(): ChatSummary | undefined {
+    const row = this.db
+      .select({ id: chats.id })
+      .from(chats)
+      .innerJoin(nodes, eq(nodes.id, chats.nodeId))
+      .where(and(eq(chats.role, "conductor"), isNull(nodes.deletedAt)))
+      .get();
+    return row && this.getChat(row.id);
+  }
+
+  /** Chats (not deleted), for the workspace tools. */
+  liveChats(): ChatSummary[] {
+    const rows = this.db
+      .select({ id: chats.id })
+      .from(chats)
+      .innerJoin(nodes, eq(nodes.id, chats.nodeId))
+      .where(isNull(nodes.deletedAt))
+      .orderBy(asc(chats.createdAt))
+      .all();
+    return rows.flatMap((r) => this.getChat(r.id) ?? []);
+  }
+
+  /** A node's position on the canvas (children of frames are stored relative to them). */
+  absoluteRect(nodeId: string): { x: number; y: number; w: number; h: number } | undefined {
+    const n = this.getNode(nodeId);
+    if (!n) return undefined;
+    const parent = n.parentId ? this.absoluteRect(n.parentId) : undefined;
+    return { x: n.x + (parent?.x ?? 0), y: n.y + (parent?.y ?? 0), w: n.w, h: n.h };
+  }
+
+  listProjects(): Project[] {
+    const rows = this.db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(isNull(projects.archivedAt))
+      .orderBy(asc(projects.createdAt))
+      .all();
+    return rows.flatMap((r) => this.getProject(r.id) ?? []);
+  }
+
+  // ── MCP connections (§9.15) ────────────────────────────────────────────────
+
+  mcpRows(): (typeof mcpServers.$inferSelect)[] {
+    return this.db.select().from(mcpServers).orderBy(asc(mcpServers.createdAt)).all();
+  }
+
+  mcpRow(id: string): typeof mcpServers.$inferSelect | undefined {
+    return this.db.select().from(mcpServers).where(eq(mcpServers.id, id)).get();
+  }
+
+  saveMcpRow(row: Omit<typeof mcpServers.$inferInsert, "createdAt"> & { createdAt?: number }): typeof mcpServers.$inferSelect {
+    const full = { ...row, createdAt: row.createdAt ?? Date.now() };
+    return this.db
+      .insert(mcpServers)
+      .values(full)
+      .onConflictDoUpdate({ target: mcpServers.id, set: { ...full, createdAt: undefined } })
+      .returning()
+      .get();
+  }
+
+  removeMcpRow(id: string): void {
+    this.db.delete(mcpServers).where(eq(mcpServers.id, id)).run();
   }
 
   createTurn(chatId: string, userText: string): Turn {
@@ -504,6 +601,9 @@ export class WorkspaceStore {
    */
   softDelete(nodeIds: string[]): string[] {
     const now = Date.now();
+    // The Conductor is pinned and can't be deleted (§10.2).
+    const pinned = this.conductor()?.nodeId;
+    nodeIds = nodeIds.filter((id) => id !== pinned);
     return this.db.transaction((tx) => {
       const ids = new Set(nodeIds);
       for (const id of nodeIds) {
@@ -771,6 +871,10 @@ function toChatSummary(r: typeof chats.$inferSelect, projectId: string | null, w
     status: status.success ? status.data : "idle",
     createdAt: r.createdAt,
     lastActivityAt: r.lastActivityAt,
+    role: r.role === "conductor" ? "conductor" : null,
+    workspaceTools: r.workspaceTools,
+    spawnedBy: r.spawnedBy,
+    connections: JSON.parse(r.connectionsJson) as string[],
   };
 }
 

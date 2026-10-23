@@ -82,6 +82,31 @@ describe("CodexMapper", () => {
     expect(events.at(-1)).toMatchObject({ type: "turn.completed", status: "interrupted" });
   });
 
+  it("shows an MCP server's elicitation (tool approval) as a permission request", () => {
+    const m = new CodexMapper(CWD);
+    const req = m.request("mcpServer/elicitation/request", {
+      serverName: "github",
+      threadId: "t",
+      mode: "form",
+      message: "Allow create_issue?",
+      requestedSchema: { type: "object", properties: {} },
+    });
+    expect(req).toMatchObject({
+      elicitation: true,
+      event: { type: "permission.requested", kind: "mcp", summary: "github: Allow create_issue?" },
+    });
+    expect(
+      m.request("mcpServer/elicitation/request", {
+        serverName: "x",
+        threadId: "t",
+        mode: "url",
+        url: "https://x",
+        elicitationId: "e",
+        message: "m",
+      }),
+    ).toBeNull();
+  });
+
   it("reports per-turn token usage", () => {
     const usage = mapAll("write-and-run").filter((e) => e.type === "usage");
     expect(usage).toHaveLength(1);

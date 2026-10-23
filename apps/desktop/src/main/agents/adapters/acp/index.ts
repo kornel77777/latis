@@ -6,6 +6,7 @@ import type {
   AuthStatus,
   DetectResult,
   LoginHandle,
+  McpServerConfig,
   ModelInfo,
   PermissionMode,
   RequestResponse,
@@ -36,8 +37,24 @@ interface NewSessionResult {
   models?: { currentModelId: string; availableModels: { modelId: string; name: string; description?: string }[] } | null;
 }
 interface InitializeResult {
-  agentCapabilities?: { loadSession?: boolean; promptCapabilities?: { image?: boolean } };
+  agentCapabilities?: { loadSession?: boolean; promptCapabilities?: { image?: boolean }; mcpCapabilities?: { http?: boolean } };
 }
+
+const pairs = (o?: Record<string, string>) => Object.entries(o ?? {}).map(([name, value]) => ({ name, value }));
+
+/**
+ * ACP's `mcpServers` entries. Every agent takes stdio; HTTP only when it says so, otherwise
+ * HTTP servers are skipped (Latis's own goes through the `latis-mcp` shim, see index.ts).
+ */
+function acpMcp(list: McpServerConfig[] | undefined, http: boolean): unknown[] {
+  return (list ?? []).flatMap((m): unknown[] => {
+    if (m.transport === "http") return http ? [{ type: "http", name: m.name, url: m.url, headers: pairs(m.headers) }] : [];
+    return [{ name: m.name, command: m.command, args: m.args ?? [], env: pairs(m.env) }];
+  });
+}
+
+/** Calls to Latis's own workspace tools; they carry their guardrails in Latis and don't ask the user. */
+const isWorkspaceTool = (call: ToolCall) => /\(latis MCP Server\)/.test(call.title ?? "") || /^(mcp__)?latis__/.test(call.toolCallId);
 type PermissionOption = { optionId: string; name: string; kind: "allow_once" | "allow_always" | "reject_once" | "reject_always" };
 
 /** Well-known mode ids per Latis mode, used when a manifest doesn't map them. */
@@ -219,6 +236,8 @@ class AcpSession extends SessionBase implements AgentSession {
   private disposed = false;
   /** "Always for this chat" answers, by alwaysKey. */
   private always = new Set<string>();
+  /** Instructions still to send with the first message. */
+  private instructions: string | null = null;
 
   private constructor(
     private readonly adapter: AcpAdapter,
@@ -249,15 +268,18 @@ class AcpSession extends SessionBase implements AgentSession {
       );
       const init = await s.peer.request<InitializeResult>("initialize", initializeParams());
       s.images = Boolean(init.agentCapabilities?.promptCapabilities?.image);
+      const mcpServers = acpMcp(opts.mcpServers, Boolean(init.agentCapabilities?.mcpCapabilities?.http));
       if (resume && init.agentCapabilities?.loadSession) {
         // The agent replays the conversation as updates; Latis already has it in the event log.
         s.loading = true;
-        s.state = await s.peer.request<NewSessionResult>("session/load", { sessionId: resume, cwd: opts.cwd, mcpServers: [] });
+        s.state = await s.peer.request<NewSessionResult>("session/load", { sessionId: resume, cwd: opts.cwd, mcpServers });
         s.loading = false;
         s.sessionId = resume;
       } else {
-        s.state = await s.peer.request<NewSessionResult>("session/new", { cwd: opts.cwd, mcpServers: [] });
+        s.state = await s.peer.request<NewSessionResult>("session/new", { cwd: opts.cwd, mcpServers });
         s.sessionId = s.state.sessionId ?? "";
+        // ACP has no system prompt; a new conversation gets the instructions with its first message.
+        if (opts.systemPromptAppend) s.instructions = opts.systemPromptAppend;
       }
       adapter.rememberOptions(s.state);
       await s.applyMode(opts.permissionMode);
@@ -350,7 +372,8 @@ class AcpSession extends SessionBase implements AgentSession {
     const options = params.options as PermissionOption[];
     // Emulated modes on top of whatever the agent's own mode decides (docs/adapters/acp.md).
     const kind = call.kind ?? "other";
-    if (this.mode === "full-auto") return Promise.resolve(this.pick(options, ["allow_once", "allow_always"]));
+    if (this.mode === "full-auto" || (this.mode !== "read-only" && isWorkspaceTool(call)))
+      return Promise.resolve(this.pick(options, ["allow_once", "allow_always"]));
     if (this.mode === "read-only" && !READ_KINDS.has(kind)) {
       this.mapper.markDenied(call.toolCallId);
       return Promise.resolve(this.pick(options, ["reject_once", "reject_always"]));
@@ -369,8 +392,9 @@ class AcpSession extends SessionBase implements AgentSession {
   async send(turn: UserTurn): Promise<void> {
     const prompt = [
       ...(this.images ? (turn.images ?? []) : []).map((img) => ({ type: "image", mimeType: img.mime, data: img.dataBase64 })),
-      { type: "text", text: turn.text },
+      { type: "text", text: this.instructions ? `<instructions>\n${this.instructions}\n</instructions>\n\n${turn.text}` : turn.text },
     ];
+    this.instructions = null;
     this.turnStart = Date.now();
     // session/prompt resolves when the turn ends, so it isn't awaited here.
     this.peer

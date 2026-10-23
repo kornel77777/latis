@@ -1,0 +1,12 @@
+// A scripted Conductor (M5, scenario S4): three reviewers in the folder named last in the message,
+// wait for all of them, read one, and write the summary note. Needs the workspace tools.
+{"delay":0,"event":{"type":"session.started","model":"demo-1"}}
+{"delay":20,"stream":"I'll start three reviewers on the auth module.","chunk":12}
+{"delay":0,"mcp":{"tool":"spawn_chat","args":{"agent":"fake","cwd":"{{last}}","prompt":"Review the auth module for security /review","title":"Auth: security"}},"as":"a"}
+{"delay":0,"mcp":{"tool":"spawn_chat","args":{"agent":"fake","cwd":"{{last}}","prompt":"Review the auth module for readability /review","title":"Auth: readability"}},"as":"b"}
+{"delay":0,"mcp":{"tool":"spawn_chat","args":{"agent":"fake","cwd":"{{last}}","prompt":"Review the auth module for test coverage /review","title":"Auth: tests"}},"as":"c"}
+{"delay":0,"mcp":{"tool":"wait_for_chats","args":{"chat_ids":["{{a.chat_id}}","{{b.chat_id}}","{{c.chat_id}}"],"timeout_s":60}},"as":"w"}
+{"delay":0,"mcp":{"tool":"read_chat","args":{"chat_id":"{{a.chat_id}}"}}}
+{"delay":0,"mcp":{"tool":"create_note","args":{"title":"Auth review: where they agree","markdown":"All three reviewers finished (timed out: {{w.timed_out}})."}},"as":"n"}
+{"delay":20,"stream":"Done. The summary is in the note next to me.","chunk":12}
+{"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":900}}

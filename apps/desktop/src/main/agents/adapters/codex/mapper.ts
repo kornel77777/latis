@@ -56,6 +56,8 @@ export interface CodexRequest {
   pureRead: boolean;
   /** Question ids by question text, for building the answer. */
   questionIds?: Record<string, string>;
+  /** An MCP server's elicitation (e.g. approving a tool call); answered with an `action`. */
+  elicitation?: boolean;
 }
 
 const SHELL_WRAPPER = /^(?:\/bin\/|\/usr\/bin\/)?(?:ba|z)?sh -l?c (['"])([\s\S]*)\1$/;
@@ -70,6 +72,7 @@ export function unwrapCommand(command: string): string {
 }
 
 export class CodexMapper {
+  private elicitations = 0;
   private items = new Map<string, ThreadItem>();
   private open = new Set<string>();
   private turnStart = 0;
@@ -266,6 +269,19 @@ export class CodexMapper {
         editInsideCwd: false,
         pureRead: false,
         questionIds: Object.fromEntries(qs.map((q) => [q.question, q.id])),
+      };
+    }
+    if (method === "mcpServer/elicitation/request" && params.mode !== "url") {
+      // Codex asks before running a tool of an MCP server it doesn't trust; shown as a normal approval.
+      const id = `mcp-${++this.elicitations}`;
+      const server = String(params.serverName ?? "MCP server");
+      const message = typeof params.message === "string" ? params.message : "wants to continue";
+      return {
+        requestId: id,
+        event: { type: "permission.requested", id, kind: "mcp", summary: `${server}: ${message}` },
+        editInsideCwd: false,
+        pureRead: false,
+        elicitation: true,
       };
     }
     return null;

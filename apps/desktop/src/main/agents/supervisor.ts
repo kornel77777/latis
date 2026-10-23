@@ -11,6 +11,7 @@ import {
   type PermissionMode,
   type QueuedMessage,
   type RequestResponse,
+  type SessionOptions,
   type StoredEvent,
   type Turn,
   type UserTurn,
@@ -44,6 +45,13 @@ export interface SupervisorSinks {
 export interface TurnHooks {
   beforeTurn(chatId: string, turnId: string): Promise<void>;
   afterTurn(chatId: string, turnId: string, finalMessage: string | undefined): Promise<void>;
+}
+
+export interface SessionExtras {
+  /** Per-session options: MCP servers, instructions (§10). */
+  sessionOptions?(chat: ChatSummary): Promise<Partial<SessionOptions>>;
+  /** What the agent receives for what the user typed (skills, §9.14). The transcript keeps the typed text. */
+  expand?(chatId: string, text: string): string;
 }
 
 const TITLE_MAX = 48;
@@ -80,7 +88,28 @@ export class SessionSupervisor {
     private readonly adapters: Map<string, AgentAdapter>,
     private readonly sinks: SupervisorSinks,
     private readonly hooks?: TurnHooks,
+    private readonly extras: SessionExtras = {},
   ) {}
+
+  /** The latest assistant text this run, for the workspace tools. */
+  lastMessageOf(chatId: string): string | undefined {
+    return this.lastMessage.get(chatId) ?? this.streamed.get(chatId);
+  }
+
+  /** True while a turn runs. */
+  busy(chatId: string): boolean {
+    return Boolean(this.live.get(chatId)?.turnId) || this.queueOf(chatId).length > 0;
+  }
+
+  /** Sends now when the chat is idle, otherwise waits for the running turn to end (send_message mode "queue"). */
+  async enqueue(chatId: string, text: string): Promise<"sent" | "queued"> {
+    if (!this.live.get(chatId)?.turnId) {
+      await this.send(chatId, text);
+      return "sent";
+    }
+    this.setQueue(chatId, [...this.queueOf(chatId), { id: randomUUID(), text, createdAt: Date.now() }]);
+    return "queued";
+  }
 
   /** Queues a note that goes to the agent with the user's next message (§9.4 AC2, §9.5 AC3). */
   addNote(chatId: string, text: string) {
@@ -114,7 +143,8 @@ export class SessionSupervisor {
     const notes = this.notes.get(chatId);
     this.notes.delete(chatId);
     // Notes reach the agent but not the transcript, which shows what the user typed.
-    const forAgent = notes?.length ? `${notes.map((n) => `[Note from Latis] ${n}`).join("\n")}\n\n${text}` : text;
+    const typed = this.expand(chatId, text);
+    const forAgent = notes?.length ? `${notes.map((n) => `[Note from Latis] ${n}`).join("\n")}\n\n${typed}` : typed;
     await live.session.send({ text: forAgent, ...(images?.length && { images }) });
     return turn;
   }
@@ -136,7 +166,7 @@ export class SessionSupervisor {
     // Steering carries text only; a message with images waits for the turn to end.
     if (live.session.steer && !images?.length) {
       try {
-        await live.session.steer(text);
+        await live.session.steer(this.expand(chatId, text));
         this.sinks.event(this.log.append(chatId, live.turnId, { type: "user.steered", text }));
         return { delivered: "steered", queue: this.queueOf(chatId) };
       } catch (err) {
@@ -146,6 +176,15 @@ export class SessionSupervisor {
     const queue = [...this.queueOf(chatId), { id: randomUUID(), text, createdAt: Date.now(), ...(images?.length && { images }) }];
     this.setQueue(chatId, queue);
     return { delivered: "queued", queue };
+  }
+
+  private expand(chatId: string, text: string): string {
+    try {
+      return this.extras.expand?.(chatId, text) ?? text;
+    } catch (err) {
+      console.warn("[supervisor] expanding skills failed", err);
+      return text;
+    }
   }
 
   queueOf(chatId: string): QueuedMessage[] {
@@ -293,13 +332,14 @@ export class SessionSupervisor {
     const adapter = this.adapters.get(chat.agentId);
     if (!adapter) throw new Error(`Agent "${chat.agentId}" isn't available.`);
     mkdirSync(chat.cwd, { recursive: true });
-    const opts = {
+    const opts: SessionOptions = {
       cwd: chat.cwd,
       chatId,
       permissionMode: chat.permissionMode as PermissionMode,
       alwaysAsk: [],
       ...(chat.model && { model: chat.model }),
       ...(chat.reasoning && { reasoning: chat.reasoning }),
+      ...(await this.extras.sessionOptions?.(chat)),
     };
     const native = this.store.nativeSessionId(chatId);
     const resuming = Boolean(native && adapter.resumeSession);

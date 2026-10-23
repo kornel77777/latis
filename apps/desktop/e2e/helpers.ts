@@ -18,7 +18,15 @@ export async function launch(dataDir: string, extraEnv: Record<string, string> =
   const executablePath = process.env.LATIS_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(executablePath ? { executablePath, args: [] } : { args: [appDir] }),
-    env: { ...process.env, LATIS_DATA_DIR: dataDir, NODE_ENV: "production", LATIS_SKIP_ONBOARDING: "1", ...extraEnv },
+    env: {
+      ...process.env,
+      LATIS_DATA_DIR: dataDir,
+      NODE_ENV: "production",
+      LATIS_SKIP_ONBOARDING: "1",
+      // Most specs predate the Conductor (M5); m5.spec.ts turns it on.
+      LATIS_SKIP_CONDUCTOR: "1",
+      ...extraEnv,
+    },
   });
   const page = await app.firstWindow();
   page.on("console", (m) => {

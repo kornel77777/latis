@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { blob, index, integer, primaryKey, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // SPEC §7.1, M0 subset. Later milestones add their tables via new migrations.
 
@@ -57,6 +57,14 @@ export const chats = sqliteTable("chats", {
   status: text("status").notNull().default("idle"),
   createdAt: integer("created_at").notNull(),
   lastActivityAt: integer("last_activity_at").notNull(),
+  /** "conductor" for the pinned Conductor chat (§10.2). */
+  role: text("role"),
+  /** The chat can use the Workspace MCP tools (§10.1). */
+  workspaceTools: integer("workspace_tools", { mode: "boolean" }).notNull().default(false),
+  /** The chat that started this one through `spawn_chat`. */
+  spawnedBy: text("spawned_by"),
+  /** MCP connections attached to this chat on top of the shared ones (§9.15). */
+  connectionsJson: text("connections_json").notNull().default("[]"),
 });
 
 export const turns = sqliteTable(
@@ -157,3 +165,16 @@ export const reviews = sqliteTable(
   },
   (t) => [index("reviews_open").on(t.reviewedAt, t.createdAt)],
 );
+
+// MCP connections (§9.15). Env values and headers are encrypted with safeStorage in `secret`.
+export const mcpServers = sqliteTable("mcp_servers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  transport: text("transport").notNull(),
+  command: text("command"),
+  argsJson: text("args_json").notNull().default("[]"),
+  url: text("url"),
+  secret: blob("secret", { mode: "buffer" }),
+  shared: integer("shared", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at").notNull(),
+});

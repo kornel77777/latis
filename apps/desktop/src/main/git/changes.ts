@@ -284,6 +284,17 @@ export class Changes {
     return diff(wt.path, base, snap);
   }
 
+  /** Everything a chat changed: its branch in a worktree, otherwise from before its first turn to after its last. */
+  async chatDiff(chatId: string): Promise<FileDiff[]> {
+    const chat = this.chat(chatId);
+    if (chat.worktree && !chat.worktree.removed) return this.branchDiff(chatId);
+    const cps = this.store.chatCheckpoints(chatId).filter((c) => c.after && !c.undoneAt);
+    const first = cps[0];
+    const last = cps.at(-1);
+    if (!first || !last?.after) return [];
+    return diff(first.repo, first.before, last.after);
+  }
+
   async mergePreview(chatId: string): Promise<MergePreview> {
     const { chat, wt, project } = this.worktree(chatId);
     // The agent's uncommitted work goes into a commit on its branch so the merge includes it.

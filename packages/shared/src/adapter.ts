@@ -46,6 +46,11 @@ export interface McpServerConfig {
   args?: string[];
   url?: string;
   headers?: Record<string, string>;
+  env?: Record<string, string>;
+  /** Seconds a tool call may take before the agent gives up (wait_for_chats blocks). */
+  toolTimeoutSec?: number;
+  /** Latis's own server: its tools carry their guardrails in Latis, so the agent shouldn't ask per call. */
+  trusted?: boolean;
 }
 
 export interface SessionOptions {

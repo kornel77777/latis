@@ -1,0 +1,6 @@
+// A short read-only review that echoes what it was asked (M5: spawned chats, skills).
+{"delay":0,"event":{"type":"session.started","model":"demo-1"}}
+{"delay":100,"event":{"type":"tool.started","id":"r1","kind":"read","name":"Read","input":{"path":"README.md"},"paths":["README.md"]}}
+{"delay":150,"event":{"type":"tool.completed","id":"r1","status":"ok","output":"# shop"}}
+{"delay":20,"stream":"Reviewed. You asked: {{text}}","chunk":12}
+{"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":400}}

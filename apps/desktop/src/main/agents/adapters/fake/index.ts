@@ -25,7 +25,7 @@ export class FakeAdapter implements AgentAdapter {
     plans: false,
     questions: false,
     subagents: false,
-    mcp: false,
+    mcp: true,
     reasoningLevels: false,
     usageReporting: true,
     nativeTerminal: false,
@@ -53,9 +53,16 @@ export class FakeAdapter implements AgentAdapter {
   }
 
   async startSession(opts: SessionOptions): Promise<AgentSession> {
+    const latis = opts.mcpServers?.find((m) => m.name === "latis");
     const child = spawn(process.execPath, [this.opts.runnerPath], {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env, ELECTRON_RUN_AS_NODE: "1" },
+      env: {
+        ...process.env,
+        ...opts.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        // Only Latis's own tools: the demo agent doesn't run other MCP servers.
+        ...(latis && { LATIS_FAKE_MCP: JSON.stringify(latis) }),
+      },
       stdio: "pipe",
     });
     return new FakeSession(child, (t) => this.pickScript(t));

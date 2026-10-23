@@ -16,6 +16,7 @@ export default defineConfig({
         input: {
           index: resolve(root, "src/main/index.ts"),
           "fake-runner": resolve(root, "src/main/agents/adapters/fake/runner.ts"),
+          "latis-mcp": resolve(root, "src/main/mcp/shim.ts"),
         },
       },
     },

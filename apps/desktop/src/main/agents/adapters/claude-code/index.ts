@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type {
   CanUseTool,
   EffortLevel,
+  McpHttpServerConfig,
+  McpStdioServerConfig,
   Options,
   PermissionMode as SdkPermissionMode,
   PermissionResult,
@@ -17,6 +19,7 @@ import type {
   AuthStatus,
   DetectResult,
   LoginHandle,
+  McpServerConfig,
   ModelInfo,
   PermissionMode,
   RequestResponse,
@@ -38,6 +41,15 @@ const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 const READ_ONLY_KINDS = new Set(["read", "search", "web"]);
 /** Tools that are conversations with the user, not actions, so read-only mode still lets them through. */
 const DIALOG_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
+
+function sdkMcp(m: McpServerConfig): McpStdioServerConfig | McpHttpServerConfig {
+  return m.transport === "http"
+    ? { type: "http", url: m.url!, ...(m.headers && { headers: m.headers }) }
+    : { type: "stdio", command: m.command!, args: m.args ?? [], ...(m.env && { env: m.env }) };
+}
+
+/** The workspace tools carry their own guardrails in Latis, so they don't ask the user each time. */
+const isWorkspaceTool = (name: string) => name.startsWith("mcp__latis__");
 
 export interface ClaudeAdapterOptions {
   /** Injected in tests to replay recorded streams. */
@@ -232,6 +244,7 @@ class ClaudeSession implements AgentSession {
       // Lets the chat switch into Full-auto later; the starting mode is still the one above.
       allowDangerouslySkipPermissions: true,
       ...(opts.systemPromptAppend && { systemPrompt: { type: "preset", preset: "claude_code", append: opts.systemPromptAppend } }),
+      ...(opts.mcpServers?.length && { mcpServers: Object.fromEntries(opts.mcpServers.map((m) => [m.name, sdkMcp(m)])) }),
       ...(resume && { resume }),
     };
     this.q = queryFn({ prompt: this.input, options });
@@ -265,6 +278,7 @@ class ClaudeSession implements AgentSession {
       this.mapper.markDenied(opts.toolUseID);
       return Promise.resolve({ behavior: "deny", message: "This chat is read-only in Latis. Describe the change instead of making it." });
     }
+    if (isWorkspaceTool(toolName)) return Promise.resolve({ behavior: "allow", updatedInput: input });
     const event = this.mapper.requestEvent(toolName, input, {
       toolUseID: opts.toolUseID,
       ...(opts.title !== undefined && { title: opts.title }),
