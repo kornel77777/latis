@@ -60,7 +60,8 @@ export class AgentRegistry {
     const root = this.opts.replayRoot;
     const acpLib = root
       ? new ReplayLibrary(join(root, "acp"), {
-          fallback: "write-run",
+          fallback: "gemini-write-run",
+          include: (n) => n.startsWith("gemini-"),
           turnMethod: "session/prompt",
           stubs: { "session/set_mode": {}, "session/set_config_option": {} },
         })

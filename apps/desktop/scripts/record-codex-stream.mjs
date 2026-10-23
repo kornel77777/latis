@@ -38,7 +38,7 @@ const record = (dir, msg) => lines.push(scrub(JSON.stringify({ dir, msg })));
 
 let proc, nextId, pending, onServer;
 function start() {
-  proc = spawn(codex, ["app-server"], { cwd, stdio: ["pipe", "pipe", "inherit"] });
+  proc = spawn(codex, ["app-server"], { cwd, stdio: ["pipe", "pipe", "inherit"], detached: true });
   nextId = 0;
   pending = new Map();
   createInterface({ input: proc.stdout }).on("line", (l) => {
@@ -113,7 +113,7 @@ await turn(thread.id, prompt, { steer: arg("--steer"), interrupt: flag("--interr
 if (arg("--then")) {
   if (flag("--resume")) {
     // Restart the server and resume the thread, as Latis does after an app restart.
-    proc.kill();
+    process.kill(-proc.pid, "SIGTERM");
     record("restart", {});
     start();
     await handshake();
@@ -121,7 +121,7 @@ if (arg("--then")) {
   }
   await turn(thread.id, arg("--then"));
 }
-proc.kill();
+process.kill(-proc.pid, "SIGTERM");
 const out = new URL(`../../../fixtures/codex/${name}.jsonl`, import.meta.url);
 mkdirSync(new URL(".", out), { recursive: true });
 writeFileSync(out, lines.join("\n") + "\n");

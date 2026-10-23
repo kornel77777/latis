@@ -31,7 +31,7 @@ const record = (dir, msg) => lines.push(scrub(JSON.stringify({ dir, msg })));
 
 let proc, nextId, pending;
 function start() {
-  proc = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "ignore"] });
+  proc = spawn(command, args, { cwd, stdio: ["pipe", "pipe", "ignore"], detached: true });
   nextId = 0;
   pending = new Map();
   createInterface({ input: proc.stdout }).on("line", (l) => {
@@ -61,7 +61,8 @@ const request = (method, params) =>
 function answer(m) {
   if (m.method === "session/request_permission") {
     const want = flag("--deny") ? ["reject_once", "reject_always"] : ["allow_once", "allow_always"];
-    const option = m.params.options.find((o) => want.includes(o.kind)) ?? m.params.options[0];
+    // In preference order, like the adapter (allow_always can fail, e.g. Gemini in an untrusted folder).
+    const option = want.map((k) => m.params.options.find((o) => o.kind === k)).find(Boolean) ?? m.params.options[0];
     send({ id: m.id, result: { outcome: { outcome: "selected", optionId: option.optionId } } });
   } else send({ id: m.id, error: { code: -32601, message: `Latis recorder doesn't implement ${m.method}` } });
 }
@@ -84,21 +85,29 @@ await init();
 const session = await request("session/new", { cwd, mcpServers: [] });
 const sessionId = session.sessionId;
 if (arg("--mode")) await request("session/set_mode", { sessionId, modeId: arg("--mode") });
-if (arg("--model")) await request("session/set_config_option", { sessionId, configId: "model", value: arg("--model") });
+const setModel = (sid) =>
+  request("session/set_config_option", { sessionId: sid, configId: "model", value: arg("--model") }).catch(() =>
+    request("session/set_model", { sessionId: sid, modelId: arg("--model") }),
+  );
+if (arg("--model")) await setModel(sessionId);
 console.log("stop:", (await turn(sessionId, prompt)).stopReason);
 
 if (arg("--then")) {
   if (flag("--resume")) {
-    proc.kill();
+    process.kill(-proc.pid, "SIGTERM");
     record("restart", {});
     start();
     await init();
     await request("session/load", { sessionId, cwd, mcpServers: [] });
-    if (arg("--model")) await request("session/set_config_option", { sessionId, configId: "model", value: arg("--model") });
+    const setModel = (sid) =>
+      request("session/set_config_option", { sessionId: sid, configId: "model", value: arg("--model") }).catch(() =>
+        request("session/set_model", { sessionId: sid, modelId: arg("--model") }),
+      );
+    if (arg("--model")) await setModel(sessionId);
   }
   console.log("stop:", (await turn(sessionId, arg("--then"))).stopReason);
 }
-proc.kill();
+process.kill(-proc.pid, "SIGTERM");
 const out = new URL(`../../../fixtures/acp/${name}.jsonl`, import.meta.url);
 mkdirSync(new URL(".", out), { recursive: true });
 writeFileSync(out, lines.join("\n") + "\n");

@@ -21,10 +21,11 @@ Exit criterion **S1 passes live** (`e2e/live-m3.spec.ts`). Claude Code and Codex
 
 ### Not done / known issues
 
-- CI's first run is in progress (Linux e2e slow/hanging; see below once it finishes). Windows/macOS packaging in CI unverified.
+- CI: the Linux check (lint, types, unit, native, e2e under xvfb) and the macOS/Linux packaging pass. Windows packaging failed on `windows-latest` (node-gyp couldn't find Visual Studio); now pinned to `windows-2022`, pending a green run.
 - Snapshots on very large repos haven't been timed. Binary files have no hunk actions.
 - A Claude chat moved into its own copy can't resume its old conversation (Claude sessions are per-folder); it starts a new one.
-- The always-ask list still isn't enforced in Full-auto. Gemini's live run still needs a sign-in.
+- The always-ask list still isn't enforced in Full-auto.
+- Gemini verified live 2026-10-23 (sign-in through Latis, recordings, six-chat run). That run had 3 frames over the 32 ms budget (max 125 ms); investigate in the M4 perf pass.
 
 ## Next: M4 The great UI
 

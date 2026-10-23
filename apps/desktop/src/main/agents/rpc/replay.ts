@@ -22,6 +22,8 @@ export interface ReplayOptions {
   paceMs?: number;
   /** Results for option-setting requests that weren't recorded here (e.g. a mode change). */
   stubs?: Record<string, unknown>;
+  /** Only recordings whose name passes (one agent's recordings in a shared folder). */
+  include?: (name: string) => boolean;
 }
 
 export class ReplayLibrary {
@@ -32,7 +34,8 @@ export class ReplayLibrary {
   ) {
     this.names = readdirSync(dir)
       .filter((f) => f.endsWith(".jsonl"))
-      .map((f) => f.replace(/\.jsonl$/, ""));
+      .map((f) => f.replace(/\.jsonl$/, ""))
+      .filter((n) => opts.include?.(n) ?? true);
   }
   load(name: string, cwd: string): Line[] {
     return readFileSync(join(this.dir, `${name}.jsonl`), "utf8")

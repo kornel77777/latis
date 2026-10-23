@@ -18,7 +18,7 @@ const MODELS: Record<string, { model: string; reasoning?: string }> = {
   "claude-code": { model: "haiku" },
   codex: { model: "gpt-6-luna", reasoning: "low" },
   "acp:live": { model: "haiku" },
-  gemini: { model: "default" },
+  gemini: { model: "gemini-3.5-flash-lite" },
 };
 
 async function setup() {
@@ -51,6 +51,13 @@ async function chatWith(page: Page, agentId: string, mode?: "full-auto"): Promis
     (a) => a.id === agentId,
   )!.displayName;
   await page.getByRole("menuitem", { name: new RegExp(`^${name}`) }).click();
+  // From the second chat in a repo, Latis offers its own copy (M3); these chats share the folder.
+  await expect(page.getByTestId("chat-card"))
+    .toHaveCount(before + 1, { timeout: 3000 })
+    .catch(async () => {
+      await page.getByTestId("isolate-option").locator("input").uncheck();
+      await page.getByTestId("isolate-start").click();
+    });
   await expect(page.getByTestId("chat-card")).toHaveCount(before + 1);
   const card = page.getByTestId("chat-card").nth(before);
   const chatId = (await card.getAttribute("data-chat-id"))!;

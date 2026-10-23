@@ -183,6 +183,14 @@ function initializeParams() {
   };
 }
 
+/** What an "always allow" covers: a shell command by its program name, anything else by tool kind. */
+function alwaysKey(call: ToolCall): string {
+  const kind = call.kind ?? "other";
+  const raw = (call.rawInput ?? {}) as { command?: unknown };
+  const command = typeof raw.command === "string" ? raw.command : kind === "execute" ? (call.title ?? "") : "";
+  return kind === "execute" ? `execute:${command.trim().split(/\s+/)[0] ?? ""}` : kind;
+}
+
 function modelsFrom(o: NewSessionResult | null): ModelInfo[] {
   if (!o) return [];
   const effort = o.configOptions?.find((c) => c.category === "thought_level");
@@ -209,6 +217,8 @@ class AcpSession extends SessionBase implements AgentSession {
   private state: NewSessionResult = {};
   private images = false;
   private disposed = false;
+  /** "Always for this chat" answers, by alwaysKey. */
+  private always = new Set<string>();
 
   private constructor(
     private readonly adapter: AcpAdapter,
@@ -279,14 +289,25 @@ class AcpSession extends SessionBase implements AgentSession {
 
   private async applyMode(mode: PermissionMode) {
     const id = this.modeId(mode);
-    if (id && id !== this.state.modes?.currentModeId) {
+    if (!id || id === this.state.modes?.currentModeId) return;
+    try {
       await this.peer.request("session/set_mode", { sessionId: this.sessionId, modeId: id });
       if (this.state.modes) this.state.modes.currentModeId = id;
+    } catch (err) {
+      // Gemini refuses autoEdit/yolo in folders it doesn't trust yet. Latis enforces the mode itself
+      // on every permission request (onRequest), so the chat still behaves as chosen.
+      console.warn(`[${this.adapter.id}] agent kept its own mode; Latis enforces ${mode}`, err instanceof Error ? err.message : err);
     }
   }
 
   private async setConfig(category: string, value: string) {
     const opt = this.state.configOptions?.find((c) => c.category === category);
+    // Agents on the older `models` field (Gemini CLI 0.65) switch models with session/set_model.
+    if (!opt && category === "model" && this.state.models?.availableModels.some((m) => m.modelId === value)) {
+      await this.peer.request("session/set_model", { sessionId: this.sessionId, modelId: value });
+      this.state.models.currentModelId = value;
+      return;
+    }
     if (!opt || !opt.options.some((o) => o.value === value)) return;
     const res = await this.peer.request<{ configOptions?: ConfigOption[] }>("session/set_config_option", {
       sessionId: this.sessionId,
@@ -337,6 +358,7 @@ class AcpSession extends SessionBase implements AgentSession {
     if (this.mode === "auto-edit" && EDIT_KINDS.has(kind) && this.insideCwd(call)) {
       return Promise.resolve(this.pick(options, ["allow_once", "allow_always"]));
     }
+    if (this.always.has(alwaysKey(call))) return Promise.resolve(this.pick(options, ["allow_once", "allow_always"]));
     const requestId = call.toolCallId;
     return new Promise((resolve) => {
       this.pending.set(requestId, { call, options, resolve });
@@ -386,10 +408,11 @@ class AcpSession extends SessionBase implements AgentSession {
     if (response.decision === "deny") {
       this.mapper.markDenied(p.call.toolCallId);
       p.resolve(this.pick(p.options, ["reject_once", "reject_always"]));
-    } else if (response.decision === "allow-once") {
-      p.resolve(this.pick(p.options, ["allow_once", "allow_always"]));
     } else {
-      p.resolve(this.pick(p.options, ["allow_always", "allow_once"]));
+      // "Always" is remembered by Latis and answered with allow-once: agents' own allow_always can fail
+      // (Gemini refuses it in untrusted folders) and would outlive the chat.
+      if (response.decision !== "allow-once") this.always.add(alwaysKey(p.call));
+      p.resolve(this.pick(p.options, ["allow_once", "allow_always"]));
     }
   }
 

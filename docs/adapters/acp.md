@@ -2,10 +2,10 @@
 
 Verified 2026-10-23 against the Agent Client Protocol v1 as implemented by `@agentclientprotocol/sdk@2.0.1` (method list) and two real agents:
 
-- **Gemini CLI `0.65.0`** (`gemini --acp`; `--experimental-acp` is deprecated): `initialize` verified. Not signed in on the dev machine, so no prompt stream was recorded yet. `session/new` fails with JSON-RPC error `-32000 "Gemini API key is missing or not configured."` when signed out.
+- **Gemini CLI `0.65.0`** (`gemini --acp`; `--experimental-acp` is deprecated): signed in with Google (2026-10-23), recorded in `fixtures/acp/gemini-*.jsonl` with `gemini-3.5-flash-lite`. When signed out, `session/new` fails with JSON-RPC error `-32000 "Gemini API key is missing or not configured."`.
 - **`@agentclientprotocol/claude-agent-acp@0.94.0`** (Claude Code over ACP, using the existing Claude sign-in): full recordings in `fixtures/acp/`. It stands in for "any ACP agent" in tests. Recorder: `apps/desktop/scripts/record-acp-stream.mjs --agent "<cmd args>"`.
 
-Re-record Gemini once it's signed in: `node scripts/record-acp-stream.mjs gemini-write-run "<prompt>" --agent "gemini --acp"`.
+Re-record Gemini: `node scripts/record-acp-stream.mjs gemini-write-run "<prompt>" --agent "gemini --acp" --model gemini-3.5-flash-lite`.
 
 ## Wire format
 
@@ -73,3 +73,16 @@ Not in ACP v1. The Claude bridge advertises `_meta.steering.supported` / `prompt
 - Command `gemini --acp`. Detect with `gemini --version`. Install hint `npm install -g @google/gemini-cli`.
 - Auth methods from `initialize`: `oauth-personal` (Log in with Google), `gemini-api-key`, `vertex-ai`, `gateway`. Sign-in runs plain `gemini` in a PTY (its first-run auth picker). Latis never reads `~/.gemini` credential files.
 - `session/new` failing with an auth error → the agent shows **Signed out** with a Sign in action.
+
+## Gemini specifics (recorded 2026-10-23)
+
+- **Modes:** `default` (asks), `autoEdit`, `yolo`, `plan` (read-only). In a folder Gemini doesn't trust yet, `session/set_mode` to `autoEdit` or `yolo` fails with `-32603 "Cannot enable privileged approval modes in an untrusted folder."`. Choosing an `allow_always` permission option fails the tool the same way. So Latis:
+  - treats a refused mode switch as non-fatal and enforces the mode itself in `session/request_permission`;
+  - answers "Always for this chat" with `allow_once`, remembering the decision per tool kind (per program name for shell commands).
+- **Models:** no `configOptions`. `session/new` returns the older `models: { availableModels[{modelId, name}], currentModelId: "auto" }`. Switching uses `session/set_model { sessionId, modelId }`; `session/set_config_option` is "Method not found".
+- **New files:** the diff content has `oldText: ""` with `_meta.kind: "add"` (not `oldText: null`).
+- **Rejections:** a rejected tool comes back `failed` with text `Tool "write_file" was canceled by the user.`.
+- **Shell tools:** `kind: execute`, `title` is the command, `content` is text like `[current working directory …] (description)`. There's no `rawInput`.
+- **Thoughts:** streamed as `agent_thought_chunk` with a bold title line.
+- **Process tree:** `gemini` re-launches itself as a child `node --max-old-space-size=…` process. Killing only the wrapper leaves the child running, so Latis starts agents in their own process group and kills the group (`taskkill /T` on Windows).
+- **Resume:** `session/load` replays a `<session_context>` user chunk and the history before responding; Latis drops them.

@@ -168,3 +168,15 @@ A single hunk is reverse-applied to the working tree with `--recount`. If the fi
 ### 2026-10-23: git via `child_process.execFile`, not execa
 
 No extra dependency for a handful of calls. `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`. When the user has no git identity, Latis commits as `Latis <latis@localhost>`.
+
+### 2026-10-23: ACP "always allow" is remembered by Latis; refused modes aren't fatal
+
+Gemini refuses `autoEdit`/`yolo` and `allow_always` in folders it doesn't trust, and the tool fails. Latis keeps the agent in its default mode when a switch is refused, and enforces the chat's mode on each permission request. "Always for this chat" is a Latis-side rule (tool kind, or program name for shell commands), answered with `allow_once`. Applies to every ACP agent.
+
+### 2026-10-23: Agents run in their own process group
+
+`spawnTransport` uses `detached` (POSIX) and kills the whole group (Windows: `taskkill /T /F`), because CLIs like `gemini` re-launch themselves and the child outlived the wrapper.
+
+### 2026-10-23: Windows CI builds on windows-2022
+
+better-sqlite3 13 compiles from source on install. node-gyp 11 couldn't find Visual Studio on the newer `windows-latest` image.

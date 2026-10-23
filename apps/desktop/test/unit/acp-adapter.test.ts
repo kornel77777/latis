@@ -50,11 +50,14 @@ describe("diffHunks", () => {
 });
 
 describe("AcpMapper", () => {
-  it.each(["write-run", "deny", "cancel", "resume"])("maps %s to schema-valid events", (name) => {
-    const events = mapAll(name);
-    for (const e of events) expect(AgentEvent.safeParse(e).success).toBe(true);
-    expect(events.at(-1)).toMatchObject({ type: "turn.completed" });
-  });
+  it.each(["write-run", "deny", "cancel", "resume", "gemini-write-run", "gemini-deny", "gemini-resume"])(
+    "maps %s to schema-valid events",
+    (name) => {
+      const events = mapAll(name);
+      for (const e of events) expect(AgentEvent.safeParse(e).success).toBe(true);
+      expect(events.at(-1)).toMatchObject({ type: "turn.completed" });
+    },
+  );
 
   it("starts steps once real input arrives and attaches the written file's diff", () => {
     const events = mapAll("write-run");
@@ -78,6 +81,14 @@ describe("AcpMapper", () => {
     const final = events.filter((e) => e.type === "message.completed").at(-1);
     expect(final).toMatchObject({ text: expect.stringContaining("hello.txt") });
     expect(events.find((e) => e.type === "usage")).toMatchObject({ costUsd: expect.any(Number) });
+  });
+
+  it("maps Gemini's tool calls: a created file with its diff, shell commands as exec", () => {
+    const events = mapAll("gemini-write-run");
+    const change = events.find((e) => e.type === "file.changed");
+    expect(change, JSON.stringify(change)).toMatchObject({ path: "hello.txt", change: "created", additions: 1 });
+    expect(events.filter((e) => e.type === "tool.started").map((e) => e.type === "tool.started" && e.kind)).toEqual(["edit", "exec"]);
+    expect(mapAll("gemini-deny").find((e) => e.type === "tool.completed")).toMatchObject({ status: "denied" });
   });
 
   it("marks a refused tool as denied", () => {
@@ -119,6 +130,7 @@ function adapter() {
     turnMethod: "session/prompt",
     paceMs: 0,
     stubs: { "session/set_mode": {}, "session/set_config_option": {} },
+    include: (n) => !n.startsWith("gemini-"),
   });
   return new AcpAdapter(MANIFEST, {
     transport: (cwd) => replayTransport(lib, cwd),
@@ -142,6 +154,49 @@ function collect(session: AgentSession) {
   return { events, waitFor };
 }
 const opts = (permissionMode: PermissionMode) => ({ cwd: CWD, permissionMode, alwaysAsk: [] });
+
+describe("AcpAdapter (replayed Gemini CLI)", () => {
+  const gemini = (stubs?: Record<string, unknown>) => {
+    const lib = new ReplayLibrary(DIR, {
+      fallback: "gemini-write-run",
+      turnMethod: "session/prompt",
+      paceMs: 0,
+      include: (n) => n.startsWith("gemini-"),
+      ...(stubs && { stubs }),
+    });
+    return new AcpAdapter(BUILT_IN_MANIFESTS[0]!, {
+      transport: (cwd) => replayTransport(lib, cwd),
+      executable: "/replay/gemini",
+      probeDir: mkdtempSync(join(tmpdir(), "latis-probe-")),
+    });
+  };
+
+  it("lists models from the older models field and picks them with session/set_model", async () => {
+    const models = await gemini().listModels();
+    expect(models.map((m) => m.id)).toContain("gemini-3.5-flash-lite");
+  });
+
+  it("opens even when Gemini refuses Auto-edit in an untrusted folder, and still auto-allows in-folder edits", async () => {
+    // No stub for session/set_mode: the replay answers it with an error, as Gemini does in untrusted folders.
+    const s = await gemini().startSession(opts("auto-edit"));
+    const { events, waitFor } = collect(s);
+    await s.send({ text: "write hello.txt" });
+    await waitFor((e) => e.type === "turn.completed");
+    expect(events.filter((e) => e.type === "permission.requested")).toHaveLength(0);
+    expect(events.find((e) => e.type === "file.changed")).toMatchObject({ change: "created" });
+    await s.dispose();
+  });
+
+  it("remembers 'always for this chat' itself and answers with allow-once", async () => {
+    const s = await gemini({ "session/set_mode": {} }).startSession(opts("ask"));
+    const { waitFor } = collect(s);
+    await s.send({ text: "write hello.txt" });
+    const req = await waitFor((e) => e.type === "permission.requested");
+    await s.respond(req.type === "permission.requested" ? req.id : "", { kind: "permission", decision: "allow-chat" });
+    expect(await waitFor((e) => e.type === "tool.completed")).toMatchObject({ status: "ok" });
+    await s.dispose();
+  });
+});
 
 describe("AcpAdapter (replayed agent)", () => {
   it("reports sign-in and lists models with effort levels from config options", async () => {

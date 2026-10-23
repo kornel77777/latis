@@ -9,7 +9,7 @@ interface ContentBlock {
   text?: string;
 }
 type ToolContent =
-  | { type: "diff"; path: string; oldText: string | null; newText: string }
+  | { type: "diff"; path: string; oldText: string | null; newText: string; _meta?: { kind?: string } }
   | { type: "content"; content: ContentBlock }
   | { type: "terminal"; terminalId: string };
 
@@ -52,7 +52,7 @@ interface Tool {
   call: ToolCall;
   started: boolean;
   done: boolean;
-  diffs: Map<string, { oldText: string | null; newText: string }>;
+  diffs: Map<string, { oldText: string | null; newText: string; created: boolean }>;
 }
 
 export function diffHunks(oldText: string | null, newText: string): DiffHunk[] {
@@ -130,14 +130,22 @@ export class AcpMapper {
   private merge(tool: Tool, update: ToolCall) {
     const call = tool.call;
     for (const [k, v] of Object.entries(update)) if (v !== undefined && v !== null) (call as unknown as Record<string, unknown>)[k] = v;
-    for (const c of update.content ?? []) if (c.type === "diff") tool.diffs.set(c.path, { oldText: c.oldText, newText: c.newText });
+    // New files: oldText null (Claude bridge) or "" with _meta.kind "add" (Gemini CLI).
+    for (const c of update.content ?? [])
+      if (c.type === "diff") {
+        // Later updates repeat the diff without _meta; once created, it stays created.
+        const created = tool.diffs.get(c.path)?.created || c.oldText === null || c._meta?.kind === "add";
+        tool.diffs.set(c.path, { oldText: c.oldText, newText: c.newText, created });
+      }
   }
 
   private complete(tool: Tool): AgentEvent[] {
     if (tool.done) return [];
     tool.done = true;
     const c = tool.call;
-    const status = c.status === "failed" ? (/refused|denied|rejected/i.test(JSON.stringify(c.rawOutput ?? "")) ? "denied" : "error") : "ok";
+    // How agents word a refusal: the Claude bridge "User refused permission", Gemini "was canceled by the user".
+    const said = JSON.stringify([c.rawOutput ?? "", c.content ?? []]);
+    const status = c.status === "failed" ? (/refused|denied|rejected|cancell?ed by the user/i.test(said) ? "denied" : "error") : "ok";
     const files: AgentEvent[] =
       status === "ok"
         ? [...tool.diffs].map(([path, d]) => {
@@ -145,7 +153,7 @@ export class AcpMapper {
             return {
               type: "file.changed",
               path: this.rel(path),
-              change: d.oldText === null ? "created" : "modified",
+              change: d.created ? "created" : "modified",
               hunks,
               ...countChanges(hunks),
             };

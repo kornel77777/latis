@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 
 /** A newline-delimited message channel to an agent process (or a replay of one). */
@@ -28,6 +28,8 @@ export function spawnTransport(spec: SpawnSpec): LineTransport {
     stdio: ["pipe", "pipe", "pipe"],
     // Windows needs a shell to run npm-installed `.cmd` shims.
     shell: process.platform === "win32",
+    // Own process group, so killing it also ends helpers the agent spawned (gemini re-launches itself as a child).
+    detached: process.platform !== "win32",
   });
   const lineListeners = new Set<(line: string) => void>();
   const exitListeners = new Set<(info: { code: number | null; signal: string | null }) => void>();
@@ -66,8 +68,19 @@ export function spawnTransport(spec: SpawnSpec): LineTransport {
     },
     kill: () => {
       killed = true;
-      child.kill();
+      killTree(child);
     },
     stderrTail: () => stderr.join("\n"),
   };
+}
+
+/** Ends the process and everything it started. */
+export function killTree(child: ChildProcess): void {
+  if (child.pid === undefined || child.exitCode !== null) return;
+  try {
+    if (process.platform === "win32") spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    else process.kill(-child.pid, "SIGTERM");
+  } catch {
+    child.kill();
+  }
 }
