@@ -5,9 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# A newer push supersedes older runs on the same branch.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,10 +25,11 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
-      - name: e2e (FakeAdapter)
+      - name: e2e (replays + demo agent)
         run: |
-          sudo apt-get update && sudo apt-get install -y xvfb
-          pnpm --filter @latis/desktop exec playwright install-deps
+          # Only what Electron needs; `playwright install-deps` pulls every browser's codecs and can take an hour.
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libnss3 libgbm1 libasound2t64 libgtk-3-0 libxss1
           xvfb-run -a pnpm e2e
 
   build:
@@ -33,6 +40,7 @@ jobs:
         # windows-2022: node-gyp 11 (better-sqlite3 builds from source) fails to find Visual Studio on newer images.
         os: [macos-latest, windows-2022, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
