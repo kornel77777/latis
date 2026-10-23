@@ -27,13 +27,15 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
   await conductor.getByTestId("composer").press("Enter");
 
   // Three chats appear in a new project frame for the folder, each titled by the Conductor.
-  for (const t of ["Auth: security", "Auth: readability", "Auth: tests"])
-    await expect(page.getByTestId("chat-title").filter({ hasText: t })).toHaveCount(1, { timeout: 20_000 });
-  await expect(page.locator(".react-flow__node-frame")).toHaveCount(1);
+  // Off-screen cards aren't rendered, so this reads the canvas data rather than the DOM.
+  const load = () => page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  await expect
+    .poll(async () => (await load()).chats.flatMap((c) => (c.spawnedBy ? [c.title] : [])).sort(), { timeout: 20_000 })
+    .toEqual(["Auth: readability", "Auth: security", "Auth: tests"]);
+  expect((await load()).nodes.filter((n) => n.type === "frame")).toHaveLength(1);
 
   // The Conductor waited for all three, then wrote the note and finished.
-  await expect(conductor).toHaveAttribute("data-status", "done", { timeout: 30_000 });
-  await expect(conductor.getByTestId("transcript")).toContainText("The summary is in the note");
+  await expect.poll(async () => (await load()).chats.find((c) => c.role === "conductor")?.status, { timeout: 30_000 }).toBe("done");
   const state = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
   const reviewers = state.chats.filter((c) => c.spawnedBy);
   expect(reviewers).toHaveLength(3);
@@ -56,6 +58,9 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
     "latis.read_chat",
     "latis.create_note",
   ]);
+  // The demo agent streams its reply without a final message event.
+  const said = transcript.events.map((e) => (e.event.type === "message.delta" ? e.event.text : "")).join("");
+  expect(said).toContain("The summary is in the note");
   const failed = transcript.events.filter((e) => e.event.type === "tool.completed" && e.event.status !== "ok");
   expect(failed).toHaveLength(0);
 
