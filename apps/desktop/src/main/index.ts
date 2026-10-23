@@ -354,6 +354,61 @@ registerHandlers({
     await changes.askResolve(chatId, files);
     return { ok: true };
   },
+  "note:create": ({ canvasId: id, x, y, text }) =>
+    store.createNote({ canvasId: id, projectId: null, parentId: null, x, y, ...(text !== undefined && { text }) }),
+  "note:update": ({ nodeId, text }) => {
+    store.updateNodeData(nodeId, { text });
+    return { ok: true };
+  },
+  "note:export": async ({ nodeId }) => {
+    const node = store.getNode(nodeId);
+    if (!node) throw new Error("That note no longer exists.");
+    const text = String(node.data.text ?? "");
+    const first =
+      text
+        .split("\n")
+        .find((l) => l.trim())
+        ?.replace(/^#+\s*/, "")
+        .trim() || "note";
+    const options = {
+      title: "Export note",
+      defaultPath: `${first.replace(/[^\w\- ]+/g, "").slice(0, 60) || "note"}.md`,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    };
+    const r = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options);
+    if (r.canceled || !r.filePath) return { ok: false };
+    writeFileSync(r.filePath, text.endsWith("\n") ? text : `${text}\n`);
+    return { ok: true };
+  },
+  "canvas:delete": async ({ nodeIds }) => {
+    const deleted = store.softDelete(nodeIds);
+    // Deleted chats stop their agents; their Inbox and Review items disappear with them.
+    const chatIds = deleted.flatMap((id) => {
+      const n = store.getNode(id);
+      return n?.type === "chat" && typeof n.data.chatId === "string" ? [n.data.chatId] : [];
+    });
+    await Promise.all(chatIds.map((c) => supervisor.release(c)));
+    emit(win?.webContents, "attention:changed", store.openAttention());
+    emit(win?.webContents, "reviews:changed", store.listReviews());
+    return { deleted };
+  },
+  "canvas:restore": ({ nodeIds }) => {
+    store.restore(nodeIds);
+    emit(win?.webContents, "attention:changed", store.openAttention());
+    emit(win?.webContents, "reviews:changed", store.listReviews());
+    return store.loadCanvas(canvasId);
+  },
+  "canvas:deleted": () => store.deletedItems(canvasId),
+  "project:update": ({ projectId, ...patch }) => store.updateProject(projectId, patch),
+  "project:locate": async ({ projectId }) => {
+    const p = store.getProject(projectId);
+    if (!p) throw new Error("That project no longer exists.");
+    const options = { title: `Where is ${p.name} now?`, properties: ["openDirectory"] as "openDirectory"[] };
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+    const folder = r.filePaths[0];
+    if (r.canceled || !folder) return null;
+    return store.updateProject(projectId, { folderPath: folder });
+  },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };

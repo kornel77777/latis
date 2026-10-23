@@ -91,4 +91,42 @@ describe("EventLog", () => {
     expect(log2.append(chat.id, null, { type: "usage" }).seq).toBe(3);
     vi.useRealTimers();
   });
+
+  it("soft-deletes a project frame with its contents, lists it for restore, and restores it", () => {
+    const store = new WorkspaceStore(openDb(file()));
+    const canvasId = store.ensureDefaultCanvas();
+    const { project, node: frame } = store.createProject({ canvasId, folderPath: "/tmp/latis-x", x: 0, y: 0 });
+    const { node: chatNode } = store.createChatNode({
+      canvasId,
+      projectId: project.id,
+      parentId: frame.id,
+      x: 0,
+      y: 0,
+      agentId: "fake",
+      model: null,
+      reasoning: null,
+      permissionMode: "ask",
+      cwd: "/tmp/latis-x",
+      title: "Pricing",
+    });
+    const note = store.createNote({ canvasId, projectId: null, parentId: null, x: 900, y: 0, text: "# Ideas\nmore" });
+
+    const deleted = store.softDelete([frame.id]);
+    expect(deleted.sort()).toEqual([frame.id, chatNode.id].sort());
+    const after = store.loadCanvas(canvasId);
+    expect(after.nodes.map((n) => n.id)).toEqual([note.id]);
+    expect(after.projects).toEqual([]);
+    expect(store.deletedItems(canvasId)).toEqual([
+      expect.objectContaining({ type: "frame", title: "latis-x", nodeIds: expect.arrayContaining([frame.id, chatNode.id]) }),
+    ]);
+
+    store.restore(deleted);
+    const back = store.loadCanvas(canvasId);
+    expect(back.nodes).toHaveLength(3);
+    expect(back.projects.map((p) => p.id)).toEqual([project.id]);
+    expect(back.chats[0]?.title).toBe("Pricing");
+
+    store.softDelete([note.id]);
+    expect(store.deletedItems(canvasId)[0]).toMatchObject({ type: "note", title: "Ideas" });
+  });
 });

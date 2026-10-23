@@ -1,7 +1,18 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { NodeResizer, type NodeProps } from "@xyflow/react";
-import { AlertTriangle, FolderOpen, Plus } from "lucide-react";
-import { Button, Menu, StatusDot } from "@latis/ui";
+import {
+  AlertTriangle,
+  FolderOpen,
+  FolderSearch,
+  Maximize2,
+  MoreHorizontal,
+  Palette,
+  Pencil,
+  Plus,
+  SquareTerminal,
+  Trash2,
+} from "lucide-react";
+import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot } from "@latis/ui";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { AgentMenuItems } from "./AgentMenuItems";
@@ -18,6 +29,8 @@ export const PROJECT_COLORS: Record<string, string> = {
 export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeProps<FlowNode>) {
   const project = useWorkspace((s) => (data.projectId ? s.projects[data.projectId] : undefined));
   const startChat = useWorkspace((s) => s.startChat);
+  const [renaming, setRenaming] = useState(false);
+  const { updateProject, locateProject, deleteNodes, focusNode, newTerminal } = useWorkspace.getState();
   const counts = useWorkspace(
     useShallow((s) => {
       const st = Object.values(s.chats)
@@ -42,13 +55,36 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
       >
         <header className="latis-frame-drag flex h-11 cursor-grab items-center gap-2 px-4 active:cursor-grabbing">
           <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} />
-          <span className="text-[14px] font-semibold text-text-1">{project.name}</span>
+          {renaming ? (
+            <input
+              autoFocus
+              defaultValue={project.name}
+              aria-label="Project name"
+              className="nodrag w-48 rounded-[6px] border border-line-strong bg-bg-1 px-1.5 text-[14px] font-semibold text-text-1 outline-none"
+              onBlur={(e) => {
+                setRenaming(false);
+                const name = e.currentTarget.value.trim();
+                if (name && name !== project.name) void updateProject(project.id, { name });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setRenaming(false);
+              }}
+            />
+          ) : (
+            <span className="text-[14px] font-semibold text-text-1" onDoubleClick={() => setRenaming(true)} data-testid="frame-name">
+              {project.name}
+            </span>
+          )}
           <span className="truncate font-mono text-[11px] text-text-3" title={project.folderPath}>
             {project.folderPath}
           </span>
           {project.folderMissing && (
-            <span className="flex items-center gap-1 text-[11.5px] text-state-error">
+            <span className="nodrag flex items-center gap-1.5 text-[11.5px] text-state-error">
               <AlertTriangle size={12} /> Folder missing
+              <Button size="sm" variant="secondary" onClick={() => void locateProject(project.id)} data-testid="frame-locate">
+                <FolderSearch size={12} /> Locate…
+              </Button>
             </span>
           )}
           {counts[0]! > 0 && (
@@ -71,6 +107,9 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
             >
               <AgentMenuItems includeDemo={false} onPick={(agentId) => void startChat(agentId, project.id)} />
             </Menu>
+            <Button size="icon" variant="ghost" aria-label="Terminal in this project" onClick={() => void newTerminal(project.id)}>
+              <SquareTerminal size={14} />
+            </Button>
             <Button
               size="icon"
               variant="ghost"
@@ -79,6 +118,44 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
             >
               <FolderOpen size={14} />
             </Button>
+            <Button size="icon" variant="ghost" aria-label="Fit project" onClick={() => focusNode(project.frameNodeId)}>
+              <Maximize2 size={13} />
+            </Button>
+            <Menu
+              trigger={
+                <Button size="icon" variant="ghost" aria-label="Project menu" data-testid="frame-menu">
+                  <MoreHorizontal size={15} />
+                </Button>
+              }
+            >
+              <MenuItem onSelect={() => setRenaming(true)}>
+                <Pencil size={13} /> Rename
+              </MenuItem>
+              <MenuLabel>
+                <span className="flex items-center gap-1.5">
+                  <Palette size={12} /> Colour
+                </span>
+              </MenuLabel>
+              <div className="flex gap-1.5 px-2 pb-1.5" role="group" aria-label="Project colour">
+                {Object.entries(PROJECT_COLORS).map(([name, hex]) => (
+                  <button
+                    key={name}
+                    aria-label={name}
+                    aria-pressed={project.color === name}
+                    onClick={() => void updateProject(project.id, { color: name })}
+                    className="h-5 w-5 rounded-full border-2"
+                    style={{ background: hex, borderColor: project.color === name ? "var(--text-1)" : "transparent" }}
+                  />
+                ))}
+              </div>
+              <MenuItem onSelect={() => useWorkspace.getState().tidyUp()}>
+                <Maximize2 size={13} /> Tidy up
+              </MenuItem>
+              <MenuSeparator />
+              <MenuItem danger onSelect={() => void deleteNodes([project.frameNodeId])}>
+                <Trash2 size={13} /> Remove project from canvas
+              </MenuItem>
+            </Menu>
           </div>
         </header>
       </section>

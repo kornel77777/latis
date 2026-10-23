@@ -51,3 +51,63 @@ test("semantic zoom: full card, condensed card, status tile; drafts survive", as
   await expect(first.getByTestId("composer")).toHaveValue("a draft to keep", { timeout: 5000 });
   await app.close();
 });
+
+test("notes: create with N, edit markdown, persist; delete with undo; projects: rename, colour, remove, locate", async () => {
+  const { mkdirSync, writeFileSync, renameSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { stubFolderPicker } = await import("./helpers");
+  const dataDir = tempDataDir();
+  let { app, page } = await launch(dataDir);
+
+  // N makes a note in edit mode; Escape shows the rendered markdown.
+  await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("n");
+  const note = page.getByTestId("note");
+  await note.getByTestId("note-editor").fill("# Launch plan\n\n- [ ] ship it\n\n`code`");
+  await page.keyboard.press("Escape");
+  await expect(note.getByTestId("note-preview").locator("h3")).toHaveText("Launch plan");
+  await expect(note.getByTestId("note-preview").locator("input[type=checkbox]")).toHaveCount(1);
+
+  // Delete with Backspace, then undo.
+  await note.click();
+  await page.keyboard.press("Backspace");
+  await expect(page.getByTestId("note")).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.getByTestId("note")).toHaveCount(1);
+
+  // A project: rename, recolour, remove (soft) and undo.
+  const repo = join(dataDir, "shop");
+  mkdirSync(repo);
+  writeFileSync(join(repo, "README.md"), "# shop\n");
+  await stubFolderPicker(app, repo);
+  await page.getByTestId("open-folder").click();
+  const frame = page.getByTestId("project-frame");
+  await frame.getByTestId("frame-name").dblclick();
+  await frame.getByLabel("Project name").fill("Shop");
+  await frame.getByLabel("Project name").press("Enter");
+  await expect(frame.getByTestId("frame-name")).toHaveText("Shop");
+  await frame.getByTestId("frame-menu").click();
+  await page.getByRole("button", { name: "pink" }).click();
+  await page.keyboard.press("Escape");
+  await frame.getByTestId("frame-menu").click();
+  await page.getByRole("menuitem", { name: /Remove project/ }).click();
+  await expect(page.getByTestId("project-frame")).toHaveCount(0);
+  await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(page.getByTestId("project-frame")).toHaveText(/Shop/);
+  await app.close();
+
+  // Everything persisted; the moved folder shows "Folder missing" with Locate.
+  renameSync(repo, join(dataDir, "shop-moved"));
+  ({ app, page } = await launch(dataDir));
+  // Off-screen nodes aren't rendered (virtualisation); fit everything first.
+  await page.locator(".react-flow__pane").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Shift+1");
+  await expect(page.getByTestId("note")).toContainText("Launch plan");
+  await expect(page.getByTestId("project-frame")).toContainText("Folder missing");
+  await stubFolderPicker(app, join(dataDir, "shop-moved"));
+  await page.getByTestId("frame-locate").click();
+  await expect(page.getByTestId("project-frame")).not.toContainText("Folder missing");
+  await expect(page.getByTestId("project-frame")).toContainText("shop-moved");
+  await app.close();
+});

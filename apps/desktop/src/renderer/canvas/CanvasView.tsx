@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Background, BackgroundVariant, MiniMap, ReactFlow, useReactFlow, useViewport, type NodeTypes } from "@xyflow/react";
-import { FolderOpen, Sparkles } from "lucide-react";
+import { FolderOpen, LayoutGrid, Sparkles, StickyNote } from "lucide-react";
 import { Button } from "@latis/ui";
 import { ChatNode } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
+import { NoteNode } from "./NoteNode";
 import { ProjectFrame } from "./ProjectFrame";
 import { useCanvasActions } from "./useCanvasActions";
 
-const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame };
+const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame, note: NoteNode };
 
 let visibleTimer: ReturnType<typeof setTimeout> | null = null;
 /** Tells main which chats are on screen, so it can skip their notifications while Latis is focused (§8.6). */
@@ -51,6 +52,31 @@ export function CanvasView() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest("input, textarea, [contenteditable]")) return;
+      const mod = e.metaKey || e.ctrlKey;
+      const ws = useWorkspace.getState();
+      // Canvas undo/redo (§7.2); text fields keep their own.
+      if (mod && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        void (e.shiftKey ? ws.redo() : ws.undo());
+        return;
+      }
+      if (!mod && (e.key === "Delete" || e.key === "Backspace")) {
+        const ids = ws.nodes.filter((n) => n.selected).map((n) => n.id);
+        if (ids.length) {
+          e.preventDefault();
+          void ws.deleteNodes(ids);
+        }
+        return;
+      }
+      if (!mod && !e.shiftKey && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        const box = container.current?.getBoundingClientRect();
+        const at = box
+          ? flow.screenToFlowPosition({ x: box.left + box.width / 2 - 170, y: box.top + box.height / 2 - 130 })
+          : { x: 0, y: 0 };
+        void ws.createNote(at);
+        return;
+      }
       if (e.shiftKey && e.code === "Digit1") void flow.fitView({ duration: 320 });
       if (e.shiftKey && e.code === "Digit2") void flow.fitView({ nodes: flow.getNodes().filter((n) => n.selected), duration: 320 });
       if (!e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "0") void flow.zoomTo(1, { duration: 200 });
@@ -81,6 +107,8 @@ export function CanvasView() {
         selectionOnDrag
         panOnDrag={[1]}
         panActivationKeyCode="Space"
+        // Deleting goes through soft delete + undo (onKey), not React Flow's own removal.
+        deleteKeyCode={null}
         zoomActivationKeyCode={["Meta", "Control"]}
         onPaneContextMenu={(e) => {
           e.preventDefault();
@@ -138,6 +166,27 @@ export function CanvasView() {
             }}
           >
             <Sparkles size={13} /> New demo chat
+          </button>
+          <button
+            role="menuitem"
+            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            onClick={() => {
+              void useWorkspace.getState().createNote(flow.screenToFlowPosition(menu));
+              setMenu(null);
+            }}
+            data-testid="menu-new-note"
+          >
+            <StickyNote size={13} /> New note <kbd className="ml-auto font-mono text-[11px] text-text-3">N</kbd>
+          </button>
+          <button
+            role="menuitem"
+            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            onClick={() => {
+              useWorkspace.getState().tidyUp();
+              setMenu(null);
+            }}
+          >
+            <LayoutGrid size={13} /> Tidy up
           </button>
         </div>
       )}

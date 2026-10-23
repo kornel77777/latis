@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
-import { and, asc, desc, eq, inArray, isNull, max } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, max } from "drizzle-orm";
 import {
   AgentEvent,
   AttentionKind,
@@ -27,6 +27,7 @@ import { attention, canvases, chats, checkpoints, events, nodes, projects, revie
 const DEFAULT_CANVAS = "main";
 const PROJECT_COLORS = ["teal", "indigo", "amber", "pink", "green", "sky"];
 export const CHAT_SIZE = { w: 460, h: 600 };
+export const NOTE_SIZE = { w: 340, h: 260 };
 export const FRAME_PAD = { x: 24, top: 56 };
 
 export interface ChatOptionsPatch {
@@ -379,7 +380,8 @@ export class WorkspaceStore {
       .select()
       .from(attention)
       .innerJoin(chats, eq(chats.id, attention.chatId))
-      .where(isNull(attention.resolvedAt))
+      .innerJoin(nodes, eq(nodes.id, chats.nodeId))
+      .where(and(isNull(attention.resolvedAt), isNull(nodes.deletedAt)))
       .orderBy(desc(attention.createdAt))
       .all();
     return rows.flatMap(({ attention: r }) => {
@@ -398,6 +400,130 @@ export class WorkspaceStore {
         },
       ];
     });
+  }
+
+  // ── Notes, soft delete, projects (M4) ──────────────────────────────────────
+
+  createNote(input: {
+    canvasId: string;
+    projectId: string | null;
+    parentId: string | null;
+    x: number;
+    y: number;
+    text?: string;
+  }): CanvasNode {
+    const row = this.db
+      .insert(nodes)
+      .values({
+        id: randomUUID(),
+        canvasId: input.canvasId,
+        projectId: input.projectId,
+        parentId: input.parentId,
+        type: "note",
+        x: input.x,
+        y: input.y,
+        w: NOTE_SIZE.w,
+        h: NOTE_SIZE.h,
+        dataJson: JSON.stringify({ text: input.text ?? "" }),
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+    return toCanvasNode(row);
+  }
+
+  getNode(nodeId: string): CanvasNode | undefined {
+    const row = this.db.select().from(nodes).where(eq(nodes.id, nodeId)).get();
+    return row && toCanvasNode(row);
+  }
+
+  /** Merges into a node's data (note text, etc.). */
+  updateNodeData(nodeId: string, patch: Record<string, unknown>): void {
+    const node = this.getNode(nodeId);
+    if (!node) throw new Error("That item no longer exists.");
+    this.db
+      .update(nodes)
+      .set({ dataJson: JSON.stringify({ ...node.data, ...patch }) })
+      .where(eq(nodes.id, nodeId))
+      .run();
+  }
+
+  /**
+   * Soft-deletes nodes (a frame takes its contents and its project with it). Files on disk are
+   * never touched (§9.1 AC3). Returns every node id deleted, for undo/restore.
+   */
+  softDelete(nodeIds: string[]): string[] {
+    const now = Date.now();
+    return this.db.transaction((tx) => {
+      const ids = new Set(nodeIds);
+      for (const id of nodeIds) {
+        for (const child of tx
+          .select({ id: nodes.id })
+          .from(nodes)
+          .where(and(eq(nodes.parentId, id), isNull(nodes.deletedAt)))
+          .all())
+          ids.add(child.id);
+      }
+      const list = [...ids];
+      if (!list.length) return [];
+      const rows = tx.select().from(nodes).where(inArray(nodes.id, list)).all();
+      tx.update(nodes).set({ deletedAt: now }).where(inArray(nodes.id, list)).run();
+      for (const r of rows)
+        if (r.type === "frame" && r.projectId) tx.update(projects).set({ archivedAt: now }).where(eq(projects.id, r.projectId)).run();
+      return list;
+    });
+  }
+
+  restore(nodeIds: string[]): void {
+    this.db.transaction((tx) => {
+      const rows = tx.select().from(nodes).where(inArray(nodes.id, nodeIds)).all();
+      tx.update(nodes).set({ deletedAt: null }).where(inArray(nodes.id, nodeIds)).run();
+      for (const r of rows)
+        if (r.type === "frame" && r.projectId) tx.update(projects).set({ archivedAt: null }).where(eq(projects.id, r.projectId)).run();
+    });
+  }
+
+  /** Deleted top-level items from the last 7 days, newest first (§7.2 restore). */
+  deletedItems(canvasId: string): { nodeIds: string[]; type: string; title: string; deletedAt: number }[] {
+    const since = Date.now() - 7 * 24 * 3600 * 1000;
+    const rows = this.db
+      .select()
+      .from(nodes)
+      .where(and(eq(nodes.canvasId, canvasId), isNotNull(nodes.deletedAt)))
+      .orderBy(desc(nodes.deletedAt))
+      .all()
+      .filter((r) => r.deletedAt! >= since);
+    // Group by deletion moment: a deleted frame and its contents restore together.
+    const groups = new Map<number, typeof rows>();
+    for (const r of rows) groups.set(r.deletedAt!, [...(groups.get(r.deletedAt!) ?? []), r]);
+    return [...groups.values()].map((g) => {
+      const head = g.find((r) => !g.some((o) => o.id === r.parentId)) ?? g[0]!;
+      return { nodeIds: g.map((r) => r.id), type: head.type, title: this.nodeTitle(head), deletedAt: head.deletedAt! };
+    });
+  }
+
+  private nodeTitle(r: typeof nodes.$inferSelect): string {
+    const data = JSON.parse(r.dataJson) as { chatId?: string; projectId?: string; text?: string };
+    if (r.type === "chat" && data.chatId)
+      return this.db.select({ t: chats.title }).from(chats).where(eq(chats.id, data.chatId)).get()?.t ?? "Chat";
+    if (r.type === "frame" && data.projectId)
+      return this.db.select({ n: projects.name }).from(projects).where(eq(projects.id, data.projectId)).get()?.n ?? "Project";
+    if (r.type === "note")
+      return (
+        (data.text ?? "")
+          .split("\n")
+          .find((l) => l.trim())
+          ?.replace(/^#+\s*/, "")
+          .slice(0, 60) || "Untitled note"
+      );
+    return r.type;
+  }
+
+  updateProject(projectId: string, patch: { name?: string; color?: string; folderPath?: string }): Project {
+    this.db.update(projects).set(patch).where(eq(projects.id, projectId)).run();
+    const p = this.getProject(projectId);
+    if (!p) throw new Error("That project no longer exists.");
+    return p;
   }
 
   // ── Worktrees, checkpoints, reviews (M3) ───────────────────────────────────
@@ -514,6 +640,8 @@ export class WorkspaceStore {
       .select()
       .from(reviews)
       .innerJoin(chats, eq(chats.id, reviews.chatId))
+      .innerJoin(nodes, eq(nodes.id, chats.nodeId))
+      .where(isNull(nodes.deletedAt))
       .orderBy(desc(reviews.createdAt))
       .all()
       .map((r) => toReview(r.reviews));

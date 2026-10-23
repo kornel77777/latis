@@ -80,6 +80,8 @@ interface WorkspaceState {
   mergeFor: string | null;
   /** Chat whose timeline dialog is open. */
   timelineFor: string | null;
+  /** Note being edited (one at a time). */
+  editingNote: string | null;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -137,6 +139,17 @@ interface WorkspaceState {
   openReview(target?: { reviewId?: string; branchOf?: string }): void;
   closeReview(): void;
   updateReview(item: ReviewItem): void;
+  createNote(at: { x: number; y: number }, text?: string): Promise<void>;
+  updateNote(nodeId: string, text: string): void;
+  /** Soft delete with undo (§7.2). */
+  deleteNodes(nodeIds: string[]): Promise<void>;
+  restoreNodes(nodeIds: string[]): Promise<void>;
+  undo(): Promise<void>;
+  redo(): Promise<void>;
+  updateProject(projectId: string, patch: { name?: string; color?: string }): Promise<void>;
+  locateProject(projectId: string): Promise<void>;
+  /** Re-lays out the selected frame's contents (or every frame) in tidy columns. */
+  tidyUp(): void;
 }
 
 function toFlowNode(n: CanvasNode): FlowNode {
@@ -193,6 +206,40 @@ function scheduleSave(get: () => WorkspaceState, delay = 300) {
 }
 
 let viewportTimer: ReturnType<typeof setTimeout> | null = null;
+const noteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const gestureStart = new Map<string, NodeGeometry>();
+/** Chat-sized slots for Tidy up (CHAT_SIZE / FRAME_PAD in main). */
+const TIDY = { w: 460, h: 600, pad: 24, top: 56 };
+
+// Canvas undo/redo (§7.2: 50 steps per canvas).
+interface UndoEntry {
+  label: string;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
+}
+
+const undoStack: UndoEntry[] = [];
+const redoStack: UndoEntry[] = [];
+let undoing = false;
+/** Records an action; steps taken by undo/redo themselves aren't recorded again. */
+function pushUndo(entry: UndoEntry) {
+  if (undoing) return;
+  undoStack.push(entry);
+  if (undoStack.length > 50) undoStack.shift();
+  redoStack.length = 0;
+}
+
+/** Moves/resizes nodes to the given geometry and saves it. */
+async function applyGeometry(list: NodeGeometry[]): Promise<void> {
+  const byId = new Map(list.map((g) => [g.id, g]));
+  useWorkspace.setState((s) => ({
+    nodes: s.nodes.map((n) => {
+      const g = byId.get(n.id);
+      return g ? { ...n, position: { x: g.x, y: g.y }, width: g.w, height: g.h } : n;
+    }),
+  }));
+  await latis.invoke("canvas:saveNodes", { nodes: list });
+}
 
 // Main → renderer events are applied once per animation frame (SPEC §5).
 let pendingEvents: StoredEvent[] = [];
@@ -229,6 +276,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   isolateOffer: null,
   mergeFor: null,
   timelineFor: null,
+  editingNote: null,
 
   async load() {
     try {
@@ -266,7 +314,26 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   onNodesChange(changes) {
+    // Undo for moves and resizes: remember where nodes were when the gesture started.
+    for (const c of changes) {
+      if (((c.type === "position" && c.dragging) || (c.type === "dimensions" && c.resizing)) && !gestureStart.has(c.id)) {
+        const n = get().nodes.find((x) => x.id === c.id);
+        if (n) gestureStart.set(c.id, geometry(n));
+      }
+    }
     set({ nodes: applyNodeChanges(changes, get().nodes) });
+    const ended = changes.filter(
+      (c) => (c.type === "position" && c.dragging === false) || (c.type === "dimensions" && c.resizing === false),
+    );
+    if (ended.length && gestureStart.size) {
+      const before = [...gestureStart.values()];
+      gestureStart.clear();
+      const after = before.flatMap((b) => {
+        const n = get().nodes.find((x) => x.id === b.id);
+        return n ? [geometry(n)] : [];
+      });
+      pushUndo({ label: "Move", undo: () => applyGeometry(before), redo: () => applyGeometry(after) });
+    }
     for (const c of changes) {
       if ((c.type === "position" && c.dragging === false) || (c.type === "dimensions" && c.resizing === false)) {
         dirty.add(c.id);
@@ -338,7 +405,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
             const base = { ...n, selected: false };
             return frame && n.id === frame.id ? { ...base, width: frame.w, height: frame.h } : base;
           }),
-          { ...toFlowNode(node), selected: true },
+          { ...toFlowNode(node), selected: true, className: "latis-appear" },
         ]),
         chats: { ...s.chats, [chat.id]: { summary: chat, turns: [], events: [], lastSeq: -1, loaded: true } },
         ...(draft && { drafts: { ...s.drafts, [chat.id]: draft } }),
@@ -581,6 +648,142 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   closeReview: () => set({ reviewPanel: { open: false } }),
   updateReview(item) {
     set((s) => ({ reviews: s.reviews.map((r) => (r.id === item.id ? item : r)) }));
+  },
+
+  async createNote(at, text) {
+    try {
+      const node = await latis.invoke("note:create", {
+        canvasId: get().canvasId,
+        x: Math.round(at.x),
+        y: Math.round(at.y),
+        ...(text !== undefined && { text }),
+      });
+      set((s) => ({
+        nodes: sortNodes([
+          ...s.nodes.map((n) => ({ ...n, selected: false })),
+          { ...toFlowNode(node), selected: true, className: "latis-appear" },
+        ]),
+        editingNote: node.id,
+      }));
+      pushUndo({
+        label: "New note",
+        undo: () =>
+          get()
+            .deleteNodes([node.id])
+            .then(() => undefined),
+        redo: () => get().restoreNodes([node.id]),
+      });
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  updateNote(nodeId, text) {
+    set((s) => ({ nodes: s.nodes.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, text } } : n)) }));
+    const prev = noteTimers.get(nodeId);
+    if (prev) clearTimeout(prev);
+    noteTimers.set(
+      nodeId,
+      setTimeout(() => {
+        noteTimers.delete(nodeId);
+        latis.invoke("note:update", { nodeId, text }).catch((err: unknown) => get().toast(`Note not saved: ${errorText(err)}`));
+      }, 400),
+    );
+  },
+  async deleteNodes(nodeIds) {
+    try {
+      const { deleted } = await latis.invoke("canvas:delete", { nodeIds });
+      const gone = new Set(deleted);
+      set((s) => {
+        const removed = s.nodes.filter((n) => gone.has(n.id));
+        const chatIds = new Set(removed.flatMap((n) => (n.data.chatId ? [n.data.chatId] : [])));
+        const projectIds = new Set(removed.flatMap((n) => (n.type === "frame" && n.data.projectId ? [n.data.projectId] : [])));
+        return {
+          nodes: s.nodes.filter((n) => !gone.has(n.id)),
+          chats: Object.fromEntries(Object.entries(s.chats).filter(([id]) => !chatIds.has(id))),
+          projects: Object.fromEntries(Object.entries(s.projects).filter(([id]) => !projectIds.has(id))),
+        };
+      });
+      const label = deleted.length === 1 ? "Deleted 1 item" : `Deleted ${deleted.length} items`;
+      pushUndo({ label: "Delete", undo: () => get().restoreNodes(deleted), redo: () => get().deleteNodes(deleted) });
+      if (!undoing) get().toast(`${label}. Restore it from ⌘K for 7 days.`, { label: "Undo", run: () => void get().undo() });
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async restoreNodes(nodeIds) {
+    try {
+      const canvas = await latis.invoke("canvas:restore", { nodeIds });
+      const back = new Set(nodeIds);
+      set((s) => {
+        const chats = { ...s.chats };
+        for (const c of canvas.chats) chats[c.id] ??= { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
+        return {
+          nodes: sortNodes([...s.nodes.filter((n) => !back.has(n.id)), ...canvas.nodes.filter((n) => back.has(n.id)).map(toFlowNode)]),
+          chats,
+          projects: Object.fromEntries(canvas.projects.map((p) => [p.id, p])),
+        };
+      });
+      for (const c of canvas.chats) if (!get().chats[c.id]?.loaded) void get().loadTranscript(c.id);
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async undo() {
+    const entry = undoStack.pop();
+    if (!entry) return;
+    undoing = true;
+    try {
+      await entry.undo();
+      redoStack.push(entry);
+    } finally {
+      undoing = false;
+    }
+  },
+  async redo() {
+    const entry = redoStack.pop();
+    if (!entry) return;
+    undoing = true;
+    try {
+      await entry.redo();
+      undoStack.push(entry);
+    } finally {
+      undoing = false;
+    }
+  },
+  async updateProject(projectId, patch) {
+    try {
+      const p = await latis.invoke("project:update", { projectId, ...patch });
+      set((s) => ({ projects: { ...s.projects, [p.id]: p } }));
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async locateProject(projectId) {
+    try {
+      const p = await latis.invoke("project:locate", { projectId });
+      if (p) set((s) => ({ projects: { ...s.projects, [p.id]: p } }));
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  tidyUp() {
+    const s = get();
+    const selected = s.nodes.find((n) => n.selected && n.type === "frame");
+    const frames = selected ? [selected] : s.nodes.filter((n) => n.type === "frame");
+    const before = s.nodes.filter((n) => frames.some((f) => f.id === n.parentId || f.id === n.id)).map(geometry);
+    const moved: NodeGeometry[] = [];
+    for (const f of frames) {
+      const kids = s.nodes.filter((n) => n.parentId === f.id).sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+      const cols = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(kids.length))));
+      kids.forEach((k, i) => {
+        const g = geometry(k);
+        moved.push({ ...g, x: TIDY.pad + (i % cols) * (TIDY.w + TIDY.pad), y: TIDY.top + Math.floor(i / cols) * (TIDY.h + TIDY.pad) });
+      });
+      const rows = Math.ceil(kids.length / cols);
+      if (kids.length) moved.push({ ...geometry(f), w: TIDY.pad + cols * (TIDY.w + TIDY.pad), h: TIDY.top + rows * (TIDY.h + TIDY.pad) });
+    }
+    void applyGeometry(moved);
+    pushUndo({ label: "Tidy up", undo: () => applyGeometry(before), redo: () => applyGeometry(moved) });
   },
 
   async createSandbox() {

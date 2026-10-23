@@ -377,6 +377,27 @@ export const invokeContract = {
   },
   /** Asks the chat's agent to bring its branch up to date with the base and resolve conflicts. */
   "worktree:askResolve": { req: z.object({ chatId: z.string(), files: z.array(z.string()) }), res: ok },
+  "note:create": {
+    req: z.object({ canvasId: z.string(), x: z.number(), y: z.number(), text: z.string().optional() }),
+    res: CanvasNode,
+  },
+  "note:update": { req: z.object({ nodeId: z.string(), text: z.string().max(1_000_000) }), res: ok },
+  /** Saves a note as a .md file the user picks. */
+  "note:export": { req: z.object({ nodeId: z.string() }), res: ok },
+  /** Soft delete (frames take their contents and project); files on disk are never touched (§9.1 AC3). */
+  "canvas:delete": { req: z.object({ nodeIds: z.array(z.string()).min(1) }), res: z.object({ deleted: z.array(z.string()) }) },
+  /** Brings deleted nodes back; returns the canvas so the renderer can merge them in. */
+  "canvas:restore": { req: z.object({ nodeIds: z.array(z.string()).min(1) }), res: CanvasState },
+  "canvas:deleted": {
+    req: none,
+    res: z.array(z.object({ nodeIds: z.array(z.string()), type: z.string(), title: z.string(), deletedAt: z.number() })),
+  },
+  "project:update": {
+    req: z.object({ projectId: z.string(), name: z.string().min(1).max(80).optional(), color: z.string().optional() }),
+    res: Project,
+  },
+  /** "Folder missing → Locate" (§9.1 AC4): pick where the folder went. `null` when cancelled. */
+  "project:locate": { req: z.object({ projectId: z.string() }), res: Project.nullable() },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   "settings:getTheme": { req: none, res: Theme },
