@@ -22,22 +22,37 @@ import {
 import type { QueuedMessage } from "@latis/shared";
 import { buildTranscript } from "@latis/shared";
 import { Button, Menu, MenuItem, MenuSeparator, StatusDot, cn } from "@latis/ui";
+import { useZoomLevel } from "../canvas/zoom";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
+import { ChatCondensed, ChatTile } from "./ChatCompact";
 import { Item, type ItemActions } from "./items";
 import { ModelPicker, PermissionPicker, ReasoningPicker } from "./pickers";
 import { TerminalChatBody } from "./TerminalChatBody";
 
 const FALLBACK_HUE: Record<string, string> = { "claude-code": "amber-sand", codex: "slate-blue", gemini: "sky", fake: "violet" };
 
+/** A chat on the canvas: full card, condensed card or status tile depending on zoom (§8.4). */
 export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<FlowNode>) {
+  const level = useZoomLevel();
   const chatId = data.chatId ?? "";
+  if (level === "tile") return <ChatTile chatId={chatId} selected={selected} />;
+  if (level === "condensed") return <ChatCondensed chatId={chatId} selected={selected} />;
+  return <FullChat chatId={chatId} selected={selected} />;
+});
+
+const FullChat = memo(function FullChat({ chatId, selected }: { chatId: string; selected: boolean }) {
   const chat = useWorkspace((s) => s.chats[chatId]);
   const agent = useWorkspace((s) => s.agents.find((a) => a.id === chat?.summary.agentId));
   const queue = useWorkspace((s) => s.queues[chatId]);
   const timeline = useWorkspace((s) => s.timelines[chatId]);
   const { send, steer, respond, interrupt, restart, setChatOptions, reveal, openAsTerminal, markSeen } = useWorkspace.getState();
   const items = useMemo(() => (chat ? buildTranscript(chat.turns, chat.events) : []), [chat]);
-  const [draft, setDraft] = useState(() => useWorkspace.getState().drafts[chatId] ?? "");
+  // Drafts live in the store so they survive the card unmounting (zoom, off-screen virtualisation).
+  const [draft, setDraftState] = useState(() => useWorkspace.getState().drafts[chatId] ?? "");
+  const setDraft = (text: string) => {
+    setDraftState(text);
+    useWorkspace.setState((st) => ({ drafts: { ...st.drafts, [chatId]: text } }));
+  };
   const [editingTitle, setEditingTitle] = useState(false);
   const list = useRef<VirtuosoHandle>(null);
 

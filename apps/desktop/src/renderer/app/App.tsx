@@ -9,6 +9,7 @@ import { TitleBar } from "./TitleBar";
 import { IsolateDialog, MergeDialog, TimelineDialog } from "../changes/ChangeDialogs";
 import { ReviewPanel } from "../changes/ReviewPanel";
 import { Onboarding } from "./Onboarding";
+import { PerfOverlay } from "./PerfOverlay";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
 import { useResolvedTheme } from "./useResolvedTheme";
@@ -74,6 +75,7 @@ export function App() {
         <TimelineDialog />
         <ReviewPanel />
         <Onboarding />
+        <PerfOverlay />
       </div>
     </ReactFlowProvider>
   );

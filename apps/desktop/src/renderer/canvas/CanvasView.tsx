@@ -54,6 +54,9 @@ export function CanvasView() {
       if (e.shiftKey && e.code === "Digit1") void flow.fitView({ duration: 320 });
       if (e.shiftKey && e.code === "Digit2") void flow.fitView({ nodes: flow.getNodes().filter((n) => n.selected), duration: 320 });
       if (!e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "0") void flow.zoomTo(1, { duration: 200 });
+      // Keyboard zoom (Ctrl/⌘ +/− stays the interface-size zoom).
+      if (!e.metaKey && !e.ctrlKey && e.key === "-") void flow.zoomOut({ duration: 150 });
+      if (!e.metaKey && !e.ctrlKey && (e.key === "=" || e.key === "+")) void flow.zoomIn({ duration: 150 });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -72,6 +75,8 @@ export function CanvasView() {
         }}
         minZoom={0.1}
         maxZoom={4}
+        // §8.3 virtualisation: only nodes in the viewport mount; agents keep running in main.
+        onlyRenderVisibleElements
         panOnScroll
         selectionOnDrag
         panOnDrag={[1]}

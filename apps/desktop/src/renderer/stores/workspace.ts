@@ -599,9 +599,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 }));
 
+/** Events applied so far, for the perf overlay's event rate. */
+export const perfCounters = { events: 0 };
+
 function flushEvents() {
   frame = 0;
   const batch = pendingEvents;
+  perfCounters.events += batch.length;
   pendingEvents = [];
   useWorkspace.setState((s) => {
     const chats = { ...s.chats };
