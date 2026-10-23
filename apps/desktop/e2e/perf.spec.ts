@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 import { expect, test, type Page } from "@playwright/test";
 import type { LatisApi } from "@latis/shared";
 import { launch, tempDataDir } from "./helpers";
