@@ -44,6 +44,17 @@ export const Project = z.object({
 });
 export type Project = z.infer<typeof Project>;
 
+/** A chat's own git worktree (§9.3). */
+export const WorktreeInfo = z.object({
+  id: z.string(),
+  branch: z.string(),
+  baseRef: z.string(),
+  path: z.string(),
+  merged: z.boolean(),
+  removed: z.boolean(),
+});
+export type WorktreeInfo = z.infer<typeof WorktreeInfo>;
+
 export const ChatSummary = z.object({
   id: z.string(),
   nodeId: z.string(),
@@ -57,6 +68,7 @@ export const ChatSummary = z.object({
   status: ChatStatus,
   /** True when the agent conversation can be resumed after a restart. */
   resumable: z.boolean(),
+  worktree: WorktreeInfo.nullable(),
   createdAt: z.number(),
   lastActivityAt: z.number(),
 });
@@ -129,6 +141,77 @@ export const Prefs = z.object({
 });
 export type Prefs = z.infer<typeof Prefs>;
 
+const DiffHunkSchema = z.object({
+  oldStart: z.number(),
+  oldLines: z.number(),
+  newStart: z.number(),
+  newLines: z.number(),
+  lines: z.array(z.string()),
+});
+
+export const FileDiff = z.object({
+  path: z.string(),
+  oldPath: z.string().optional(),
+  change: z.enum(["created", "modified", "deleted"]),
+  hunks: z.array(DiffHunkSchema),
+  additions: z.number(),
+  deletions: z.number(),
+  binary: z.boolean(),
+});
+export type FileDiff = z.infer<typeof FileDiff>;
+
+export const FileStat = z.object({
+  path: z.string(),
+  change: z.enum(["created", "modified", "deleted"]),
+  additions: z.number(),
+  deletions: z.number(),
+});
+export type FileStat = z.infer<typeof FileStat>;
+
+export const Decision = z.enum(["accepted", "reverted"]);
+export const ReviewDecisions = z.record(
+  z.string(),
+  z.object({ file: Decision.optional(), hunks: z.record(z.string(), Decision).optional() }),
+);
+export type ReviewDecisions = z.infer<typeof ReviewDecisions>;
+
+/** A finished turn that changed files (§9.5 AC1). */
+export const ReviewItem = z.object({
+  id: z.string(),
+  chatId: z.string(),
+  turnId: z.string(),
+  summary: z.string(),
+  files: z.array(FileStat),
+  decisions: ReviewDecisions,
+  createdAt: z.number(),
+  reviewedAt: z.number().nullable(),
+});
+export type ReviewItem = z.infer<typeof ReviewItem>;
+
+/** One turn on a chat's timeline (§9.4 AC3). */
+export const TimelineEntry = z.object({
+  turnId: z.string(),
+  seq: z.number(),
+  userText: z.string(),
+  startedAt: z.number(),
+  files: z.array(z.string()),
+  undone: z.boolean(),
+  /** A checkpoint exists, so the turn can be undone/restored. */
+  restorable: z.boolean(),
+});
+export type TimelineEntry = z.infer<typeof TimelineEntry>;
+
+export const MergePreview = z.object({
+  branch: z.string(),
+  baseRef: z.string(),
+  /** Commits the branch has that the base doesn't (after committing the agent's pending work). */
+  ahead: z.number(),
+  conflicts: z.array(z.string()),
+  /** The main folder isn't on the base branch or has uncommitted changes, so merging there would be unsafe. */
+  blocker: z.string().nullable(),
+});
+export type MergePreview = z.infer<typeof MergePreview>;
+
 export const Turn = z.object({
   id: z.string(),
   chatId: z.string(),
@@ -193,6 +276,8 @@ export const invokeContract = {
       model: z.string().optional(),
       reasoning: z.string().optional(),
       permissionMode: PermissionModeSchema.optional(),
+      /** Run in its own git worktree on a new `latis/<slug>` branch (§9.3 AC1). */
+      isolate: z.boolean().optional(),
     }),
     /** `frame` is the project frame's new geometry when it grew to fit the chat. */
     res: z.object({ node: CanvasNode, chat: ChatSummary, frame: NodeGeometry.nullable() }),
@@ -250,6 +335,48 @@ export const invokeContract = {
     req: z.object({ canvasId: z.string(), x: z.number(), y: z.number() }),
     res: z.object({ project: Project, node: CanvasNode, existed: z.boolean() }),
   },
+  /** Whether the project is a git repo and already has chats (to offer a worktree, §9.3 AC1, AC6). */
+  "project:git": {
+    req: z.object({ projectId: z.string() }),
+    res: z.object({ isRepo: z.boolean(), chats: z.number(), gitMissing: z.boolean() }),
+  },
+  "project:initGit": { req: z.object({ projectId: z.string() }), res: ok },
+  "chat:timeline": { req: z.object({ chatId: z.string() }), res: z.array(TimelineEntry) },
+  /** Undo restores every file the turn changed; redo puts them back (§9.4 AC2). */
+  "chat:undoTurn": { req: z.object({ chatId: z.string(), turnId: z.string() }), res: z.array(TimelineEntry) },
+  "chat:redoTurn": { req: z.object({ chatId: z.string(), turnId: z.string() }), res: z.array(TimelineEntry) },
+  /** Puts every file changed since this turn began back the way it was before it (§9.4 AC3). */
+  "chat:restoreTo": { req: z.object({ chatId: z.string(), turnId: z.string() }), res: z.array(TimelineEntry) },
+  "reviews:list": { req: none, res: z.array(ReviewItem) },
+  "reviews:diff": { req: z.object({ reviewId: z.string() }), res: z.array(FileDiff) },
+  /** Worktree branch (plus uncommitted work) vs. its base (§9.3 AC3). */
+  "reviews:branchDiff": { req: z.object({ chatId: z.string() }), res: z.array(FileDiff) },
+  /** Revert a file, or one hunk of it, in the working tree; the agent hears about it next turn. */
+  "reviews:revert": { req: z.object({ reviewId: z.string(), path: z.string(), hunk: z.number().int().optional() }), res: ReviewItem },
+  "reviews:accept": {
+    req: z.object({ reviewId: z.string(), path: z.string().optional(), hunk: z.number().int().optional() }),
+    res: ReviewItem,
+  },
+  "reviews:markReviewed": { req: z.object({ reviewId: z.string(), reviewed: z.boolean() }), res: ReviewItem },
+  /** Sends feedback on a file or hunk back to the chat that made it, quoting the hunk (§9.5 AC4). */
+  "reviews:askChanges": {
+    req: z.object({ reviewId: z.string(), path: z.string(), hunk: z.number().int().optional(), feedback: z.string().min(1) }),
+    res: ok,
+  },
+  /** Moves a chat into its own new worktree; its next message continues there (§8.5 cwd chip). */
+  "chat:isolate": { req: z.object({ chatId: z.string() }), res: ChatSummary },
+  "worktree:mergePreview": { req: z.object({ chatId: z.string() }), res: MergePreview },
+  "worktree:merge": {
+    req: z.object({ chatId: z.string(), mode: z.enum(["merge", "squash"]) }),
+    res: z.object({ merged: z.boolean(), conflicts: z.array(z.string()) }),
+  },
+  /** `force` deletes unmerged commits; without it, unmerged branches are refused (§9.3 AC5). */
+  "worktree:remove": {
+    req: z.object({ chatId: z.string(), force: z.boolean() }),
+    res: z.object({ removed: z.boolean(), unmerged: z.number() }),
+  },
+  /** Asks the chat's agent to bring its branch up to date with the base and resolve conflicts. */
+  "worktree:askResolve": { req: z.object({ chatId: z.string(), files: z.array(z.string()) }), res: ok },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   "settings:getTheme": { req: none, res: Theme },
@@ -271,6 +398,8 @@ export const eventContract = {
   /** A notification was clicked: pan to this chat. */
   "focus:chat": z.object({ chatId: z.string() }),
   "agents:changed": z.array(AgentInfo),
+  "reviews:changed": z.array(ReviewItem),
+  "chat:timeline": z.object({ chatId: z.string(), entries: z.array(TimelineEntry) }),
 } as const;
 
 export type InvokeChannel = keyof typeof invokeContract;

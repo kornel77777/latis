@@ -6,12 +6,17 @@ import {
   CornerDownRight,
   Folder,
   FolderOpen,
+  GitBranch,
+  GitCompare,
+  GitMerge,
+  History,
   MoreHorizontal,
   Pencil,
   RotateCcw,
   Send,
   Square,
   SquareTerminal,
+  Trash2,
   X,
 } from "lucide-react";
 import type { QueuedMessage } from "@latis/shared";
@@ -29,6 +34,7 @@ export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<Flo
   const chat = useWorkspace((s) => s.chats[chatId]);
   const agent = useWorkspace((s) => s.agents.find((a) => a.id === chat?.summary.agentId));
   const queue = useWorkspace((s) => s.queues[chatId]);
+  const timeline = useWorkspace((s) => s.timelines[chatId]);
   const { send, steer, respond, interrupt, restart, setChatOptions, reveal, openAsTerminal, markSeen } = useWorkspace.getState();
   const items = useMemo(() => (chat ? buildTranscript(chat.turns, chat.events) : []), [chat]);
   const [draft, setDraft] = useState(() => useWorkspace.getState().drafts[chatId] ?? "");
@@ -39,8 +45,14 @@ export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<Flo
     () => ({
       respond: (requestId, response) => void respond(chatId, requestId, response),
       openPath: (path) => void reveal(chatId, path),
+      turnState: (turnId) => {
+        const e = timeline?.find((t) => t.turnId === turnId);
+        return e && { files: e.files.length, undone: e.undone, restorable: e.restorable };
+      },
+      undo: (turnId) => void useWorkspace.getState().undoTurn(chatId, turnId),
+      redo: (turnId) => void useWorkspace.getState().redoTurn(chatId, turnId),
     }),
-    [chatId, respond, reveal],
+    [chatId, respond, reveal, timeline],
   );
 
   // Looking at a chat clears its "finished" Inbox item (§8.6).
@@ -126,14 +138,65 @@ export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<Flo
                 <AlertTriangle size={13} />
               </span>
             )}
-            <button
-              className="flex h-6 max-w-28 items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] text-text-3 hover:bg-surface-2 hover:text-text-1"
-              title={s.cwd}
-              onClick={() => void reveal(chatId)}
-              aria-label={`Folder ${folder}`}
-            >
-              <Folder size={12} className="shrink-0" /> <span className="truncate">{folder}</span>
-            </button>
+            {s.worktree && !s.worktree.removed ? (
+              <Menu
+                trigger={
+                  <button
+                    className="flex h-6 max-w-36 items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] text-accent hover:bg-surface-2"
+                    title={`Own copy: ${s.worktree.path}`}
+                    aria-label={`Branch ${s.worktree.branch}`}
+                    data-testid="branch-chip"
+                  >
+                    <GitBranch size={12} className="shrink-0" />{" "}
+                    <span className="truncate">{s.worktree.branch.replace(/^latis\//, "")}</span>
+                    {s.worktree.merged && <span className="text-text-3">· merged</span>}
+                  </button>
+                }
+              >
+                <MenuItem onSelect={() => useWorkspace.getState().openReview({ branchOf: chatId })}>
+                  <GitCompare size={13} /> Review changes…
+                </MenuItem>
+                <MenuItem onSelect={() => useWorkspace.setState({ mergeFor: chatId })}>
+                  <GitMerge size={13} /> Merge into {s.worktree.baseRef}…
+                </MenuItem>
+                <MenuItem onSelect={() => void reveal(chatId)}>
+                  <FolderOpen size={13} /> Open the copy
+                </MenuItem>
+                <MenuSeparator />
+                <MenuItem onSelect={() => useWorkspace.setState({ mergeFor: chatId })}>
+                  <Trash2 size={13} /> Remove copy…
+                </MenuItem>
+              </Menu>
+            ) : (
+              <Menu
+                trigger={
+                  <button
+                    className="flex h-6 max-w-28 items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] text-text-3 hover:bg-surface-2 hover:text-text-1"
+                    title={s.cwd}
+                    aria-label={`Folder ${folder}`}
+                    data-testid="folder-chip"
+                  >
+                    <Folder size={12} className="shrink-0" /> <span className="truncate">{folder}</span>
+                  </button>
+                }
+              >
+                <MenuItem onSelect={() => void reveal(chatId)}>
+                  <FolderOpen size={13} /> Reveal folder
+                </MenuItem>
+                {s.projectId && !terminalAgent && (
+                  <MenuItem
+                    onSelect={() =>
+                      void window.latis
+                        .invoke("chat:isolate", { chatId })
+                        .then(() => useWorkspace.getState().toast("This chat now works in its own copy on a new branch."))
+                        .catch((err: unknown) => useWorkspace.getState().toast(err instanceof Error ? err.message : String(err)))
+                    }
+                  >
+                    <GitBranch size={13} /> Work in its own copy
+                  </MenuItem>
+                )}
+              </Menu>
+            )}
             <Menu
               trigger={
                 <Button variant="ghost" size="icon" aria-label="Chat menu">
@@ -147,6 +210,11 @@ export const ChatNode = memo(function ChatNode({ data, selected }: NodeProps<Flo
               <MenuItem onSelect={() => void reveal(chatId)}>
                 <FolderOpen size={13} /> Open folder
               </MenuItem>
+              {!terminalAgent && (
+                <MenuItem onSelect={() => useWorkspace.setState({ timelineFor: chatId })}>
+                  <History size={13} /> Timeline
+                </MenuItem>
+              )}
               {!terminalAgent && s.agentId !== "fake" && (
                 <MenuItem onSelect={() => void openAsTerminal(chatId)}>
                   <SquareTerminal size={13} /> Open as terminal

@@ -4,6 +4,7 @@ import {
   CircleAlert,
   FolderOpen,
   FolderTree,
+  GitCompare,
   Inbox,
   LayoutGrid,
   MessageCircleQuestion,
@@ -61,6 +62,7 @@ export function Sidebar() {
           </button>
         ))}
       </div>
+      <ReviewEntry />
       <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto">
         {tab === "projects" && <ProjectsTab />}
         {tab === "files" && (
@@ -69,6 +71,30 @@ export function Sidebar() {
         {tab === "inbox" && <InboxTab />}
       </div>
     </aside>
+  );
+}
+
+/** §9.5 AC5: the Review Inbox count, one click from anywhere. */
+function ReviewEntry() {
+  const open = useWorkspace((s) => s.reviews.filter((r) => r.reviewedAt === null).length);
+  const openReview = useWorkspace((s) => s.openReview);
+  return (
+    <button
+      onClick={() => openReview()}
+      className="mx-1.5 mt-1.5 flex h-8 items-center gap-2 rounded-control px-2 text-left text-[12.5px] text-text-2 hover:bg-surface-2 hover:text-text-1"
+      title="Review changes (Ctrl+Shift+R)"
+      data-testid="open-review"
+    >
+      <GitCompare size={13} /> Review changes
+      {open > 0 && (
+        <span
+          className="ml-auto rounded-full bg-accent px-1.5 text-[10px] font-semibold leading-4 text-accent-fg"
+          data-testid="review-count"
+        >
+          {open}
+        </span>
+      )}
+    </button>
   );
 }
 

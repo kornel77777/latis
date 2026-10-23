@@ -1,0 +1,7 @@
+// Writes src/<last word>.txt without asking, then reports. Used by M3 tests (worktrees, review, merge).
+{"delay":0,"event":{"type":"session.started","model":"demo-1"}}
+{"delay":50,"event":{"type":"tool.started","id":"w1","kind":"edit","name":"Write","input":{"path":"src/{{word}}.txt"},"paths":["src/{{word}}.txt"]}}
+{"delay":50,"writeFile":{"path":"src/{{word}}.txt","content":"Feature: {{word}}\nline two\nline three\n"}}
+{"delay":20,"event":{"type":"tool.completed","id":"w1","status":"ok"}}
+{"delay":20,"stream":"Wrote src/{{word}}.txt.","chunk":8}
+{"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":200}}

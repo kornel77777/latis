@@ -6,6 +6,8 @@ import { Dock } from "./Dock";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { TitleBar } from "./TitleBar";
+import { IsolateDialog, MergeDialog, TimelineDialog } from "../changes/ChangeDialogs";
+import { ReviewPanel } from "../changes/ReviewPanel";
 import { Onboarding } from "./Onboarding";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
@@ -33,6 +35,12 @@ export function App() {
       } else if (mod && e.code === "Backquote") {
         e.preventDefault();
         useWorkspace.getState().toggleDock();
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === "r") {
+        // §8.9: Review Inbox.
+        e.preventDefault();
+        const s = useWorkspace.getState();
+        if (s.reviewPanel.open) s.closeReview();
+        else s.openReview();
       } else if (e.ctrlKey && e.key.toLowerCase() === "j") {
         // §8.6: Ctrl+J next item, Ctrl+Shift+J previous (Ctrl on every OS, like the spec).
         e.preventDefault();
@@ -61,6 +69,10 @@ export function App() {
         <StatusBar />
         <Toasts />
         <SettingsDialog />
+        <IsolateDialog />
+        <MergeDialog />
+        <TimelineDialog />
+        <ReviewPanel />
         <Onboarding />
       </div>
     </ReactFlowProvider>

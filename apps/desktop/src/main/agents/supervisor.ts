@@ -39,6 +39,12 @@ export interface SupervisorSinks {
   raised(item: AttentionItem): void;
 }
 
+/** Checkpoints around turns (§9.4); failures are logged, never block the agent. */
+export interface TurnHooks {
+  beforeTurn(chatId: string, turnId: string): Promise<void>;
+  afterTurn(chatId: string, turnId: string, finalMessage: string | undefined): Promise<void>;
+}
+
 const TITLE_MAX = 48;
 const DETAIL_MAX = 160;
 const REQUEST_KINDS = ["permission", "question", "plan"] as const;
@@ -63,16 +69,27 @@ export class SessionSupervisor {
   private sendAfterInterrupt = new Map<string, string>();
   /** The latest assistant text per chat, for the "finished" item. */
   private lastMessage = new Map<string, string>();
+  private streamed = new Map<string, string>();
+  /** Things the agent should know with the next message (e.g. the user reverted its files). */
+  private notes = new Map<string, string[]>();
 
   constructor(
     private readonly store: WorkspaceStore,
     private readonly log: EventLog,
     private readonly adapters: Map<string, AgentAdapter>,
     private readonly sinks: SupervisorSinks,
+    private readonly hooks?: TurnHooks,
   ) {}
+
+  /** Queues a note that goes to the agent with the user's next message (§9.4 AC2, §9.5 AC3). */
+  addNote(chatId: string, text: string) {
+    this.notes.set(chatId, [...(this.notes.get(chatId) ?? []), text]);
+  }
 
   async send(chatId: string, text: string): Promise<Turn> {
     this.resolve(chatId, { kinds: ["finished", "error", "rate_limited"] });
+    this.lastMessage.delete(chatId);
+    this.streamed.delete(chatId);
     let live: Live;
     try {
       live = await this.ensureSession(chatId);
@@ -92,7 +109,12 @@ export class SessionSupervisor {
     live.erroredThisTurn = false;
     this.sinks.turn(turn);
     this.setStatus(chatId, "working");
-    await live.session.send({ text });
+    await this.hooks?.beforeTurn(chatId, turn.id).catch((err: unknown) => console.warn("[supervisor] checkpoint failed", err));
+    const notes = this.notes.get(chatId);
+    this.notes.delete(chatId);
+    // Notes reach the agent but not the transcript, which shows what the user typed.
+    const forAgent = notes?.length ? `${notes.map((n) => `[Note from Latis] ${n}`).join("\n")}\n\n${text}` : text;
+    await live.session.send({ text: forAgent });
     return turn;
   }
 
@@ -317,10 +339,24 @@ export class SessionSupervisor {
       }
       this.sinks.event(this.log.append(chatId, live.turnId, e));
       this.setStatus(chatId, nextStatus(this.statuses.get(chatId) ?? "idle", e));
+      // Agents that only stream (no message.completed) still get a summary from their streamed text.
+      if (e.type === "message.delta") this.streamed.set(chatId, (this.streamed.get(chatId) ?? "") + e.text);
+      if (e.type === "message.completed" || e.type === "tool.started") {
+        const text = e.type === "message.completed" ? e.text : this.streamed.get(chatId);
+        if (text?.trim()) this.lastMessage.set(chatId, text);
+        this.streamed.delete(chatId);
+      }
+      if (e.type === "turn.completed" && this.streamed.get(chatId)?.trim()) {
+        this.lastMessage.set(chatId, this.streamed.get(chatId)!);
+        this.streamed.delete(chatId);
+      }
       this.attentionFor(chatId, live, e);
-      if (e.type === "message.completed" && e.text.trim()) this.lastMessage.set(chatId, e.text);
       if (e.type === "turn.completed" && live.turnId) {
         this.store.endTurn(live.turnId, e.status);
+        const turnId = live.turnId;
+        void this.hooks
+          ?.afterTurn(chatId, turnId, this.lastMessage.get(chatId))
+          .catch((err: unknown) => console.warn("[supervisor] checkpoint failed", err));
         if (e.status === "ok") this.autoTitle(chatId);
         live.turnId = null;
         this.afterTurn(chatId, e.status);

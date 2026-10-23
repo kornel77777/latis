@@ -109,3 +109,51 @@ export const attention = sqliteTable(
   },
   (t) => [index("attention_open").on(t.resolvedAt, t.createdAt)],
 );
+
+// SPEC §7.1 `worktrees` (§9.3). `base_ref` is the branch the worktree started from; `base_commit` its commit then.
+export const worktrees = sqliteTable("worktrees", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  path: text("path").notNull(),
+  branch: text("branch").notNull(),
+  baseRef: text("base_ref").notNull(),
+  baseCommit: text("base_commit").notNull(),
+  createdAt: integer("created_at").notNull(),
+  mergedAt: integer("merged_at"),
+  removedAt: integer("removed_at"),
+});
+
+// SPEC §7.1 `checkpoints` (§9.4), one row per turn: before/after snapshot commits (also held by
+// refs/latis/checkpoints/<chat>/<turn>/…) and the files the turn changed.
+export const checkpoints = sqliteTable(
+  "checkpoints",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    turnId: text("turn_id").notNull(),
+    repo: text("repo").notNull(),
+    before: text("before").notNull(),
+    after: text("after"),
+    filesJson: text("files_json").notNull().default("[]"),
+    undoneAt: integer("undone_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("checkpoints_chat").on(t.chatId, t.createdAt)],
+);
+
+// Review Inbox items (§9.5): a finished turn that changed files.
+export const reviews = sqliteTable(
+  "reviews",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    turnId: text("turn_id").notNull(),
+    summary: text("summary").notNull(),
+    filesJson: text("files_json").notNull(),
+    /** Per-file/hunk decisions: { "<path>": { file?: "accepted"|"reverted", hunks?: { "<i>": "accepted"|"reverted" } } } */
+    decisionsJson: text("decisions_json").notNull().default("{}"),
+    createdAt: integer("created_at").notNull(),
+    reviewedAt: integer("reviewed_at"),
+  },
+  (t) => [index("reviews_open").on(t.reviewedAt, t.createdAt)],
+);

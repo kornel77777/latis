@@ -21,7 +21,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
         <RadixDialog.Content
-          className="fixed left-1/2 top-1/2 z-50 max-h-[86vh] w-[min(92vw,var(--dialog-w))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lift"
+          className="fixed left-1/2 top-1/2 z-50 max-h-[86vh] w-[min(92vw,var(--dialog-w))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-panel border border-line bg-surface p-5 shadow-lift outline-none"
           style={{ ["--dialog-w" as string]: `${width}px` }}
         >
           <RadixDialog.Title className="text-[16px] font-semibold text-text-1">{title}</RadixDialog.Title>

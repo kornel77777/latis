@@ -32,6 +32,10 @@ const toolIcon: Record<ToolKind, LucideIcon> = {
 export interface ItemActions {
   respond(requestId: string, response: RespondPayload): void;
   openPath(path: string): void;
+  /** Checkpoint state of a turn, for ↶ undo / ↷ redo in its footer (§9.4 AC2). */
+  turnState?(turnId: string): { files: number; undone: boolean; restorable: boolean } | undefined;
+  undo?(turnId: string): void;
+  redo?(turnId: string): void;
 }
 
 export function Item({ item, actions }: { item: TranscriptItem; actions: ItemActions }) {
@@ -90,9 +94,33 @@ export function Item({ item, actions }: { item: TranscriptItem; actions: ItemAct
             </span>
           )}
           {item.status !== "ok" && <span className="text-state-error">· {item.status}</span>}
+          {item.turnId && <UndoTurn turnId={item.turnId} actions={actions} />}
         </div>
       );
   }
+}
+
+function UndoTurn({ turnId, actions }: { turnId: string; actions: ItemActions }) {
+  const st = actions.turnState?.(turnId);
+  if (!st?.restorable || st.files === 0) return null;
+  return st.undone ? (
+    <button
+      className="ml-auto rounded px-1 text-text-2 hover:bg-surface-2 hover:text-text-1"
+      onClick={() => actions.redo?.(turnId)}
+      data-testid="redo-turn"
+    >
+      ↷ Redo turn
+    </button>
+  ) : (
+    <button
+      className="ml-auto rounded px-1 text-text-2 hover:bg-surface-2 hover:text-text-1"
+      onClick={() => actions.undo?.(turnId)}
+      title={`Restores the ${st.files} file${st.files === 1 ? "" : "s"} this turn changed`}
+      data-testid="undo-turn"
+    >
+      ↶ Undo turn
+    </button>
+  );
 }
 
 function AssistantMessage({ text, streaming }: { text: string; streaming: boolean }) {

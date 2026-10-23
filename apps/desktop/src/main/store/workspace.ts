@@ -14,12 +14,15 @@ import {
   type NodeGeometry,
   type PermissionMode,
   type Project,
+  type ReviewDecisions,
+  type ReviewItem,
+  type FileStat,
   type StoredEvent,
   type Transcript,
   type Turn,
 } from "@latis/shared";
 import type { Db } from "./db";
-import { attention, canvases, chats, events, nodes, projects, settings, turns } from "./schema";
+import { attention, canvases, chats, checkpoints, events, nodes, projects, reviews, settings, turns, worktrees } from "./schema";
 
 const DEFAULT_CANVAS = "main";
 const PROJECT_COLORS = ["teal", "indigo", "amber", "pink", "green", "sky"];
@@ -56,6 +59,10 @@ export class WorkspaceStore {
     const nodeIds = nodeRows.map((n) => n.id);
     const chatRows = nodeIds.length ? this.db.select().from(chats).where(inArray(chats.nodeId, nodeIds)).all() : [];
     const projectOf = new Map(nodeRows.map((n) => [n.id, n.projectId]));
+    const wtIds = chatRows.flatMap((r) => (r.worktreeId ? [r.worktreeId] : []));
+    const wtOf = new Map(
+      (wtIds.length ? this.db.select().from(worktrees).where(inArray(worktrees.id, wtIds)).all() : []).map((w) => [w.id, w]),
+    );
     const frames = nodeRows.filter((n) => n.type === "frame" && n.projectId);
     const projectRows = frames.length
       ? this.db
@@ -78,7 +85,7 @@ export class WorkspaceStore {
       name: c.name,
       viewport: vp?.success ? vp.data : null,
       nodes: nodeRows.map(toCanvasNode),
-      chats: chatRows.map((r) => toChatSummary(r, projectOf.get(r.nodeId) ?? null)),
+      chats: chatRows.map((r) => toChatSummary(r, projectOf.get(r.nodeId) ?? null, wtOf.get(r.worktreeId ?? ""))),
       projects: projectRows.map((p) => toProject(p, frames.find((f) => f.projectId === p.id)!.id)),
     };
   }
@@ -206,6 +213,7 @@ export class WorkspaceStore {
     permissionMode: PermissionMode;
     cwd: string;
     title: string;
+    worktreeId?: string | null;
   }): { node: CanvasNode; chat: ChatSummary } {
     const now = Date.now();
     const nodeId = randomUUID();
@@ -238,13 +246,15 @@ export class WorkspaceStore {
           reasoning: input.reasoning,
           permissionMode: input.permissionMode,
           cwd: input.cwd,
+          worktreeId: input.worktreeId ?? null,
           title: input.title,
           createdAt: now,
           lastActivityAt: now,
         })
         .returning()
         .get();
-      return { node: toCanvasNode(node), chat: toChatSummary(chat, input.projectId) };
+      const wt = chat.worktreeId ? tx.select().from(worktrees).where(eq(worktrees.id, chat.worktreeId)).get() : undefined;
+      return { node: toCanvasNode(node), chat: toChatSummary(chat, input.projectId, wt) };
     });
   }
 
@@ -252,7 +262,8 @@ export class WorkspaceStore {
     const row = this.db.select().from(chats).where(eq(chats.id, chatId)).get();
     if (!row) return undefined;
     const node = this.db.select({ projectId: nodes.projectId }).from(nodes).where(eq(nodes.id, row.nodeId)).get();
-    return toChatSummary(row, node?.projectId ?? null);
+    const wt = row.worktreeId ? this.getWorktree(row.worktreeId) : undefined;
+    return toChatSummary(row, node?.projectId ?? null, wt);
   }
 
   /** The agent's own conversation id, for resume. Main-process only; never sent to the renderer. */
@@ -389,6 +400,126 @@ export class WorkspaceStore {
     });
   }
 
+  // ── Worktrees, checkpoints, reviews (M3) ───────────────────────────────────
+
+  chatsInProject(projectId: string): number {
+    return this.db
+      .select({ id: nodes.id })
+      .from(nodes)
+      .where(and(eq(nodes.projectId, projectId), eq(nodes.type, "chat"), isNull(nodes.deletedAt)))
+      .all().length;
+  }
+
+  createWorktree(row: Omit<typeof worktrees.$inferInsert, "id" | "createdAt">): typeof worktrees.$inferSelect {
+    return this.db
+      .insert(worktrees)
+      .values({ ...row, id: randomUUID(), createdAt: Date.now() })
+      .returning()
+      .get();
+  }
+
+  getWorktree(id: string): typeof worktrees.$inferSelect | undefined {
+    return this.db.select().from(worktrees).where(eq(worktrees.id, id)).get();
+  }
+
+  updateWorktree(id: string, patch: Partial<Pick<typeof worktrees.$inferSelect, "mergedAt" | "removedAt">>): void {
+    this.db.update(worktrees).set(patch).where(eq(worktrees.id, id)).run();
+  }
+
+  /** The chat's cwd moves when its worktree is removed (back to the project folder). */
+  setChatCwd(chatId: string, cwd: string, worktreeId: string | null): void {
+    this.db.update(chats).set({ cwd, worktreeId }).where(eq(chats.id, chatId)).run();
+  }
+
+  addCheckpoint(input: { chatId: string; turnId: string; repo: string; before: string }): void {
+    this.db
+      .insert(checkpoints)
+      .values({ id: randomUUID(), createdAt: Date.now(), ...input })
+      .run();
+    this.db.update(turns).set({ checkpointBefore: input.before }).where(eq(turns.id, input.turnId)).run();
+  }
+
+  finishCheckpoint(turnId: string, after: string, files: string[]): void {
+    this.db
+      .update(checkpoints)
+      .set({ after, filesJson: JSON.stringify(files) })
+      .where(eq(checkpoints.turnId, turnId))
+      .run();
+    this.db.update(turns).set({ checkpointAfter: after }).where(eq(turns.id, turnId)).run();
+  }
+
+  checkpoint(turnId: string) {
+    const r = this.db.select().from(checkpoints).where(eq(checkpoints.turnId, turnId)).get();
+    return r && { ...r, files: JSON.parse(r.filesJson) as string[] };
+  }
+
+  chatCheckpoints(chatId: string) {
+    return this.db
+      .select()
+      .from(checkpoints)
+      .where(eq(checkpoints.chatId, chatId))
+      .orderBy(asc(checkpoints.createdAt))
+      .all()
+      .map((r) => ({ ...r, files: JSON.parse(r.filesJson) as string[] }));
+  }
+
+  setUndone(turnId: string, undone: boolean): void {
+    this.db
+      .update(checkpoints)
+      .set({ undoneAt: undone ? Date.now() : null })
+      .where(eq(checkpoints.turnId, turnId))
+      .run();
+  }
+
+  turns(chatId: string): Turn[] {
+    return this.db.select().from(turns).where(eq(turns.chatId, chatId)).orderBy(asc(turns.seq)).all().map(toTurn);
+  }
+
+  addReview(input: { chatId: string; turnId: string; summary: string; files: FileStat[] }): ReviewItem {
+    const row = this.db
+      .insert(reviews)
+      .values({
+        id: randomUUID(),
+        chatId: input.chatId,
+        turnId: input.turnId,
+        summary: input.summary,
+        filesJson: JSON.stringify(input.files),
+        createdAt: Date.now(),
+      })
+      .returning()
+      .get();
+    return toReview(row);
+  }
+
+  getReview(id: string): ReviewItem | undefined {
+    const r = this.db.select().from(reviews).where(eq(reviews.id, id)).get();
+    return r && toReview(r);
+  }
+
+  updateReview(id: string, patch: { decisions?: ReviewDecisions; reviewedAt?: number | null }): ReviewItem {
+    this.db
+      .update(reviews)
+      .set({
+        ...(patch.decisions && { decisionsJson: JSON.stringify(patch.decisions) }),
+        ...(patch.reviewedAt !== undefined && { reviewedAt: patch.reviewedAt }),
+      })
+      .where(eq(reviews.id, id))
+      .run();
+    return this.getReview(id)!;
+  }
+
+  /** Open review items plus the 50 most recently reviewed, newest first, for chats that still exist. */
+  listReviews(): ReviewItem[] {
+    const rows = this.db
+      .select()
+      .from(reviews)
+      .innerJoin(chats, eq(chats.id, reviews.chatId))
+      .orderBy(desc(reviews.createdAt))
+      .all()
+      .map((r) => toReview(r.reviews));
+    return [...rows.filter((r) => r.reviewedAt === null), ...rows.filter((r) => r.reviewedAt !== null).slice(0, 50)];
+  }
+
   getSetting<T>(key: string): T | undefined {
     const row = this.db.select().from(settings).where(eq(settings.key, key)).get();
     return row ? (JSON.parse(row.valueJson) as T) : undefined;
@@ -430,7 +561,20 @@ function toCanvasNode(r: typeof nodes.$inferSelect): CanvasNode {
 
 const MODES = new Set<string>(["read-only", "ask", "auto-edit", "full-auto"]);
 
-function toChatSummary(r: typeof chats.$inferSelect, projectId: string | null): ChatSummary {
+function toReview(r: typeof reviews.$inferSelect): ReviewItem {
+  return {
+    id: r.id,
+    chatId: r.chatId,
+    turnId: r.turnId,
+    summary: r.summary,
+    files: JSON.parse(r.filesJson) as FileStat[],
+    decisions: JSON.parse(r.decisionsJson) as ReviewDecisions,
+    createdAt: r.createdAt,
+    reviewedAt: r.reviewedAt,
+  };
+}
+
+function toChatSummary(r: typeof chats.$inferSelect, projectId: string | null, wt?: typeof worktrees.$inferSelect): ChatSummary {
   const status = ChatStatus.safeParse(r.status);
   return {
     id: r.id,
@@ -441,6 +585,9 @@ function toChatSummary(r: typeof chats.$inferSelect, projectId: string | null): 
     reasoning: r.reasoning,
     permissionMode: MODES.has(r.permissionMode) ? (r.permissionMode as PermissionMode) : "auto-edit",
     resumable: r.nativeSessionId !== null,
+    worktree: wt
+      ? { id: wt.id, branch: wt.branch, baseRef: wt.baseRef, path: wt.path, merged: wt.mergedAt !== null, removed: wt.removedAt !== null }
+      : null,
     cwd: r.cwd,
     title: r.title,
     status: status.success ? status.data : "idle",

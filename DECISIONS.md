@@ -131,3 +131,40 @@ The first-run tour creates up to two chats (the first two ready agents) with a s
 ### 2026-10-23: Replay for every agent
 
 `LATIS_REPLAY=<fixtures>` replays Claude (`claude-code/`), Codex (`codex/`) and the built-in ACP agent (`acp/`). The replay pauses at each recorded client message until the app sends it. `LATIS_AGENT_PATH` (dev/test) prepends folders to the PATH used to find agent CLIs.
+
+## M3
+
+### 2026-10-23: Checkpoints are snapshot commits on hidden refs
+
+Before and after every turn, Latis snapshots the repo's working tree (tracked and untracked, minus ignored) as a commit object. It builds it in a throwaway index seeded from a copy of the real one (for the stat cache), so the user's staging area, HEAD and branches are never touched. Commits live under `refs/latis/checkpoints/<chat>/<turn>/{before,after}` so `git gc` keeps them. Undo/redo restore exactly the files the turn changed with `git restore --source=… --worktree`, deleting files the turn created. "Restore to before this turn" reverts the files this chat changed from that turn on. Chats sharing a folder can see each other's edits in their snapshots; that's what worktrees are for.
+
+### 2026-10-23: Tables beyond the §7.1 sketch
+
+`checkpoints` holds before/after commits, the files changed and `undone_at` (the sketch had one `git_ref`). `worktrees` adds `base_commit`. A new `reviews` table holds Review Inbox items with per-file/per-hunk decisions.
+
+### 2026-10-23: The agent hears about reverts with the next message
+
+Undo, redo, restore and Review reverts queue a `[Note from Latis] …` line that goes in front of the user's next message to that chat (§9.4 AC2, §9.5 AC3). The transcript still shows only what the user typed.
+
+### 2026-10-23: Worktrees
+
+- They go under `<dataDir>/worktrees/<repo>/<slug>` on `latis/<agent>-<rand>` branches from the current HEAD (§18 Q5 default).
+- The second chat in a repo gets the offer, on by default.
+- Any chat can move into its own copy from its folder chip. This was needed for S1's "both in separate worktrees". Claude sessions are tied to a folder, so a moved Claude chat starts a new conversation; the supervisor says so.
+- For folders that aren't repos, a toast offers "Initialise git" rather than blocking.
+
+### 2026-10-23: Merge from the project folder, after a dry run
+
+- Merge commits the agent's pending work on its branch, then runs `git merge-tree --write-tree` (git ≥ 2.38) as a dry run that touches nothing.
+- It refuses if the project folder isn't on the base branch or has uncommitted changes.
+- Then it does a `--no-ff` merge or a squash in the project folder.
+- On conflicts it lists the files and offers: ask the agent to merge the base in and resolve, open the copy, or cancel.
+- Removing a copy refuses unmerged commits unless the user confirms. Squash-merged work counts as merged.
+
+### 2026-10-23: Hunk revert uses `git apply -R`
+
+A single hunk is reverse-applied to the working tree with `--recount`. If the file moved on since, Latis says so and suggests reverting the whole file instead. "Accept" is a review decision only; nothing changes on disk.
+
+### 2026-10-23: git via `child_process.execFile`, not execa
+
+No extra dependency for a handful of calls. `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`. When the user has no git identity, Latis commits as `Latis <latis@localhost>`.

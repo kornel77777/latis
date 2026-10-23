@@ -8,6 +8,7 @@ import type { AttentionItem, PermissionMode, Prefs, RequestResponse, Theme } fro
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
 import { SessionSupervisor } from "./agents/supervisor";
+import { Changes } from "./git/changes";
 import { EventCoalescer } from "./ipc/coalescer";
 import { emit, registerHandlers } from "./ipc/register";
 import { Notifier } from "./notify";
@@ -85,22 +86,40 @@ const notifier = new Notifier({
   },
 });
 
-const coalescer = new EventCoalescer((chatId, events) => emit(win?.webContents, "chat:events", { chatId, events }));
-const supervisor = new SessionSupervisor(store, eventLog, agents.adapters, {
-  event: (se) => coalescer.push(se),
-  status: (chatId, status) => {
-    coalescer.flush();
-    emit(win?.webContents, "chat:status", { chatId, status });
+const changes = new Changes(store, dataDir, {
+  reviews: (items) => emit(win?.webContents, "reviews:changed", items),
+  timeline: (chatId, entries) => emit(win?.webContents, "chat:timeline", { chatId, entries }),
+  note: (chatId, text) => supervisor.addNote(chatId, text),
+  message: async (chatId, text) => {
+    await supervisor.steer(chatId, text);
   },
-  updated: (chat) => emit(win?.webContents, "chat:updated", chat),
-  queue: (chatId, queue) => emit(win?.webContents, "chat:queue", { chatId, queue }),
-  turn: (turn) => emit(win?.webContents, "chat:turn", turn),
-  attention: (items) => {
-    notifier.badge(items);
-    emit(win?.webContents, "attention:changed", items);
-  },
-  raised: (item) => notifier.raised(item),
 });
+
+const coalescer = new EventCoalescer((chatId, events) => emit(win?.webContents, "chat:events", { chatId, events }));
+const supervisor = new SessionSupervisor(
+  store,
+  eventLog,
+  agents.adapters,
+  {
+    event: (se) => coalescer.push(se),
+    status: (chatId, status) => {
+      coalescer.flush();
+      emit(win?.webContents, "chat:status", { chatId, status });
+    },
+    updated: (chat) => emit(win?.webContents, "chat:updated", chat),
+    queue: (chatId, queue) => emit(win?.webContents, "chat:queue", { chatId, queue }),
+    turn: (turn) => emit(win?.webContents, "chat:turn", turn),
+    attention: (items) => {
+      notifier.badge(items);
+      emit(win?.webContents, "attention:changed", items);
+    },
+    raised: (item) => notifier.raised(item),
+  },
+  {
+    beforeTurn: (chatId, turnId) => changes.beforeTurn(chatId, turnId),
+    afterTurn: (chatId, turnId, finalMessage) => changes.afterTurn(chatId, turnId, finalMessage),
+  },
+);
 notifier.badge(store.openAttention());
 
 function applyTheme(theme: Theme) {
@@ -192,12 +211,14 @@ registerHandlers({
     if (!p) return { ok: false };
     return { ok: (await shell.openPath(p.folderPath)) === "" };
   },
-  "chat:create": ({ canvasId: id, projectId, agentId, x, y, model, reasoning, permissionMode }) => {
+  "chat:create": async ({ canvasId: id, projectId, agentId, x, y, model, reasoning, permissionMode, isolate }) => {
     if (!agents.get(agentId)) throw new Error(`unknown agent ${agentId}`);
     const project = projectId ? store.getProject(projectId) : undefined;
     if (projectId && !project) throw new Error("That project no longer exists.");
     if (!project && agentId !== "fake") throw new Error("Open a project folder first, then start the chat inside it.");
     const place = project ? store.placeInFrame(project.frameNodeId) : { x, y, frame: null };
+    const agentName = agents.get(agentId)!.displayName;
+    const own = isolate && project ? await changes.createWorktree(project.id, project.folderPath, agentName) : null;
     const created = store.createChatNode({
       canvasId: id,
       projectId: project?.id ?? null,
@@ -208,7 +229,8 @@ registerHandlers({
       model: model ?? (agentId === "fake" ? "demo-1" : null),
       reasoning: reasoning ?? null,
       permissionMode: permissionMode ?? store.getSetting<PermissionMode>("defaultPermissionMode") ?? "auto-edit",
-      cwd: project?.folderPath ?? sandboxDir(),
+      cwd: own?.cwd ?? project?.folderPath ?? sandboxDir(),
+      worktreeId: own?.worktreeId ?? null,
       title: agentId === "fake" ? "Demo chat" : agents.isTerminal(agentId) ? agents.get(agentId)!.displayName : "New chat",
     });
     return { ...created, frame: place.frame };
@@ -280,6 +302,58 @@ registerHandlers({
   "pty:write": ({ id, data }) => ({ ok: ptys.write(id, data) }),
   "pty:resize": ({ id, cols, rows }) => ({ ok: ptys.resize(id, cols, rows) }),
   "pty:kill": ({ id }) => ({ ok: ptys.kill(id) }),
+  "project:git": async ({ projectId }) => {
+    const p = store.getProject(projectId);
+    if (!p) throw new Error("That project no longer exists.");
+    return { ...(await changes.projectGit(p.folderPath)), chats: store.chatsInProject(projectId) };
+  },
+  "project:initGit": async ({ projectId }) => {
+    const p = store.getProject(projectId);
+    if (!p) throw new Error("That project no longer exists.");
+    await changes.initGit(p.folderPath);
+    return { ok: true };
+  },
+  "chat:timeline": ({ chatId }) => changes.timeline(chatId),
+  "chat:undoTurn": ({ chatId, turnId }) => changes.undo(chatId, turnId),
+  "chat:redoTurn": ({ chatId, turnId }) => changes.redo(chatId, turnId),
+  "chat:restoreTo": ({ chatId, turnId }) => changes.restoreTo(chatId, turnId),
+  "reviews:list": () => store.listReviews(),
+  "reviews:diff": ({ reviewId }) => changes.reviewDiff(reviewId),
+  "reviews:branchDiff": ({ chatId }) => changes.branchDiff(chatId),
+  "reviews:revert": ({ reviewId, path, hunk }) => changes.revert(reviewId, path, hunk),
+  "reviews:accept": ({ reviewId, path, hunk }) => changes.accept(reviewId, path, hunk),
+  "reviews:markReviewed": ({ reviewId, reviewed }) => changes.markReviewed(reviewId, reviewed),
+  "reviews:askChanges": async ({ reviewId, path, hunk, feedback }) => {
+    await changes.askChanges(reviewId, path, hunk, feedback);
+    return { ok: true };
+  },
+  "chat:isolate": async ({ chatId }) => {
+    const chat = store.getChat(chatId);
+    const project = chat?.projectId ? store.getProject(chat.projectId) : undefined;
+    if (!chat || !project) throw new Error("Only chats in a project can have their own copy.");
+    if (chat.worktree && !chat.worktree.removed) return chat;
+    // The agent restarts in the copy (resuming its conversation) with the next message.
+    await supervisor.release(chatId);
+    const own = await changes.createWorktree(project.id, project.folderPath, agents.get(chat.agentId)?.displayName ?? "chat");
+    store.setChatCwd(chatId, own.cwd, own.worktreeId);
+    const updated = store.getChat(chatId)!;
+    emit(win?.webContents, "chat:updated", updated);
+    return updated;
+  },
+  "worktree:mergePreview": ({ chatId }) => changes.mergePreview(chatId),
+  "worktree:merge": ({ chatId, mode }) => changes.merge(chatId, mode),
+  "worktree:remove": async ({ chatId, force }) => {
+    // The agent process runs inside the worktree; stop it before the folder goes away.
+    await supervisor.release(chatId);
+    const r = await changes.removeWorktree(chatId, force);
+    const chat = store.getChat(chatId);
+    if (chat) emit(win?.webContents, "chat:updated", chat);
+    return r;
+  },
+  "worktree:askResolve": async ({ chatId, files }) => {
+    await changes.askResolve(chatId, files);
+    return { ok: true };
+  },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };

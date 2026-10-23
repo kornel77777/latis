@@ -56,7 +56,8 @@ export function useCanvasActions() {
         projectId = (await openFolder())?.id ?? null;
         if (!projectId) return null;
       }
-      return s.createChat({ agentId, projectId });
+      await s.startChat(agentId, projectId);
+      return null;
     },
     [newDemoChat, openFolder],
   );

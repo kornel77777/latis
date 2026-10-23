@@ -34,7 +34,7 @@ export type TranscriptItem =
   | { kind: "question"; key: string; id: string; questions: QuestionSpec[]; pending: boolean }
   | { kind: "plan"; key: string; id: string; markdown: string; pending: boolean }
   | { kind: "error"; key: string; message: string }
-  | { kind: "turn-end"; key: string; status: string; durationMs: number; outputTokens?: number; costUsd?: number };
+  | { kind: "turn-end"; key: string; turnId: string | null; status: string; durationMs: number; outputTokens?: number; costUsd?: number };
 
 export function buildTranscript(turns: Turn[], events: StoredEvent[]): TranscriptItem[] {
   const byTurn = new Map<string | null, StoredEvent[]>();
@@ -45,15 +45,15 @@ export function buildTranscript(turns: Turn[], events: StoredEvent[]): Transcrip
   }
   const items: TranscriptItem[] = [];
   const orphan = byTurn.get(null);
-  if (orphan) items.push(...projectTurn(orphan));
+  if (orphan) items.push(...projectTurn(orphan, null));
   for (const t of [...turns].sort((a, b) => a.seq - b.seq)) {
     items.push({ kind: "user", key: `u-${t.id}`, text: t.userText });
-    items.push(...projectTurn(byTurn.get(t.id) ?? []));
+    items.push(...projectTurn(byTurn.get(t.id) ?? [], t.id));
   }
   return items;
 }
 
-function projectTurn(events: StoredEvent[]): TranscriptItem[] {
+function projectTurn(events: StoredEvent[], turnId: string | null): TranscriptItem[] {
   const items: TranscriptItem[] = [];
   const steps = new Map<string, Extract<TranscriptItem, { kind: "step" }>>();
   let assistant: Extract<TranscriptItem, { kind: "assistant" }> | null = null;
@@ -176,6 +176,7 @@ function projectTurn(events: StoredEvent[]): TranscriptItem[] {
         items.push({
           kind: "turn-end",
           key,
+          turnId,
           status: e.status,
           durationMs: e.durationMs,
           ...(outputTokens !== undefined && { outputTokens }),

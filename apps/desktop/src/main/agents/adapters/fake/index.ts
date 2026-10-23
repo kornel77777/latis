@@ -46,11 +46,10 @@ export class FakeAdapter implements AgentAdapter {
     return { file: process.env.SHELL ?? "/bin/sh", args: [], cwd: opts.cwd };
   }
 
-  /** "/crash" or "/<script>" anywhere in the message picks that script. */
+  /** "/crash" or "/<script>" anywhere in the message picks that script (the first one that exists). */
   pickScript(text: string): string {
-    const m = /\/([a-z-]+)/.exec(text);
-    const name = m?.[1];
-    return name && name in this.opts.scripts ? this.opts.scripts[name]! : this.opts.scripts["demo"]!;
+    const name = [...text.matchAll(/\/([a-z-]+)/g)].map((m) => m[1]!).find((n) => n in this.opts.scripts);
+    return this.opts.scripts[name ?? "demo"]!;
   }
 
   async startSession(opts: SessionOptions): Promise<AgentSession> {

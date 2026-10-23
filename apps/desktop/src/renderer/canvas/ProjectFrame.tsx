@@ -17,7 +17,7 @@ export const PROJECT_COLORS: Record<string, string> = {
 
 export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeProps<FlowNode>) {
   const project = useWorkspace((s) => (data.projectId ? s.projects[data.projectId] : undefined));
-  const createChat = useWorkspace((s) => s.createChat);
+  const startChat = useWorkspace((s) => s.startChat);
   const counts = useWorkspace(
     useShallow((s) => {
       const st = Object.values(s.chats)
@@ -69,7 +69,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
                 </Button>
               }
             >
-              <AgentMenuItems includeDemo={false} onPick={(agentId) => void createChat({ agentId, projectId: project.id })} />
+              <AgentMenuItems includeDemo={false} onPick={(agentId) => void startChat(agentId, project.id)} />
             </Menu>
             <Button
               size="icon"

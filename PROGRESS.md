@@ -1,6 +1,36 @@
 # Progress
 
-## Current: M2 Many agents: done 2026-10-23 (Gemini live run pending a sign-in)
+## Current: M3 Safe changes: done 2026-10-23
+
+Exit criterion **S1 passes live** (`e2e/live-m3.spec.ts`). Claude Code and Codex worked in separate worktrees, the user was notified as each finished, both diffs were reviewed in the Review Inbox, and both were merged into `main`.
+
+### Done
+
+- **Git service** (`src/main/git/`): snapshot commits through a throwaway index, so the user's index and HEAD are untouched. Also: diffs, restoring paths, single-hunk revert, worktrees, `merge-tree` dry runs, safe removal.
+- **Checkpoints (§9.4):** before/after every turn on hidden refs. Undo/redo in the turn footer; a Timeline dialog with "restore to before this turn". The agent is told with the next message.
+- **Review Inbox (§9.5):**
+  - Every turn that changed files becomes an item (agent summary, files, +/−).
+  - Full-screen panel (`Ctrl/⌘+Shift+R`) with project/agent filters, unified/split diffs highlighted by Shiki.
+  - Per-file and per-hunk Accept/Revert, Accept all, mark reviewed, "Ask for changes" quoting the hunk.
+  - Count shown in the sidebar.
+- **Worktrees (§9.3):**
+  - The offer for a second chat in a repo, plus "Work in its own copy" for any chat.
+  - Branch chip with Review changes, Merge (merge or squash, dry run first, conflicts with "ask the agent to resolve"), and Remove copy (refuses unmerged work unless confirmed).
+  - "Initialise git" for plain folders.
+- **Tests:** 82 unit, 17 native (including S1 at the service level), 12 e2e (3 new for M3), and live S1.
+
+### Not done / known issues
+
+- CI's first run is in progress (Linux e2e slow/hanging; see below once it finishes). Windows/macOS packaging in CI unverified.
+- Snapshots on very large repos haven't been timed. Binary files have no hunk actions.
+- A Claude chat moved into its own copy can't resume its old conversation (Claude sessions are per-folder); it starts a new one.
+- The always-ask list still isn't enforced in Full-auto. Gemini's live run still needs a sign-in.
+
+## Next: M4 The great UI
+
+Semantic zoom, focus mode, command palette + FTS search + restore, frames polish, smart placement, notes, browser dock + element picker, appearance settings, accessibility pass, onboarding checklist. Exit: design review against §8 and a keyboard-only S1.
+
+## M2 Many agents: done 2026-10-23 (Gemini live run pending a sign-in)
 
 Exit criteria, live against real agents (`e2e/live-m2.spec.ts`): **S3**: a Codex command approval answered from the Inbox. **S2**: a correction steered into a running Claude Code turn and followed without stopping it. **Six chats across three agents** (Claude Code, Codex, and an ACP agent added by manifest) streaming at once: p95 frame 9.1 ms, max 17.3 ms, none over 32 ms, 614 MB. The third agent was the Claude ACP bridge, not Gemini, because Gemini CLI isn't signed in on this machine. Gemini's ACP path is replay-tested and `initialize`-verified only.
 
@@ -35,10 +65,6 @@ Exit criteria, live against real agents (`e2e/live-m2.spec.ts`): **S3**: a Codex
 - The queue isn't persisted across restarts. Codex `item/tool/requestUserInput` is mapped but not recorded live.
 - Built-in terminal manifests (Copilot, OpenCode, Grok, Aider) are unverified against the real CLIs.
 - A Playwright run couldn't type into composers at very low zoom (see docs/qa/M2.md).
-
-## Next: M3 Safe changes
-
-Worktrees (§9.3), checkpoints/undo/timeline (§9.4), diff viewer, Review Inbox (§9.5), merge with conflict detection. Exit: scenario S1.
 
 ## M1 First real agent: done 2026-10-22
 

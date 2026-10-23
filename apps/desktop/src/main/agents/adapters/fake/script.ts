@@ -44,12 +44,21 @@ export interface ScriptContext {
 
 /** Plays a script, yielding normalised events. Pure apart from what `ctx` does. */
 export async function* playScript(steps: ScriptStep[], ctx: ScriptContext): AsyncGenerator<AgentEvent> {
-  const fill = (s: string) => s.replaceAll("{{text}}", ctx.userText);
+  // {{text}} is the whole message; {{word}} its last word, so scripts can name files after it.
+  const word =
+    ctx.userText
+      .trim()
+      .split(/\s+/)
+      .at(-1)
+      ?.replace(/[^\w-]/g, "") || "file";
+  const fill = (s: string) => s.replaceAll("{{text}}", ctx.userText).replaceAll("{{word}}", word);
   for (const step of steps) {
     if (ctx.isInterrupted()) return;
     if (step.delay) await ctx.sleep(step.delay);
     if ("event" in step) {
-      yield step.event.type === "message.completed" ? { ...step.event, text: fill(step.event.text) } : step.event;
+      // {{word}} is \w and - only, so substituting inside the JSON is safe.
+      const event = JSON.parse(JSON.stringify(step.event).replaceAll("{{word}}", word)) as AgentEvent;
+      yield event.type === "message.completed" ? { ...event, text: fill(event.text) } : event;
     } else if ("stream" in step) {
       const text = fill(step.stream);
       for (let i = 0; i < text.length; i += step.chunk) {
@@ -59,12 +68,13 @@ export async function* playScript(steps: ScriptStep[], ctx: ScriptContext): Asyn
       }
     } else if ("writeFile" in step) {
       const content = fill(step.writeFile.content);
-      const change = await ctx.writeFile(step.writeFile.path, content);
+      const path = fill(step.writeFile.path);
+      const change = await ctx.writeFile(path, content);
       const lines = content.split("\n");
       if (lines.at(-1) === "") lines.pop();
       yield {
         type: "file.changed",
-        path: step.writeFile.path,
+        path,
         change,
         hunks: [{ oldStart: 0, oldLines: 0, newStart: 1, newLines: lines.length, lines: lines.map((l) => `+${l}`) }],
         additions: lines.length,

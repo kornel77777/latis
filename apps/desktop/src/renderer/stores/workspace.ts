@@ -8,6 +8,8 @@ import {
   type Prefs,
   type PtyInfo,
   type QueuedMessage,
+  type ReviewItem,
+  type TimelineEntry,
   type CanvasNode,
   type ChatStatus,
   type ChatSummary,
@@ -67,6 +69,17 @@ interface WorkspaceState {
   jumpIndex: number;
   /** Composer text to start a chat with (onboarding starter prompts). */
   drafts: Record<string, string>;
+  /** Review Inbox items (§9.5): open ones plus recently reviewed. */
+  reviews: ReviewItem[];
+  /** Review panel (Ctrl+Shift+R); `chatId` opens a worktree's whole-branch diff instead. */
+  reviewPanel: { open: boolean; reviewId?: string; branchOf?: string };
+  timelines: Record<string, TimelineEntry[]>;
+  /** Pending "work in its own copy?" question for a new chat (§9.3 AC1, AC6). */
+  isolateOffer: { agentId: string; projectId: string; isRepo: boolean } | null;
+  /** Chat whose worktree merge dialog is open. */
+  mergeFor: string | null;
+  /** Chat whose timeline dialog is open. */
+  timelineFor: string | null;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -74,7 +87,14 @@ interface WorkspaceState {
   onNodesChange(changes: NodeChange<FlowNode>[]): void;
   saveViewport(v: Viewport): void;
   openFolder(at: { x: number; y: number }): Promise<Project | null>;
-  createChat(input: { agentId: string; projectId: string | null; x?: number; y?: number; draft?: string }): Promise<string | null>;
+  createChat(input: {
+    agentId: string;
+    projectId: string | null;
+    x?: number;
+    y?: number;
+    draft?: string;
+    isolate?: boolean;
+  }): Promise<string | null>;
   focusNode(nodeId: string): void;
   loadTranscript(chatId: string): Promise<void>;
   send(chatId: string, text: string): Promise<void>;
@@ -108,6 +128,15 @@ interface WorkspaceState {
   setSettingsOpen(open: boolean): void;
   finishOnboarding(): Promise<void>;
   createSandbox(): Promise<Project | null>;
+  /** New chat in a project: asks about a separate worktree first when another chat already works there. */
+  startChat(agentId: string, projectId: string): Promise<void>;
+  loadTimeline(chatId: string): Promise<void>;
+  undoTurn(chatId: string, turnId: string): Promise<void>;
+  redoTurn(chatId: string, turnId: string): Promise<void>;
+  restoreTo(chatId: string, turnId: string): Promise<void>;
+  openReview(target?: { reviewId?: string; branchOf?: string }): void;
+  closeReview(): void;
+  updateReview(item: ReviewItem): void;
 }
 
 function toFlowNode(n: CanvasNode): FlowNode {
@@ -194,15 +223,22 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   onboardingOpen: false,
   jumpIndex: -1,
   drafts: {},
+  reviews: [],
+  reviewPanel: { open: false },
+  timelines: {},
+  isolateOffer: null,
+  mergeFor: null,
+  timelineFor: null,
 
   async load() {
     try {
-      const [canvas, theme, attention, ptys, prefs] = await Promise.all([
+      const [canvas, theme, attention, ptys, prefs, reviews] = await Promise.all([
         latis.invoke("canvas:load"),
         latis.invoke("settings:getTheme"),
         latis.invoke("attention:list"),
         latis.invoke("pty:list"),
         latis.invoke("prefs:get"),
+        latis.invoke("reviews:list"),
       ]);
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
@@ -218,11 +254,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         ptys: ptys.filter((p) => p.place === "dock"),
         activePty: ptys.find((p) => p.place === "dock")?.id ?? null,
         prefs,
+        reviews,
         // First run: nothing on the canvas and onboarding never finished (§8.10).
         onboardingOpen: !prefs.onboarded && canvas.nodes.length === 0,
       });
       void get().loadAgents();
-      await Promise.all(canvas.chats.map((c) => get().loadTranscript(c.id)));
+      await Promise.all(canvas.chats.map((c) => Promise.all([get().loadTranscript(c.id), get().loadTimeline(c.id)])));
     } catch (err) {
       set({ loadError: err instanceof Error ? err.message : String(err) });
     }
@@ -285,7 +322,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  async createChat({ agentId, projectId, x = 0, y = 0, draft }) {
+  async createChat({ agentId, projectId, x = 0, y = 0, draft, isolate }) {
     try {
       const { node, chat, frame } = await latis.invoke("chat:create", {
         canvasId: get().canvasId,
@@ -293,6 +330,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         agentId,
         x: Math.round(x),
         y: Math.round(y),
+        ...(isolate && { isolate }),
       });
       set((s) => ({
         nodes: sortNodes([
@@ -478,6 +516,73 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     set({ onboardingOpen: false });
     await get().setPrefs({ onboarded: true });
   },
+  async startChat(agentId, projectId) {
+    try {
+      const g = await latis.invoke("project:git", { projectId });
+      // §9.3 AC1: a second chat in the same repo gets the offer of its own copy (default on).
+      if (g.chats > 0 && g.isRepo) {
+        set({ isolateOffer: { agentId, projectId, isRepo: true } });
+        return;
+      }
+      if (g.chats > 0 && !g.gitMissing) {
+        // AC6: no git, no copies. Don't block; offer to set it up.
+        await get().createChat({ agentId, projectId });
+        get().toast("This folder isn't a git repository, so its chats share it and can't be undone or reviewed.", {
+          label: "Initialise git",
+          run: () =>
+            void latis
+              .invoke("project:initGit", { projectId })
+              .then(() => get().toast("Git initialised. New chats here can have their own copy."))
+              .catch((err: unknown) => get().toast(errorText(err))),
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn("git check failed", err);
+    }
+    await get().createChat({ agentId, projectId });
+  },
+  async loadTimeline(chatId) {
+    const entries = await latis.invoke("chat:timeline", { chatId });
+    set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
+  },
+  async undoTurn(chatId, turnId) {
+    try {
+      const entries = await latis.invoke("chat:undoTurn", { chatId, turnId });
+      set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
+      get().toast("Turn undone. The agent will be told with your next message.", {
+        label: "Redo",
+        run: () => void get().redoTurn(chatId, turnId),
+      });
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async redoTurn(chatId, turnId) {
+    try {
+      const entries = await latis.invoke("chat:redoTurn", { chatId, turnId });
+      set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async restoreTo(chatId, turnId) {
+    try {
+      const entries = await latis.invoke("chat:restoreTo", { chatId, turnId });
+      set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
+      get().toast("Files restored. The agent will be told with your next message.");
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  openReview(target) {
+    set({ reviewPanel: { open: true, ...target } });
+  },
+  closeReview: () => set({ reviewPanel: { open: false } }),
+  updateReview(item) {
+    set((s) => ({ reviews: s.reviews.map((r) => (r.id === item.id ? item : r)) }));
+  },
+
   async createSandbox() {
     try {
       const r = await latis.invoke("project:createSandbox", { canvasId: get().canvasId, x: 0, y: 0 });
@@ -559,6 +664,14 @@ export function subscribeToMain(): void {
     if (!parsed.success) return console.warn("dropped invalid chat:queue payload");
     const { chatId, queue } = parsed.data;
     useWorkspace.setState((s) => ({ queues: { ...s.queues, [chatId]: queue } }));
+  });
+  latis.on("reviews:changed", (raw) => {
+    const parsed = eventContract["reviews:changed"].safeParse(raw);
+    if (parsed.success) useWorkspace.setState({ reviews: parsed.data });
+  });
+  latis.on("chat:timeline", (raw) => {
+    const parsed = eventContract["chat:timeline"].safeParse(raw);
+    if (parsed.success) useWorkspace.setState((s) => ({ timelines: { ...s.timelines, [parsed.data.chatId]: parsed.data.entries } }));
   });
   latis.on("chat:turn", (raw) => {
     const parsed = eventContract["chat:turn"].safeParse(raw);
