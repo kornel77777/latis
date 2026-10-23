@@ -1,0 +1,13 @@
+// Asks a structured question, then a plan, then edits.
+{"delay":0,"event":{"type":"session.started","model":"demo-1"}}
+{"delay":20,"stream":"I need one detail first.","chunk":4}
+{"delay":100,"event":{"type":"question.asked","id":"q1","question":"Which greeting should I use?","questions":[{"question":"Which greeting should I use?","header":"Greeting","options":[{"label":"Hello","description":"Formal"},{"label":"Hi","description":"Casual"}],"multiSelect":false}]}}
+{"delay":0,"awaitResponse":"q1"}
+{"delay":100,"event":{"type":"plan.proposed","id":"plan1","markdown":"## Plan\n\n- Create `greeting.md`\n- Put the chosen greeting in it\n\n```ts\nconst greeting = \"Hello\";\n```"}}
+{"delay":0,"awaitResponse":"plan1","denied":[{"delay":20,"stream":"Okay, I'll keep planning.","chunk":4},{"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":900}}]}
+{"delay":100,"event":{"type":"tool.started","id":"t1","kind":"edit","name":"Write","input":{"file_path":"greeting.md"},"paths":["greeting.md"]}}
+{"delay":100,"writeFile":{"path":"greeting.md","content":"# Greeting\n\nHello from the demo agent.\n"}}
+{"delay":50,"event":{"type":"tool.completed","id":"t1","status":"ok"}}
+{"delay":20,"stream":"Done. Wrote **greeting.md**:\n\n```md\n# Greeting\n```","chunk":5}
+{"delay":0,"event":{"type":"usage","outputTokens":40,"costUsd":0.0012}}
+{"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":2200}}

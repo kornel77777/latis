@@ -1,0 +1,142 @@
+@import "tailwindcss";
+@import "@latis/ui/tokens.css";
+@import "@xyflow/react/dist/base.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@source "../../../../packages/ui/src";
+
+@theme inline {
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-glass: var(--surface-glass);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-text-1: var(--text-1);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-state-working: var(--state-working);
+  --color-state-needs-you: var(--state-needs-you);
+  --color-state-done: var(--state-done);
+  --color-state-error: var(--state-error);
+  --color-state-idle: var(--state-idle);
+  --radius-control: var(--radius-control);
+  --radius-card: var(--radius-card);
+  --radius-panel: var(--radius-panel);
+  --shadow-lift: var(--shadow-lift);
+  --font-sans: var(--font-ui);
+  --font-mono: var(--font-mono);
+  --ease-latis: var(--ease);
+  --duration-fast: var(--dur-fast);
+  --animate-latis-pulse: latis-pulse 1.6s var(--ease) infinite;
+  --animate-latis-breathe: latis-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes latis-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+@keyframes latis-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--state-needs-you) 60%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--state-needs-you) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-latis-pulse,
+  .animate-latis-breathe {
+    animation: none;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg-0);
+  color: var(--text-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  user-select: none;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+.selectable {
+  user-select: text;
+}
+
+/* React Flow, re-skinned with tokens. */
+.react-flow {
+  --xy-background-color: var(--bg-1);
+}
+.react-flow__minimap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.react-flow__minimap-mask {
+  fill: color-mix(in srgb, var(--bg-0) 70%, transparent);
+}
+.react-flow__minimap-node {
+  fill: var(--surface-2);
+  stroke: none;
+}
+.react-flow__selection,
+.react-flow__nodesselection-rect {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.react-flow__resize-control.line {
+  border-color: transparent;
+}
+.react-flow__resize-control.handle {
+  background: var(--accent);
+  border: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* Shiki dual themes: tokens carry both colours as CSS variables. */
+.shiki-wrap pre {
+  margin: 0;
+  background: transparent !important;
+}
+.shiki-wrap .shiki,
+.shiki-wrap .shiki span {
+  color: var(--shiki-dark);
+}
+[data-theme="light"] .shiki-wrap .shiki,
+[data-theme="light"] .shiki-wrap .shiki span {
+  color: var(--shiki-light);
+}

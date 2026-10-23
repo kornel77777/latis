@@ -1,0 +1,5 @@
+// Starts working, then the agent process dies (exercises SessionSupervisor crash handling).
+{"delay":0,"event":{"type":"session.started","model":"demo-1"}}
+{"delay":20,"stream":"Starting on it…","chunk":3}
+{"delay":100,"event":{"type":"tool.started","id":"t1","kind":"exec","name":"Bash","input":{"command":"make"}}}
+{"delay":300,"crash":3}

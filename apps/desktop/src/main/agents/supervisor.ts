@@ -1,0 +1,431 @@
+import { mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+  nextStatus,
+  type AgentAdapter,
+  type AgentEvent,
+  type AgentSession,
+  type AttentionItem,
+  type ChatStatus,
+  type ChatSummary,
+  type PermissionMode,
+  type QueuedMessage,
+  type RequestResponse,
+  type StoredEvent,
+  type Turn,
+} from "@latis/shared";
+import type { EventLog } from "../store/event-log";
+import type { ChatOptionsPatch, WorkspaceStore } from "../store/workspace";
+
+interface Live {
+  session: AgentSession;
+  turnId: string | null;
+  /** Started with `resume`; cleared once the agent confirms the session. */
+  resuming: boolean;
+  /** An error item was already raised this turn, so a failed turn end doesn't add a second. */
+  erroredThisTurn: boolean;
+  unsubs: (() => void)[];
+}
+
+export interface SupervisorSinks {
+  event(se: StoredEvent): void;
+  status(chatId: string, status: ChatStatus): void;
+  updated(chat: ChatSummary): void;
+  queue(chatId: string, queue: QueuedMessage[]): void;
+  turn(turn: Turn): void;
+  /** The full open Inbox after any change. */
+  attention(items: AttentionItem[]): void;
+  /** A new item worth a notification. */
+  raised(item: AttentionItem): void;
+}
+
+const TITLE_MAX = 48;
+const DETAIL_MAX = 160;
+const REQUEST_KINDS = ["permission", "question", "plan"] as const;
+
+const firstLine = (s: string, max = DETAIL_MAX) => {
+  const line = s.trim().split("\n")[0]!.trim();
+  return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
+};
+
+/**
+ * Owns agent sessions (SPEC §5.1). An adapter or agent crash never propagates:
+ * the chat moves to `error` and can be restarted. Also owns the steering queue
+ * (§9.9) and raises Inbox items (§8.6).
+ */
+export class SessionSupervisor {
+  private live = new Map<string, Live>();
+  private statuses = new Map<string, ChatStatus>();
+  private queues = new Map<string, QueuedMessage[]>();
+  /** Chats with an open permission/question/plan item; the next agent event means it was answered. */
+  private openRequests = new Set<string>();
+  /** "Send now": the message to send once the interrupted turn has ended. */
+  private sendAfterInterrupt = new Map<string, string>();
+  /** The latest assistant text per chat, for the "finished" item. */
+  private lastMessage = new Map<string, string>();
+
+  constructor(
+    private readonly store: WorkspaceStore,
+    private readonly log: EventLog,
+    private readonly adapters: Map<string, AgentAdapter>,
+    private readonly sinks: SupervisorSinks,
+  ) {}
+
+  async send(chatId: string, text: string): Promise<Turn> {
+    this.resolve(chatId, { kinds: ["finished", "error", "rate_limited"] });
+    let live: Live;
+    try {
+      live = await this.ensureSession(chatId);
+    } catch (err) {
+      // Couldn't start the agent (not installed, signed out, bad cwd…): record it in the chat instead of throwing.
+      const turn = this.store.createTurn(chatId, text);
+      const message = err instanceof Error ? err.message : String(err);
+      this.sinks.event(this.log.append(chatId, turn.id, { type: "error", message, recoverable: false }));
+      this.store.endTurn(turn.id, "error");
+      this.log.flush();
+      this.setStatus(chatId, "error");
+      this.raise(chatId, "error", null, message);
+      return { ...turn, endedAt: Date.now(), status: "error" };
+    }
+    const turn = this.store.createTurn(chatId, text);
+    live.turnId = turn.id;
+    live.erroredThisTurn = false;
+    this.sinks.turn(turn);
+    this.setStatus(chatId, "working");
+    await live.session.send({ text });
+    return turn;
+  }
+
+  /**
+   * A message typed while a turn runs (§9.9): delivered at the agent's next step when it
+   * supports steering, otherwise queued until the turn ends. With no turn running it's a normal send.
+   */
+  async steer(chatId: string, text: string): Promise<{ delivered: "steered" | "queued" | "sent"; queue: QueuedMessage[] }> {
+    const live = this.live.get(chatId);
+    if (!live?.turnId) {
+      await this.send(chatId, text);
+      return { delivered: "sent", queue: this.queueOf(chatId) };
+    }
+    if (live.session.steer) {
+      try {
+        await live.session.steer(text);
+        this.sinks.event(this.log.append(chatId, live.turnId, { type: "user.steered", text }));
+        return { delivered: "steered", queue: this.queueOf(chatId) };
+      } catch (err) {
+        console.warn("[supervisor] steer failed; queueing instead", err);
+      }
+    }
+    const queue = [...this.queueOf(chatId), { id: randomUUID(), text, createdAt: Date.now() }];
+    this.setQueue(chatId, queue);
+    return { delivered: "queued", queue };
+  }
+
+  queueOf(chatId: string): QueuedMessage[] {
+    return this.queues.get(chatId) ?? [];
+  }
+
+  editQueued(chatId: string, id: string, text: string): QueuedMessage[] {
+    const queue = this.queueOf(chatId).map((q) => (q.id === id ? { ...q, text } : q));
+    this.setQueue(chatId, queue);
+    return queue;
+  }
+
+  removeQueued(chatId: string, id: string): QueuedMessage[] {
+    const queue = this.queueOf(chatId).filter((q) => q.id !== id);
+    this.setQueue(chatId, queue);
+    return queue;
+  }
+
+  /** Interrupts the running turn and sends a queued message as soon as it has stopped. */
+  async sendNow(chatId: string, id: string): Promise<boolean> {
+    const item = this.queueOf(chatId).find((q) => q.id === id);
+    if (!item) return false;
+    this.removeQueued(chatId, id);
+    const live = this.live.get(chatId);
+    if (!live?.turnId) {
+      await this.send(chatId, item.text);
+      return true;
+    }
+    this.sendAfterInterrupt.set(chatId, item.text);
+    await live.session.interrupt();
+    return true;
+  }
+
+  async respond(chatId: string, requestId: string, response: RequestResponse) {
+    const live = this.live.get(chatId);
+    if (!live) return false;
+    await live.session.respond(requestId, response);
+    this.resolve(chatId, { refId: requestId });
+    this.setStatus(chatId, "working");
+    return true;
+  }
+
+  async interrupt(chatId: string) {
+    const live = this.live.get(chatId);
+    if (!live) return false;
+    await live.session.interrupt();
+    return true;
+  }
+
+  async restart(chatId: string) {
+    await this.stop(chatId);
+    this.resolve(chatId, {});
+    this.setStatus(chatId, "idle");
+    return true;
+  }
+
+  /** Ends the structured session so the conversation can continue elsewhere (open as terminal). */
+  async release(chatId: string) {
+    await this.stop(chatId);
+    this.setStatus(chatId, "idle");
+  }
+
+  /**
+   * Starts (or restarts, if its process exited) a terminal-only agent's session and
+   * returns the PTY its chat card shows.
+   */
+  async attachTerminal(chatId: string, running: (ptyId: string) => boolean): Promise<string> {
+    const existing = this.live.get(chatId);
+    if (existing?.session.ptyId && !running(existing.session.ptyId)) await this.stop(chatId);
+    const live = await this.ensureSession(chatId);
+    if (!live.session.ptyId) throw new Error("This chat's agent doesn't run in a terminal.");
+    return live.session.ptyId;
+  }
+
+  /** The user has seen the chat: its finished/error items are done. */
+  seen(chatId: string) {
+    this.resolve(chatId, { kinds: ["finished", "error", "rate_limited"] });
+  }
+
+  dismiss(id: string) {
+    if (this.store.dismissAttention(id)) this.sinks.attention(this.store.openAttention());
+  }
+
+  /** Applies picker changes; live sessions get them immediately where the adapter supports it. */
+  async setOptions(chatId: string, patch: ChatOptionsPatch): Promise<ChatSummary> {
+    const before = this.store.getChat(chatId);
+    if (!before) throw new Error(`no chat ${chatId}`);
+    this.store.updateChat(chatId, { ...patch, ...(patch.title !== undefined && { titleLocked: true }) });
+    const after = this.store.getChat(chatId)!;
+    const live = this.live.get(chatId);
+    if (live) {
+      try {
+        if ((patch.model !== undefined || patch.reasoning !== undefined) && live.session.setModel) {
+          await live.session.setModel(after.model ?? "default", after.reasoning ?? undefined);
+        }
+        if (patch.permissionMode && patch.permissionMode !== before.permissionMode) {
+          if (live.session.setPermissionMode) await live.session.setPermissionMode(patch.permissionMode);
+          else await this.stop(chatId); // takes effect on the next message
+        }
+      } catch (err) {
+        console.warn("[supervisor] live option change failed; applies to next session", err);
+        await this.stop(chatId);
+      }
+    }
+    this.sinks.updated(after);
+    return after;
+  }
+
+  async disposeAll() {
+    await Promise.allSettled([...this.live.keys()].map((id) => this.stop(id)));
+    this.log.flush();
+  }
+
+  private setQueue(chatId: string, queue: QueuedMessage[]) {
+    if (queue.length) this.queues.set(chatId, queue);
+    else this.queues.delete(chatId);
+    this.sinks.queue(chatId, queue);
+  }
+
+  private raise(chatId: string, kind: AttentionItem["kind"], refId: string | null, summary: string, detail?: string) {
+    const item = this.store.addAttention({ chatId, kind, refId, summary, ...(detail && { detail }) });
+    if ((REQUEST_KINDS as readonly string[]).includes(kind)) this.openRequests.add(chatId);
+    this.sinks.attention(this.store.openAttention());
+    this.sinks.raised(item);
+  }
+
+  private resolve(chatId: string, filter: Parameters<WorkspaceStore["resolveAttention"]>[1]) {
+    if (this.store.resolveAttention(chatId, filter) > 0) this.sinks.attention(this.store.openAttention());
+  }
+
+  private async stop(chatId: string) {
+    const live = this.live.get(chatId);
+    if (!live) return;
+    this.live.delete(chatId);
+    live.unsubs.forEach((u) => u());
+    if (live.turnId) this.store.endTurn(live.turnId, "interrupted");
+    await live.session.dispose().catch((err: unknown) => console.warn("[supervisor] dispose failed", err));
+  }
+
+  private async ensureSession(chatId: string): Promise<Live> {
+    const existing = this.live.get(chatId);
+    if (existing) return existing;
+    const chat = this.store.getChat(chatId);
+    if (!chat) throw new Error(`no chat ${chatId}`);
+    const adapter = this.adapters.get(chat.agentId);
+    if (!adapter) throw new Error(`Agent "${chat.agentId}" isn't available.`);
+    mkdirSync(chat.cwd, { recursive: true });
+    const opts = {
+      cwd: chat.cwd,
+      chatId,
+      permissionMode: chat.permissionMode as PermissionMode,
+      alwaysAsk: [],
+      ...(chat.model && { model: chat.model }),
+      ...(chat.reasoning && { reasoning: chat.reasoning }),
+    };
+    const native = this.store.nativeSessionId(chatId);
+    const resuming = Boolean(native && adapter.resumeSession);
+    const session = resuming ? await adapter.resumeSession!(native!, opts) : await adapter.startSession(opts);
+    const live: Live = { session, turnId: null, resuming, erroredThisTurn: false, unsubs: [] };
+    live.unsubs.push(
+      session.onEvent((e) => this.onEvent(chatId, live, e)),
+      session.onExit(({ code, signal }) => this.onCrash(chatId, live, code, signal)),
+    );
+    this.live.set(chatId, live);
+    return live;
+  }
+
+  private onEvent(chatId: string, live: Live, e: AgentEvent) {
+    try {
+      if (e.type === "session.started" && e.nativeSessionId) {
+        live.resuming = false;
+        if (this.store.nativeSessionId(chatId) !== e.nativeSessionId) {
+          this.store.updateChat(chatId, { nativeSessionId: e.nativeSessionId });
+          this.sinks.updated(this.store.getChat(chatId)!);
+        }
+      }
+      if (e.type === "turn.completed" && e.status === "error" && live.resuming) {
+        // The stored conversation couldn't be resumed (deleted or from another machine). Start fresh next time.
+        live.resuming = false;
+        this.store.updateChat(chatId, { nativeSessionId: null });
+        this.sinks.event(
+          this.log.append(chatId, live.turnId, {
+            type: "error",
+            message: "Couldn't resume the previous conversation. Your next message starts a new one.",
+            recoverable: true,
+          }),
+        );
+        void this.stop(chatId);
+      }
+      // The agent blocks while a request is open, so its next event means the request was answered elsewhere.
+      const isRequest =
+        ["permission.requested", "question.asked", "plan.proposed", "usage"].includes(e.type) ||
+        (e.type === "agent.status" && e.status === "needs-you");
+      if (this.openRequests.has(chatId) && !isRequest) {
+        this.openRequests.delete(chatId);
+        this.resolve(chatId, { kinds: [...REQUEST_KINDS] });
+      }
+      this.sinks.event(this.log.append(chatId, live.turnId, e));
+      this.setStatus(chatId, nextStatus(this.statuses.get(chatId) ?? "idle", e));
+      this.attentionFor(chatId, live, e);
+      if (e.type === "message.completed" && e.text.trim()) this.lastMessage.set(chatId, e.text);
+      if (e.type === "turn.completed" && live.turnId) {
+        this.store.endTurn(live.turnId, e.status);
+        if (e.status === "ok") this.autoTitle(chatId);
+        live.turnId = null;
+        this.afterTurn(chatId, e.status);
+      }
+    } catch (err) {
+      console.error("[supervisor] event handling failed", err);
+    }
+  }
+
+  private attentionFor(chatId: string, live: Live, e: AgentEvent) {
+    switch (e.type) {
+      case "permission.requested":
+        this.raise(chatId, "permission", e.id, e.summary, e.command ?? e.paths?.join(", "));
+        break;
+      case "question.asked":
+        this.raise(chatId, "question", e.id, e.questions?.[0]?.question ?? e.question);
+        break;
+      case "plan.proposed":
+        this.raise(chatId, "plan", e.id, "Plan ready for review", firstLine(e.markdown.replace(/^#+\s*/, "")));
+        break;
+      case "rate_limited":
+        this.raise(chatId, "rate_limited", null, e.message);
+        break;
+      case "agent.status": {
+        // Terminal-only agents: answered in the terminal itself, so these items carry no request id.
+        const title = this.store.getChat(chatId)?.title ?? "Chat";
+        // A bare prompt ("> ", "$") says nothing; keep only real lines.
+        const detail = e.detail && /[A-Za-z0-9]{2}/.test(e.detail) ? e.detail : undefined;
+        if (e.status === "needs-you") this.raise(chatId, "permission", null, `${title} is waiting for you`, detail);
+        else if (e.status === "idle") this.raise(chatId, "finished", null, `${title} finished`, detail);
+        else this.resolve(chatId, { kinds: ["finished"] });
+        break;
+      }
+      case "error":
+        if (!e.recoverable) {
+          live.erroredThisTurn = true;
+          this.raise(chatId, "error", null, e.message);
+        }
+        break;
+      case "turn.completed":
+        this.resolve(chatId, { kinds: [...REQUEST_KINDS] });
+        this.openRequests.delete(chatId);
+        if (e.status === "error" && !live.erroredThisTurn) this.raise(chatId, "error", null, "The turn ended with an error.");
+        // Not "finished" yet if a queued message is about to go out.
+        if (e.status === "ok" && !this.queueOf(chatId).length && !this.sendAfterInterrupt.has(chatId)) {
+          const title = this.store.getChat(chatId)?.title ?? "Chat";
+          const last = this.lastMessage.get(chatId);
+          this.raise(chatId, "finished", null, `${title} finished`, last ? firstLine(last) : undefined);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** Sends what's waiting once a turn is over: "Send now" first, then the queue (only after a clean finish). */
+  private afterTurn(chatId: string, status: "ok" | "interrupted" | "error") {
+    const now = this.sendAfterInterrupt.get(chatId);
+    let next: string | undefined;
+    if (now !== undefined) {
+      this.sendAfterInterrupt.delete(chatId);
+      next = now;
+    } else if (status === "ok") {
+      const [head, ...rest] = this.queueOf(chatId);
+      if (head) {
+        this.setQueue(chatId, rest);
+        next = head.text;
+      }
+    }
+    if (next !== undefined) {
+      const text = next;
+      setTimeout(() => void this.send(chatId, text).catch((err: unknown) => console.error("[supervisor] queued send failed", err)), 0);
+    }
+  }
+
+  /** Titles a chat from its first message until the user renames it (§8.5). */
+  private autoTitle(chatId: string) {
+    if (this.store.isTitleLocked(chatId)) return;
+    const first = this.store.transcript(chatId).turns[0];
+    if (!first) return;
+    const title = firstLine(first.userText, TITLE_MAX);
+    const chat = this.store.getChat(chatId);
+    if (!title || chat?.title === title) return;
+    this.store.updateChat(chatId, { title });
+    this.sinks.updated(this.store.getChat(chatId)!);
+  }
+
+  private onCrash(chatId: string, live: Live, code: number | null, signal: string | null) {
+    if (this.live.get(chatId) !== live) return;
+    this.live.delete(chatId);
+    live.unsubs.forEach((u) => u());
+    const why = signal ? `signal ${signal}` : `code ${code}`;
+    const message = `Agent process exited (${why}).`;
+    this.sinks.event(this.log.append(chatId, live.turnId, { type: "error", message, recoverable: false }));
+    if (live.turnId) this.store.endTurn(live.turnId, "error");
+    this.log.flush();
+    this.setStatus(chatId, "error");
+    this.resolve(chatId, { kinds: [...REQUEST_KINDS] });
+    this.raise(chatId, "error", null, message);
+  }
+
+  private setStatus(chatId: string, status: ChatStatus) {
+    if (this.statuses.get(chatId) === status) return;
+    this.statuses.set(chatId, status);
+    this.store.updateChat(chatId, { status });
+    this.sinks.status(chatId, status);
+  }
+}
