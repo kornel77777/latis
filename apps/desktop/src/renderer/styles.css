@@ -76,9 +76,12 @@ body {
   overflow: hidden;
   user-select: none;
 }
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* In the base layer so components can override it with utilities (e.g. text fields that show focus otherwise). */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 .drag-region {
   -webkit-app-region: drag;

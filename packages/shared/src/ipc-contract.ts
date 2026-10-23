@@ -398,6 +398,21 @@ export const invokeContract = {
   },
   /** "Folder missing → Locate" (§9.1 AC4): pick where the folder went. `null` when cancelled. */
   "project:locate": { req: z.object({ projectId: z.string() }), res: Project.nullable() },
+  /** Full-text search over chats and notes (§9.16). */
+  "search:query": {
+    req: z.object({ q: z.string().max(200) }),
+    res: z.array(
+      z.object({
+        kind: z.enum(["user", "message", "note"]),
+        chatId: z.string().nullable(),
+        nodeId: z.string().nullable(),
+        snippet: z.string(),
+      }),
+    ),
+  },
+  /** Files in a project (git-tracked and untracked-but-not-ignored, or a bounded walk), for the palette. */
+  "project:files": { req: z.object({ projectId: z.string() }), res: z.array(z.string()) },
+  "project:openFile": { req: z.object({ projectId: z.string(), path: z.string() }), res: ok },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   "settings:getTheme": { req: none, res: Theme },

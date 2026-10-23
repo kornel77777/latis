@@ -295,6 +295,7 @@ export class WorkspaceStore {
       .values({ id: randomUUID(), chatId, seq: (last?.seq ?? -1) + 1, userText, startedAt: Date.now() })
       .returning()
       .get();
+    this.index("user", row.id, chatId, userText);
     return toTurn(row);
   }
 
@@ -332,6 +333,7 @@ export class WorkspaceStore {
             payloadJson: JSON.stringify(se.event),
           })
           .run();
+        if (se.event.type === "message.completed") this.index("message", `${se.chatId}:${se.seq}`, se.chatId, se.event.text);
       }
     });
   }
@@ -429,6 +431,7 @@ export class WorkspaceStore {
       })
       .returning()
       .get();
+    if (input.text) this.index("note", row.id, null, input.text);
     return toCanvasNode(row);
   }
 
@@ -446,6 +449,53 @@ export class WorkspaceStore {
       .set({ dataJson: JSON.stringify({ ...node.data, ...patch }) })
       .where(eq(nodes.id, nodeId))
       .run();
+    if (node.type === "note" && typeof patch.text === "string") {
+      this.db.$client.prepare("DELETE FROM search WHERE kind = 'note' AND ref = ?").run(nodeId);
+      this.index("note", nodeId, null, patch.text);
+    }
+  }
+
+  private index(kind: "user" | "message" | "note", ref: string, chatId: string | null, body: string): void {
+    if (body.trim())
+      this.db.$client.prepare("INSERT INTO search (kind, ref, chat_id, body) VALUES (?, ?, ?, ?)").run(kind, ref, chatId, body);
+  }
+
+  /**
+   * Full-text search (§9.16) over user messages, agent replies and notes, best matches first.
+   * Items on deleted nodes are left out.
+   */
+  search(
+    query: string,
+    limit = 30,
+  ): { kind: "user" | "message" | "note"; chatId: string | null; nodeId: string | null; snippet: string }[] {
+    // Each word is a prefix term, quoted so FTS syntax in the query can't break it.
+    const terms = query
+      .split(/\s+/)
+      .map((w) => w.replace(/"/g, ""))
+      .filter(Boolean)
+      .map((w) => `"${w}"*`);
+    if (!terms.length) return [];
+    const rows = this.db.$client
+      .prepare(
+        `SELECT s.kind, s.ref, s.chat_id AS chatId, snippet(search, 3, '[', ']', '…', 12) AS snippet,
+                COALESCE(cn.id, s.ref) AS nodeId
+           FROM search s
+           LEFT JOIN chats c ON c.id = s.chat_id
+           LEFT JOIN nodes cn ON cn.id = c.node_id
+           LEFT JOIN nodes nn ON s.kind = 'note' AND nn.id = s.ref
+          WHERE search MATCH ?
+            AND (cn.id IS NULL OR cn.deleted_at IS NULL)
+            AND (s.kind != 'note' OR (nn.id IS NOT NULL AND nn.deleted_at IS NULL))
+          ORDER BY bm25(search)
+          LIMIT ?`,
+      )
+      .all(terms.join(" "), limit) as {
+      kind: "user" | "message" | "note";
+      chatId: string | null;
+      nodeId: string | null;
+      snippet: string;
+    }[];
+    return rows.map((r) => ({ kind: r.kind, chatId: r.chatId, nodeId: r.nodeId, snippet: r.snippet }));
   }
 
   /**

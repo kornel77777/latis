@@ -47,8 +47,9 @@ export function TitleBar() {
         </Menu>
         <button
           className="flex h-7 w-56 items-center gap-2 rounded-control border border-line bg-surface px-2.5 text-[12px] text-text-3"
-          aria-label="Search (coming in M4)"
-          disabled
+          aria-label="Search and commands"
+          onClick={() => useWorkspace.setState({ paletteOpen: true })}
+          data-testid="open-palette"
         >
           <Search size={13} /> Search <kbd className="ml-auto font-mono text-[11px]">{isMac ? "⌘K" : "Ctrl K"}</kbd>
         </button>

@@ -82,6 +82,7 @@ interface WorkspaceState {
   timelineFor: string | null;
   /** Note being edited (one at a time). */
   editingNote: string | null;
+  paletteOpen: boolean;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -277,6 +278,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   mergeFor: null,
   timelineFor: null,
   editingNote: null,
+  paletteOpen: false,
 
   async load() {
     try {

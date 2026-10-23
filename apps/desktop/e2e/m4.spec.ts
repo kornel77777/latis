@@ -111,3 +111,58 @@ test("notes: create with N, edit markdown, persist; delete with undo; projects: 
   await expect(page.getByTestId("project-frame")).toContainText("shop-moved");
   await app.close();
 });
+
+test("command palette: run actions, find chats by what was said, files, and restore deleted items", async () => {
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { stubFolderPicker } = await import("./helpers");
+  const dataDir = tempDataDir();
+  const { app, page } = await launch(dataDir);
+  const palette = page.getByTestId("palette");
+  const input = palette.getByTestId("palette-input");
+
+  // An action: New note.
+  await page.keyboard.press("ControlOrMeta+k");
+  await input.fill("new note");
+  await expect(palette.getByTestId("palette-item").first()).toContainText("New note");
+  await input.press("Enter");
+  await expect(page.getByTestId("note")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+
+  // Content search: a chat found by something said in it, not its title.
+  await demoChats(page, 1);
+  const chat = page.getByTestId("chat-card").first();
+  await chat.getByTestId("composer").fill("please tune the zanzibar pricing");
+  await chat.getByTestId("composer").press("Enter");
+  await expect(chat).toHaveAttribute("data-status", "needs-you", { timeout: 15_000 });
+  await page.getByTestId("open-palette").click();
+  await input.fill("zanzib");
+  const hit = palette.locator("[data-group='In chats and notes']").first();
+  await expect(hit).toContainText("zanzibar");
+  if (shots) await page.screenshot({ path: `${shots}/m4-palette.png` });
+  await input.press("Escape");
+
+  // Files in the active project.
+  const repo = join(dataDir, "shop");
+  mkdirSync(join(repo, "src"), { recursive: true });
+  writeFileSync(join(repo, "src", "checkout-flow.ts"), "export {};\n");
+  await stubFolderPicker(app, repo);
+  await page.getByTestId("open-folder").click();
+  await page.keyboard.press("ControlOrMeta+k");
+  await input.fill("checkoutflow");
+  await expect(palette.locator("[data-group='Files']").first()).toContainText("src/checkout-flow.ts");
+  await input.press("Escape");
+
+  // Restore: pick the note from the palette (selects it), delete it, then bring it back.
+  await page.keyboard.press("ControlOrMeta+k");
+  await input.fill("untitled note");
+  await input.press("Enter");
+  await page.locator(".react-flow__pane").focus();
+  await page.keyboard.press("Backspace");
+  await expect(page.getByTestId("note")).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+k");
+  await input.fill("restore note");
+  await input.press("Enter");
+  await expect(page.getByTestId("note")).toHaveCount(1);
+  await app.close();
+});

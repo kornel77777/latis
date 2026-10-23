@@ -10,6 +10,7 @@ import { IsolateDialog, MergeDialog, TimelineDialog } from "../changes/ChangeDia
 import { ReviewPanel } from "../changes/ReviewPanel";
 import { Onboarding } from "./Onboarding";
 import { PerfOverlay } from "./PerfOverlay";
+import { Palette } from "../palette/Palette";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
 import { useResolvedTheme } from "./useResolvedTheme";
@@ -30,7 +31,11 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "b") {
+      if (mod && !e.shiftKey && e.key.toLowerCase() === "k") {
+        // §8.8 command palette.
+        e.preventDefault();
+        useWorkspace.setState((s) => ({ paletteOpen: !s.paletteOpen }));
+      } else if (mod && e.key.toLowerCase() === "b") {
         e.preventDefault();
         useWorkspace.getState().toggleSidebar();
       } else if (mod && e.code === "Backquote") {
@@ -76,6 +81,7 @@ export function App() {
         <ReviewPanel />
         <Onboarding />
         <PerfOverlay />
+        <Palette />
       </div>
     </ReactFlowProvider>
   );

@@ -129,4 +129,45 @@ describe("EventLog", () => {
     store.softDelete([note.id]);
     expect(store.deletedItems(canvasId)[0]).toMatchObject({ type: "note", title: "Ideas" });
   });
+
+  it("searches what was said in chats and written in notes, skipping deleted items", () => {
+    const store = new WorkspaceStore(openDb(file()));
+    const canvasId = store.ensureDefaultCanvas();
+    const { node, chat } = store.createChatNode({
+      canvasId,
+      projectId: null,
+      parentId: null,
+      x: 0,
+      y: 0,
+      agentId: "fake",
+      model: null,
+      reasoning: null,
+      permissionMode: "ask",
+      cwd: "/tmp",
+      title: "Chat",
+    });
+    const turn = store.createTurn(chat.id, "Please refactor the checkout flow");
+    store.insertEvents([
+      {
+        chatId: chat.id,
+        seq: 0,
+        ts: 1,
+        turnId: turn.id,
+        event: { type: "message.completed", text: "Moved the coupon logic into pricing.ts" },
+      },
+    ]);
+    const note = store.createNote({ canvasId, projectId: null, parentId: null, x: 0, y: 0, text: "Launch checklist" });
+
+    expect(store.search("checkout")).toEqual([
+      expect.objectContaining({ kind: "user", chatId: chat.id, nodeId: node.id, snippet: expect.stringContaining("[checkout]") }),
+    ]);
+    expect(store.search("coup")[0]).toMatchObject({ kind: "message", chatId: chat.id });
+    expect(store.search("launch")[0]).toMatchObject({ kind: "note", nodeId: note.id });
+    store.updateNodeData(note.id, { text: "Release checklist" });
+    expect(store.search("launch")).toEqual([]);
+    expect(store.search('weird "quote')).toEqual([]);
+
+    store.softDelete([node.id]);
+    expect(store.search("checkout")).toEqual([]);
+  });
 });

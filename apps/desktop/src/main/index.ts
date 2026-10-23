@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, nativeTheme, shell } from "electron";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
 import { SessionSupervisor } from "./agents/supervisor";
 import { Changes } from "./git/changes";
+import { git } from "./git/git";
 import { EventCoalescer } from "./ipc/coalescer";
 import { emit, registerHandlers } from "./ipc/register";
 import { Notifier } from "./notify";
@@ -139,6 +140,29 @@ async function dockTerminal(spec: {
   const info = await ptys.create({ ...spec, env: await shellEnv(), place: "dock" });
   emit(win?.webContents, "pty:opened", info);
   return info;
+}
+
+const FILE_LIMIT = 5000;
+const SKIP_DIRS = new Set([".git", "node_modules", ".next", "dist", "out", "build", "target", ".venv", "__pycache__"]);
+
+/** A project's files for the palette: git's view when it's a repo, else a bounded walk. */
+async function listFiles(folder: string): Promise<string[]> {
+  try {
+    const { stdout } = await git(folder, ["ls-files", "--cached", "--others", "--exclude-standard"]);
+    return stdout.split("\n").filter(Boolean).slice(0, FILE_LIMIT);
+  } catch {
+    const out: string[] = [];
+    const walk = (dir: string, rel: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        if (out.length >= FILE_LIMIT) return;
+        if (e.isDirectory()) {
+          if (!SKIP_DIRS.has(e.name) && !e.name.startsWith(".")) walk(join(dir, e.name), `${rel}${e.name}/`);
+        } else out.push(`${rel}${e.name}`);
+      }
+    };
+    walk(folder, "");
+    return out;
+  }
 }
 
 function userShell(): { file: string; args: string[] } {
@@ -408,6 +432,19 @@ registerHandlers({
     const folder = r.filePaths[0];
     if (r.canceled || !folder) return null;
     return store.updateProject(projectId, { folderPath: folder });
+  },
+  "search:query": ({ q }) => store.search(q),
+  "project:files": async ({ projectId }) => {
+    const p = store.getProject(projectId);
+    if (!p || p.folderMissing) return [];
+    return listFiles(p.folderPath);
+  },
+  "project:openFile": async ({ projectId, path }) => {
+    const p = store.getProject(projectId);
+    if (!p) return { ok: false };
+    const target = resolve(p.folderPath, path);
+    if (!target.startsWith(p.folderPath + sep)) return { ok: false };
+    return { ok: (await shell.openPath(target)) === "" };
   },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
