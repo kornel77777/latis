@@ -80,6 +80,18 @@ export const FullChat = memo(function FullChat({
     [chatId, respond, reveal, timeline],
   );
 
+  // New chats (and keyboard jumps) put the cursor in the composer.
+  const wantsFocus = useWorkspace((st) => st.focusComposer === chatId);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (!wantsFocus) return;
+    const t = setTimeout(() => {
+      composerRef.current?.focus();
+      useWorkspace.setState({ focusComposer: null });
+    }, 350); // after the canvas has panned to the new chat
+    return () => clearTimeout(t);
+  }, [wantsFocus]);
+
   // Looking at a chat clears its "finished" Inbox item (§8.6).
   useEffect(() => {
     if (selected) markSeen(chatId);
@@ -335,6 +347,7 @@ export const FullChat = memo(function FullChat({
                   </div>
                 )}
                 <textarea
+                  ref={composerRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onPaste={(e) => {

@@ -180,3 +180,43 @@ Gemini refuses `autoEdit`/`yolo` and `allow_always` in folders it doesn't trust,
 ### 2026-10-23: Windows CI builds on windows-2022
 
 better-sqlite3 13 compiles from source on install. node-gyp 11 couldn't find Visual Studio on the newer `windows-latest` image.
+
+## M4
+
+### 2026-10-23: Semantic zoom thresholds and tiles
+
+≥70% full card, 45–70% condensed, <45% status tile (§8.4). Nodes subscribe to the zoom _bucket_, so they re-render only when crossing a threshold. Tiles and condensed cards are sized in canvas units (40–56 px type) so they read at 30–40%. Frames get a big label when zoomed out. Composer drafts and attachments live in the store, so cards can unmount (zoom, virtualisation) without losing text. Off-screen nodes don't render (`onlyRenderVisibleElements`).
+
+### 2026-10-23: Keyboard
+
+- `-` / `=` zoom the canvas (Ctrl/⌘ ± stays the interface zoom). `N` new note, `F` focus selection, Delete removes the selection, Ctrl/⌘+Z/Shift+Z canvas undo, Ctrl/⌘+A selects all, Enter on a focused chat jumps to its composer.
+- The palette lists the selected chat's own actions first (own copy, merge, review branch, timeline, stop, write to).
+- In the Review panel: ↑/↓, A accept all, M mark reviewed.
+- Dialogs focus their primary action, and new chats focus their composer.
+- Together these make S1 doable keyboard-only (`e2e/m3.spec.ts`).
+
+### 2026-10-23: Soft delete and canvas undo
+
+Deleting sets `nodes.deleted_at` (a frame takes its contents and archives its project) and never touches files. Items stay restorable from ⌘K for 7 days. The `deleted_items` table in the sketch wasn't needed. The undo stack is in renderer memory (50 steps; moves, resizes, deletes, new notes, tidy-ups). It isn't persisted.
+
+### 2026-10-23: Search
+
+An FTS5 table `search(kind, ref, chat_id, body)` indexes user messages, agent replies (`message.completed`) and note text. It's written alongside the source rows and backfilled by migration 0004. Each query word is a quoted prefix term, so FTS syntax in input can't break the query. Deleted items are filtered at query time.
+
+### 2026-10-23: Dock browser is a native view
+
+A `WebContentsView` in its own `persist:latis-preview` session (sandboxed, no preload, permissions denied, new windows go to the system browser) is positioned over the dock area by the renderer. Native views draw above the DOM, so it hides while any dialog is open, and an error page is drawn by the renderer instead. Device presets use the DevTools protocol (metrics, touch, mobile UA). The picker runs in an isolated world and captures the element with `capturePage`. In device presets the screenshot's crop can be off, because the page is scaled into the dock.
+
+### 2026-10-23: Image attachments aren't stored in the transcript
+
+Pasted or picked images go to the agent with the message, but turns store text only, so a reloaded transcript doesn't show them. Queued messages keep their images until sent.
+
+### 2026-10-23: Appearance and contrast
+
+- Accent, interface size (window zoom factor), chat text size, density, solid/glass cards with opacity, canvas grid, wallpaper (a data URL in settings, ≤ 8 MB) and reduce motion (plus the system setting).
+- To meet WCAG AA (§8.12), `--text-3` is `#808894` (dark) and `#666e78` (light).
+- The light theme's accent and state colours are darker than §8.1's table, all ≥ 4.5:1 on every surface. Accent `#0b7a6e`; working, needs-you, done and error `#875b00`, `#c03a26`, `#167a4c`, `#b8284f`.
+
+### 2026-10-23: LATIS_DEMO_IN_PROJECTS (tests)
+
+The demo agent stays out of real folders in the UI. With `LATIS_DEMO_IN_PROJECTS=1` it can work in projects, so e2e tests can drive real file changes (worktrees, review, merge) without tokens.

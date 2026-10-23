@@ -15,9 +15,10 @@ export interface Activity {
 
 const short = (s: string, n = 48) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-export function activityOf(turns: Turn[], events: StoredEvent[]): Activity {
+/** `active`: the chat's status is working or needs-you (the renderer's turns don't learn their end time). */
+export function activityOf(turns: Turn[], events: StoredEvent[], active: boolean): Activity {
   const turn = turns.at(-1);
-  const running = turn && turn.endedAt === null ? turn : null;
+  const running = active && turn ? turn : null;
   let action: string | null = null;
   let pending = 0;
   const finished = new Set<string>();

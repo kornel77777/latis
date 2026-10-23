@@ -1,6 +1,39 @@
 # Progress
 
-## Current: M3 Safe changes: done 2026-10-23
+## Current: M4 The great UI: done 2026-10-23
+
+Exit criteria: **S1 keyboard-only** passes (`e2e/m3.spec.ts`). **Design review against §8**: `e2e/design.spec.ts` captures both themes; findings are fixed and listed in `docs/qa/M4.md`. CI is green on all three OSes (Linux check + macOS/Windows/Linux packages).
+
+### Done
+
+- **Semantic zoom (§8.4):** condensed cards and status tiles (state, current action, elapsed, pending approvals), with click to zoom in. Frames have a zoomed-out label. Virtualised canvas, a perf overlay (Ctrl+Alt+P), keyboard zoom.
+- **Canvas:**
+  - Markdown notes (N), exportable as .md. Soft delete with ⌘K restore for 7 days; canvas undo/redo.
+  - Frame toolbar: new chat, terminal, open, fit, colour, rename, remove, Locate a moved folder.
+  - Tidy up, select all, and nodes that animate in.
+- **Command palette (§8.8, §9.16):**
+  - Fuzzy actions, the selected chat's own actions, projects, chats, notes, project files, settings, restore.
+  - FTS5 search over what was said and written.
+- **Focus mode (§8.7):** Grid / Stage / Columns, saved as title-bar tabs; distraction-free (Ctrl/⌘+Shift+F).
+- **Dock browser (§9.7):** dev-server detection, devices with touch, a "Nothing running" page, and the element picker into a chat. Image attachments in the composer, pasted or picked.
+- **Appearance (§8.11):** accent, interface size, chat text, density, glass cards, grid, wallpaper, reduce motion.
+- **Accessibility:** WCAG AA colours, spoken announcements, keyboard paths throughout.
+- **Onboarding:** the getting-started checklist.
+- **Tests:** 93 unit, 19 native, 19 e2e (+ live, perf and design specs, opt-in).
+
+### Not done / known issues
+
+- Image attachments aren't kept in the stored transcript.
+- The canvas undo stack isn't persisted.
+- The picker screenshot is imprecise in device presets.
+- Title-bar tab split and new windows; align/distribute, snapping and smart guides.
+- The always-ask list is still not enforced in Full-auto; no Settings → Permissions yet.
+
+## Next: M5 Orchestration
+
+Workspace MCP server + stdio shim (§10.1), Conductor (§10.2), "Give workspace tools" on any chat, MCP connections (§9.15), skills (§9.14). Exit: scenario S4 with a real agent as conductor.
+
+## M3 Safe changes: done 2026-10-23
 
 Exit criterion **S1 passes live** (`e2e/live-m3.spec.ts`). Claude Code and Codex worked in separate worktrees, the user was notified as each finished, both diffs were reviewed in the Review Inbox, and both were merged into `main`.
 
@@ -27,11 +60,7 @@ Exit criterion **S1 passes live** (`e2e/live-m3.spec.ts`). Claude Code and Codex
 - The always-ask list still isn't enforced in Full-auto.
 - Gemini verified live 2026-10-23 (sign-in through Latis, recordings, six-chat run). That run had 3 frames over the 32 ms budget (max 125 ms); investigate in the M4 perf pass.
 
-## Next: M4 The great UI
-
-Semantic zoom, focus mode, command palette + FTS search + restore, frames polish, smart placement, notes, browser dock + element picker, appearance settings, accessibility pass, onboarding checklist. Exit: design review against §8 and a keyboard-only S1.
-
-## M2 Many agents: done 2026-10-23 (Gemini live run pending a sign-in)
+## M2 Many agents: done 2026-10-23 (Gemini verified live the same day)
 
 Exit criteria, live against real agents (`e2e/live-m2.spec.ts`): **S3**: a Codex command approval answered from the Inbox. **S2**: a correction steered into a running Claude Code turn and followed without stopping it. **Six chats across three agents** (Claude Code, Codex, and an ACP agent added by manifest) streaming at once: p95 frame 9.1 ms, max 17.3 ms, none over 32 ms, 614 MB. The third agent was the Claude ACP bridge, not Gemini, because Gemini CLI isn't signed in on this machine. Gemini's ACP path is replay-tested and `initialize`-verified only.
 

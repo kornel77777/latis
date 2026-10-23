@@ -42,7 +42,7 @@ export function useCanvasActions() {
   /** New chat for a real agent: in the selected node's project, else the only project, else ask for a folder first. */
   const newChat = useCallback(
     async (agentId: string) => {
-      if (agentId === "fake") return newDemoChat();
+      if (agentId === "fake" && !useWorkspace.getState().demoInProjects) return newDemoChat();
       const s = useWorkspace.getState();
       const selected = s.nodes.find((n) => n.selected);
       const fromSelection = selected?.data.projectId ?? (selected?.data.chatId ? s.chats[selected.data.chatId]?.summary.projectId : null);

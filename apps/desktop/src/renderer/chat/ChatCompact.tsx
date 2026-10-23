@@ -12,7 +12,10 @@ const FALLBACK_HUE: Record<string, string> = { "claude-code": "amber-sand", code
 function useChat(chatId: string) {
   const chat = useWorkspace((s) => s.chats[chatId]);
   const agent = useWorkspace((s) => s.agents.find((a) => a.id === chat?.summary.agentId));
-  const activity = useMemo(() => (chat ? activityOf(chat.turns, chat.events) : null), [chat]);
+  const activity = useMemo(
+    () => (chat ? activityOf(chat.turns, chat.events, chat.summary.status === "working" || chat.summary.status === "needs-you") : null),
+    [chat],
+  );
   const completed = useMemo(() => chat?.events.filter((e) => e.event.type === "turn.completed").length ?? 0, [chat]);
   return { chat, agent, activity, completed };
 }

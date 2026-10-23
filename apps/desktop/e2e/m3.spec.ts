@@ -172,3 +172,73 @@ test("a conflicting merge is caught by the dry run; reverting a change from revi
   expect(existsSync(join(repo, "src/extra.txt"))).toBe(false);
   await app.close();
 });
+
+test("S1 with the keyboard only: two agents in their own copies, reviewed and merged", async () => {
+  const dataDir = tempDataDir();
+  const repo = join(dataDir, "shop");
+  mkdirSync(repo);
+  writeFileSync(join(repo, "README.md"), "# shop\n");
+  run(repo, "init", "-q", "-b", "main");
+  run(repo, "add", "-A");
+  run(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "readme");
+  const { app, page } = await launch(dataDir, { LATIS_REPLAY: fixturesRoot, LATIS_DEMO_IN_PROJECTS: "1" });
+  await stubFolderPicker(app, repo); // the native folder dialog is the one thing a test can't type into
+  const kb = page.keyboard;
+  const palette = async (query: string) => {
+    await kb.press("ControlOrMeta+k");
+    await kb.type(query);
+    await kb.press("Enter");
+  };
+  const cards = page.getByTestId("chat-card");
+
+  await palette("open folder");
+  await expect(page.getByTestId("project-frame")).toContainText("shop");
+
+  // Chat 1: create, move into its own copy, then write.
+  await palette("new chat with demo");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first().getByTestId("composer")).toBeFocused();
+  await kb.press("Escape");
+  await palette("work in its own copy");
+  await expect(cards.first().getByTestId("branch-chip")).toBeVisible();
+  await palette("write to");
+  await expect(cards.first().getByTestId("composer")).toBeFocused();
+  await kb.type("build /write pricing");
+  await kb.press("Enter");
+  await expect(cards.first()).toHaveAttribute("data-completed-turns", "1", { timeout: 15_000 });
+
+  // Chat 2: the copy is offered and Enter takes it.
+  await palette("new chat with demo");
+  await expect(page.getByTestId("isolate-start")).toBeFocused();
+  await kb.press("Enter");
+  await expect(cards).toHaveCount(2);
+  const second = page.locator("[data-testid='chat-card']").nth(1);
+  await expect(second.getByTestId("composer")).toBeFocused();
+  await kb.type("build /write checkout");
+  await kb.press("Enter");
+  await expect(second).toHaveAttribute("data-completed-turns", "1", { timeout: 15_000 });
+  expect(existsSync(join(repo, "src/pricing.txt"))).toBe(false);
+
+  // Review both: A accepts all, ↓ moves to the next item.
+  await kb.press("ControlOrMeta+Shift+r");
+  await expect(page.getByTestId("review-item")).toHaveCount(2);
+  await kb.press("a");
+  await kb.press("ArrowDown");
+  await kb.press("a");
+  await expect(page.getByTestId("review-count")).toHaveCount(0);
+  await kb.press("Escape");
+
+  // Merge each: pick the chat in the palette, then Merge, Enter, Enter.
+  for (const title of ["build /write pricing", "build /write checkout"]) {
+    await palette(title);
+    await palette("merge");
+    await expect(page.getByTestId("merge-dialog")).toContainText("No conflicts");
+    await kb.press("Enter"); // Merge into main
+    await expect(page.getByTestId("remove-worktree")).toBeFocused();
+    await kb.press("Enter"); // Remove copy
+    await expect(page.getByTestId("merge-dialog")).toHaveCount(0);
+  }
+  expect(readFileSync(join(repo, "src/pricing.txt"), "utf8")).toContain("Feature: pricing");
+  expect(readFileSync(join(repo, "src/checkout.txt"), "utf8")).toContain("Feature: checkout");
+  await app.close();
+});

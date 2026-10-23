@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCheck, Columns2, GitMerge, Rows3, X } from "lucide-react";
 import type { FileDiff, ReviewItem } from "@latis/shared";
 import { Button, cn } from "@latis/ui";
@@ -25,9 +25,25 @@ export function ReviewPanel() {
   const [files, setFiles] = useState<FileDiff[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Keyboard (§8.12): ↑/↓ or k/j between items, a = accept all, m = mark reviewed, Esc closes.
+  const keys = useRef<{ next: (d: 1 | -1) => void; acceptAll: () => void; mark: () => void }>(null);
+  const root = useRef<HTMLDivElement>(null);
+  // Opening the panel takes focus from wherever it was (a composer, the canvas).
+  useEffect(() => {
+    if (panel.open) root.current?.focus();
+  }, [panel.open]);
   useEffect(() => {
     if (!panel.open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeReview();
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest("input, textarea, select")) return;
+      if (e.key === "Escape") closeReview();
+      else if (e.key === "ArrowDown" || e.key === "j") keys.current?.next(1);
+      else if (e.key === "ArrowUp" || e.key === "k") keys.current?.next(-1);
+      else if (e.key === "a") keys.current?.acceptAll();
+      else if (e.key === "m") keys.current?.mark();
+      else return;
+      e.preventDefault();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [panel.open, closeReview]);
@@ -65,8 +81,6 @@ export function ReviewPanel() {
     };
   }, [panel.open, panel.branchOf, target]);
 
-  if (!panel.open) return null;
-
   const act = async (fn: () => Promise<ReviewItem>) => {
     try {
       updateReview(await fn());
@@ -74,17 +88,42 @@ export function ReviewPanel() {
       toast(errorText(err));
     }
   };
+  useEffect(() => {
+    keys.current = {
+      next: (d) => {
+        if (!visible.length) return;
+        const i = visible.findIndex((r) => r.id === current?.id);
+        const n = visible[Math.min(visible.length - 1, Math.max(0, i + d))];
+        if (n) openReview({ reviewId: n.id });
+      },
+      acceptAll: () => {
+        if (current) void act(() => latis.invoke("reviews:accept", { reviewId: current.id }));
+      },
+      mark: () => {
+        if (current) void act(() => latis.invoke("reviews:markReviewed", { reviewId: current.id, reviewed: current.reviewedAt === null }));
+      },
+    };
+  });
+
+  if (!panel.open) return null;
   const branchChat = panel.branchOf ? chats[panel.branchOf]?.summary : undefined;
   const openCount = reviews.filter((r) => r.reviewedAt === null).length;
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-bg-0" role="dialog" aria-label="Review" data-testid="review-panel">
+    <div
+      ref={root}
+      tabIndex={-1}
+      className="fixed inset-0 z-40 flex flex-col bg-bg-0 outline-none"
+      role="dialog"
+      aria-label="Review"
+      data-testid="review-panel"
+    >
       <header
         className="drag-region flex h-11 shrink-0 items-center gap-3 border-b border-line px-4"
         style={{ paddingLeft: window.latis.platform === "darwin" ? 84 : 16 }}
       >
         <h2 className="text-[14px] font-semibold text-text-1">{branchChat ? `Changes on ${branchChat.worktree?.branch}` : "Review"}</h2>
-        {!branchChat && <span className="text-[12px] text-text-3">{openCount} to review</span>}
+        {!branchChat && <span className="text-[12px] text-text-3">{openCount} to review · ↑↓ items, A accept all, M mark reviewed</span>}
         <div className="no-drag ml-auto flex items-center gap-2">
           {!branchChat && (
             <>
@@ -150,9 +189,7 @@ export function ReviewPanel() {
       <div className="flex min-h-0 flex-1">
         {!branchChat && (
           <nav className="w-80 shrink-0 overflow-y-auto border-r border-line p-2" aria-label="Review items">
-            {visible.length === 0 && (
-              <p className="p-4 text-center text-[12px] text-text-3">Nothing to review. Turns that change files land here.</p>
-            )}
+            {visible.length === 0 && <p className="p-4 text-center text-[12px] text-text-3">No items.</p>}
             {visible.map((r) => {
               const c = chats[r.chatId]!.summary;
               const a = agents.find((x) => x.id === c.agentId);
@@ -226,6 +263,18 @@ export function ReviewPanel() {
                   <GitMerge size={12} /> Merge…
                 </Button>
               )}
+            </div>
+          )}
+          {!current && !branchChat && (
+            <div className="flex h-full flex-col items-center justify-center gap-3 text-center" data-testid="review-empty">
+              <CheckCheck size={28} className="text-state-done" />
+              <p className="text-[15px] font-medium text-text-1">All caught up</p>
+              <p className="max-w-sm text-[13px] text-text-3">
+                Every turn that changes files shows up here with its diff, so you can accept, revert or ask for changes.
+              </p>
+              <Button variant="secondary" onClick={closeReview}>
+                Back to the canvas
+              </Button>
             </div>
           )}
           {error && <p className="text-[13px] text-state-error">{error}</p>}

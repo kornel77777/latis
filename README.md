@@ -2,7 +2,7 @@
 
 Mission control for your coding agents: run Claude Code, Codex, Gemini and others side by side on one canvas, then review and land their work safely.
 
-Status: **M3**. Each chat can work in its own git worktree; every turn is checkpointed (undo/redo, timeline); a Review Inbox reviews diffs hunk by hunk; merges are dry-run first. Also: Claude Code, Codex, Gemini CLI (and any ACP agent or terminal CLI added by a manifest) side by side; steering and a message queue; an Inbox for approvals with notifications and Ctrl+J; a terminal dock; first-run onboarding. See `SPEC.md`, `PROGRESS.md`.
+Status: **M4**. Zoom out and chats become status tiles; ⌘K finds anything (including what was said); focus mode; notes; a dock browser with an element picker; appearance settings; keyboard-only paths. Before that, M3: Each chat can work in its own git worktree; every turn is checkpointed (undo/redo, timeline); a Review Inbox reviews diffs hunk by hunk; merges are dry-run first. Also: Claude Code, Codex, Gemini CLI (and any ACP agent or terminal CLI added by a manifest) side by side; steering and a message queue; an Inbox for approvals with notifications and Ctrl+J; a terminal dock; first-run onboarding. See `SPEC.md`, `PROGRESS.md`.
 
 ```sh
 corepack enable && pnpm install

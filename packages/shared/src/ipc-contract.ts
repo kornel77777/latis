@@ -310,7 +310,13 @@ const ok = z.object({ ok: z.boolean() });
 export const invokeContract = {
   "app:info": {
     req: none,
-    res: z.object({ version: z.string(), platform: z.string(), dataDir: z.string() }),
+    res: z.object({
+      version: z.string(),
+      platform: z.string(),
+      dataDir: z.string(),
+      /** LATIS_DEMO_IN_PROJECTS=1 (tests): the demo agent can work in project folders. */
+      demoInProjects: z.boolean(),
+    }),
   },
   "canvas:load": { req: none, res: CanvasState },
   "canvas:saveNodes": { req: z.object({ nodes: z.array(NodeGeometry) }), res: ok },

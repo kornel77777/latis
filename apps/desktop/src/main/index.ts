@@ -209,7 +209,12 @@ function openProject(id: string, folder: string, x: number, y: number) {
 }
 
 registerHandlers({
-  "app:info": () => ({ version: app.getVersion(), platform: process.platform, dataDir }),
+  "app:info": () => ({
+    version: app.getVersion(),
+    platform: process.platform,
+    dataDir,
+    demoInProjects: process.env.LATIS_DEMO_IN_PROJECTS === "1",
+  }),
   "canvas:load": () => store.loadCanvas(canvasId),
   "canvas:saveNodes": ({ nodes }) => {
     store.saveNodeGeometry(nodes);

@@ -3,6 +3,10 @@ import * as RadixDialog from "@radix-ui/react-dialog";
 import { useReactFlow } from "@xyflow/react";
 import {
   ArchiveRestore,
+  GitBranch,
+  GitMerge,
+  History,
+  Square,
   Bot,
   File,
   FolderOpen,
@@ -153,10 +157,36 @@ function PaletteBody({ close }: { close: () => void }) {
     const action = (id: string, label: string, icon: ReactNode, fn: () => void, hint?: string) =>
       out.push({ id: `a:${id}`, group: "Actions", label, icon, run: run(fn), ...(hint && { hint }) });
 
-    for (const a of ws.agents.filter((x) => x.installed && x.id !== "fake")) {
+    // The selected chat's own actions come first (keyboard-only use, §8.12).
+    const sel = ws.nodes.find((n) => n.selected && n.data.chatId);
+    const chat = sel?.data.chatId ? ws.chats[sel.data.chatId]?.summary : undefined;
+    if (chat) {
+      const wt = chat.worktree && !chat.worktree.removed ? chat.worktree : null;
+      if (chat.projectId && !wt)
+        action(
+          "isolate",
+          `Work in its own copy: ${chat.title}`,
+          <GitBranch size={14} />,
+          () =>
+            void latis
+              .invoke("chat:isolate", { chatId: chat.id })
+              .catch((err: unknown) => ws.toast(err instanceof Error ? err.message : String(err))),
+        );
+      if (wt) {
+        action("merge", `Merge ${wt.branch} into ${wt.baseRef}…`, <GitMerge size={14} />, () =>
+          useWorkspace.setState({ mergeFor: chat.id }),
+        );
+        action("branch", `Review changes on ${wt.branch}`, <GitCompare size={14} />, () => ws.openReview({ branchOf: chat.id }));
+      }
+      action("timeline", `Timeline: ${chat.title}`, <History size={14} />, () => useWorkspace.setState({ timelineFor: chat.id }));
+      if (chat.status === "working" || chat.status === "needs-you")
+        action("stop", `Stop: ${chat.title}`, <Square size={14} />, () => void ws.interrupt(chat.id));
+      action("compose", `Write to ${chat.title}`, <MessageSquare size={14} />, () => useWorkspace.setState({ focusComposer: chat.id }));
+    }
+    for (const a of ws.agents.filter((x) => x.installed && (x.id !== "fake" || ws.demoInProjects))) {
       action(`chat-${a.id}`, `New chat with ${a.displayName}`, <Bot size={14} />, () => void newChat(a.id));
     }
-    action("demo", "New demo chat", <Sparkles size={14} />, () => void newChat("fake"));
+    if (!ws.demoInProjects) action("demo", "New demo chat", <Sparkles size={14} />, () => void newChat("fake"));
     action(
       "note",
       "New note",

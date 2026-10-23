@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, FolderOpen, GitBranch, GitMerge, History, MessageSquare, RotateCcw, Undo2 } from "lucide-react";
 import type { MergePreview } from "@latis/shared";
 import { Button, Dialog, cn } from "@latis/ui";
@@ -15,6 +15,13 @@ export function IsolateDialog() {
   const project = useWorkspace((s) => (offer ? s.projects[offer.projectId] : undefined));
   const [isolate, setIsolate] = useState(true);
   const [busy, setBusy] = useState(false);
+  const startRef = useRef<HTMLButtonElement>(null);
+  // Enter starts the chat (Radix focuses the first control; the primary action is what keyboards want).
+  useEffect(() => {
+    if (!offer) return;
+    const t = setTimeout(() => startRef.current?.focus(), 30);
+    return () => clearTimeout(t);
+  }, [offer]);
   const close = () => useWorkspace.setState({ isolateOffer: null });
   const start = async () => {
     if (!offer) return;
@@ -47,7 +54,7 @@ export function IsolateDialog() {
         <Button variant="ghost" onClick={close}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={() => void start()} disabled={busy} data-testid="isolate-start">
+        <Button ref={startRef} variant="primary" onClick={() => void start()} disabled={busy} data-testid="isolate-start">
           Start chat
         </Button>
       </div>
@@ -65,6 +72,13 @@ export function MergeDialog() {
   const [busy, setBusy] = useState(false);
   const [merged, setMerged] = useState(false);
   const [unmerged, setUnmerged] = useState(0);
+  const mergeRef = useRef<HTMLButtonElement>(null);
+  const removeRef = useRef<HTMLButtonElement>(null);
+  // Keyboard: focus moves to the next sensible action (merge, then remove the copy).
+  useEffect(() => {
+    const t = setTimeout(() => (merged || preview?.ahead === 0 ? removeRef : mergeRef).current?.focus(), 30);
+    return () => clearTimeout(t);
+  }, [preview, merged]);
   const close = () => {
     useWorkspace.setState({ mergeFor: null });
     setPreview(null);
@@ -203,6 +217,7 @@ export function MergeDialog() {
                     Cancel
                   </Button>
                   <Button
+                    ref={mergeRef}
                     variant="primary"
                     disabled={busy || Boolean(preview.blocker) || preview.ahead === 0}
                     onClick={() => void doMerge()}
@@ -228,6 +243,7 @@ export function MergeDialog() {
                 Keep it
               </Button>
               <Button
+                ref={removeRef}
                 variant={unmerged ? "danger" : "secondary"}
                 disabled={busy}
                 onClick={() => void remove(unmerged > 0)}

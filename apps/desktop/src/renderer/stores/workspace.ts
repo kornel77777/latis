@@ -86,6 +86,10 @@ interface WorkspaceState {
   /** Note being edited (one at a time). */
   editingNote: string | null;
   paletteOpen: boolean;
+  /** Tests only: the demo agent may work in project folders (app:info). */
+  demoInProjects: boolean;
+  /** A chat whose composer should take focus once it's on screen (new chats, keyboard use). */
+  focusComposer: string | null;
   /** Saved focus views (§8.7) and the one showing (null = the canvas). */
   views: FocusView[];
   activeView: string | null;
@@ -303,6 +307,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   timelineFor: null,
   editingNote: null,
   paletteOpen: false,
+  demoInProjects: false,
+  focusComposer: null,
   views: [],
   activeView: null,
   zen: false,
@@ -312,7 +318,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async load() {
     try {
-      const [canvas, theme, attention, ptys, prefs, reviews, views] = await Promise.all([
+      const [canvas, theme, attention, ptys, prefs, reviews, views, info] = await Promise.all([
         latis.invoke("canvas:load"),
         latis.invoke("settings:getTheme"),
         latis.invoke("attention:list"),
@@ -320,6 +326,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         latis.invoke("prefs:get"),
         latis.invoke("reviews:list"),
         latis.invoke("views:get"),
+        latis.invoke("app:info"),
       ]);
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
@@ -337,6 +344,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         prefs,
         reviews,
         views,
+        demoInProjects: info.demoInProjects,
         // First run: nothing on the canvas and onboarding never finished (§8.10).
         onboardingOpen: !prefs.onboarded && canvas.nodes.length === 0,
       });
@@ -443,6 +451,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         ]),
         chats: { ...s.chats, [chat.id]: { summary: chat, turns: [], events: [], lastSeq: -1, loaded: true } },
         ...(draft && { drafts: { ...s.drafts, [chat.id]: draft } }),
+        focusComposer: chat.id,
       }));
       get().focusNode(node.id);
       return chat.id;

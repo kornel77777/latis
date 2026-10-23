@@ -16,6 +16,7 @@ import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot } from "@la
 import { useShallow } from "zustand/react/shallow";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { AgentMenuItems } from "./AgentMenuItems";
+import { useZoomLevel } from "./zoom";
 
 export const PROJECT_COLORS: Record<string, string> = {
   teal: "#5eead4",
@@ -30,6 +31,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
   const project = useWorkspace((s) => (data.projectId ? s.projects[data.projectId] : undefined));
   const startChat = useWorkspace((s) => s.startChat);
   const [renaming, setRenaming] = useState(false);
+  const level = useZoomLevel();
   const { updateProject, locateProject, deleteNodes, focusNode, newTerminal } = useWorkspace.getState();
   const counts = useWorkspace(
     useShallow((s) => {
@@ -41,6 +43,38 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
   );
   if (!project) return null;
   const color = PROJECT_COLORS[project.color] ?? PROJECT_COLORS.teal!;
+  // Zoomed out (§8.4): a big readable label instead of a toolbar nobody can hit.
+  if (level === "tile") {
+    return (
+      <>
+        <NodeResizer isVisible={selected} minWidth={520} minHeight={320} />
+        <section
+          aria-label={`Project ${project.name}`}
+          data-testid="project-frame"
+          className="h-full w-full rounded-panel border-2"
+          style={{
+            borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
+            background: `color-mix(in srgb, ${color} 5%, transparent)`,
+          }}
+        >
+          <header className="latis-frame-drag flex cursor-grab items-center gap-5 px-8 py-6 active:cursor-grabbing">
+            <span className="h-8 w-8 rounded-[8px]" style={{ background: color }} />
+            <span className="text-[56px] font-semibold text-text-1">{project.name}</span>
+            {counts[0]! > 0 && (
+              <span className="flex items-center gap-3 text-[36px] text-text-2">
+                <StatusDot status="working" className="!h-6 !w-6" /> {counts[0]}
+              </span>
+            )}
+            {counts[1]! > 0 && (
+              <span className="flex items-center gap-3 text-[36px] text-text-2">
+                <StatusDot status="needs-you" className="!h-6 !w-6" /> {counts[1]}
+              </span>
+            )}
+          </header>
+        </section>
+      </>
+    );
+  }
   return (
     <>
       <NodeResizer isVisible={selected} minWidth={520} minHeight={320} />
@@ -105,7 +139,10 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
                 </Button>
               }
             >
-              <AgentMenuItems includeDemo={false} onPick={(agentId) => void startChat(agentId, project.id)} />
+              <AgentMenuItems
+                includeDemo={useWorkspace.getState().demoInProjects}
+                onPick={(agentId) => void startChat(agentId, project.id)}
+              />
             </Menu>
             <Button size="icon" variant="ghost" aria-label="Terminal in this project" onClick={() => void newTerminal(project.id)}>
               <SquareTerminal size={14} />
