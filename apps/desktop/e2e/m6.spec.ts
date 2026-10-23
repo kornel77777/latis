@@ -75,7 +75,10 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   await page.getByText("Tomorrow at 09:00").click();
   await page.getByLabel("Repeat").selectOption({ label: "Every day" });
   await page.getByTestId("schedule-send").click();
-  await expect(second.getByTestId("scheduled")).toContainText("tomorrow");
+  // "tomorrow 09:00", or "in N h" when that's under 12 hours away.
+  await expect(second.getByTestId("scheduled")).toContainText(/tomorrow|in \d+ h/);
+  const due = (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("schedule:list"))).find((m) => !m.onReset)!.fireAt;
+  expect([new Date(due).getHours(), new Date(due).getMinutes(), new Date(due).getDate()]).toEqual([9, 0, new Date(Date.now() + 86_400_000).getDate()]);
   await expect(second.getByTestId("scheduled")).toContainText("repeats every day");
   await expect(second.getByTestId("composer")).toHaveValue("");
   await app.close();
