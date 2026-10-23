@@ -125,10 +125,9 @@ export class BrowserDock {
       return { action: "deny" };
     });
     const emit = () => this.onState(this.state());
-    wc.on("did-start-loading", () => {
-      this.error = null;
-      emit();
-    });
+    // The error clears only when Latis navigates or reloads: after a failed load Chromium starts
+    // loading its own error page, which would otherwise wipe the error we just recorded.
+    wc.on("did-start-loading", emit);
     wc.on("did-stop-loading", emit);
     wc.on("page-title-updated", emit);
     wc.on("did-navigate", emit);

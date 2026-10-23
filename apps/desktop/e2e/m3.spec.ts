@@ -233,6 +233,7 @@ test("S1 with the keyboard only: two agents in their own copies, reviewed and me
     await palette(title);
     await palette("merge");
     await expect(page.getByTestId("merge-dialog")).toContainText("No conflicts");
+    await expect(page.getByTestId("merge-confirm")).toBeFocused();
     await kb.press("Enter"); // Merge into main
     await expect(page.getByTestId("remove-worktree")).toBeFocused();
     await kb.press("Enter"); // Remove copy
