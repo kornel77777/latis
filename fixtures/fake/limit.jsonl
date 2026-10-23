@@ -1,0 +1,8 @@
+// Does part of a task, then hits the usage limit (M6, scenario S5).
+{"delay":0,"event":{"type":"session.started","model":"demo-1"}}
+{"delay":50,"event":{"type":"tool.started","id":"w1","kind":"edit","name":"Write","input":{"path":"src/cart.ts"},"paths":["src/cart.ts"]}}
+{"delay":50,"writeFile":{"path":"src/cart.ts","content":"export const total = (items: number[]) => items.reduce((a, b) => a + b, 0);\n"}}
+{"delay":20,"event":{"type":"tool.completed","id":"w1","status":"ok"}}
+{"delay":20,"stream":"I added the cart total in src/cart.ts.\n\n- [x] Cart total\n- [ ] Apply discount codes\n- [ ] Tests for the cart","chunk":16}
+{"delay":20,"event":{"type":"rate_limited","resetsAt":"2099-01-01T09:00:00.000Z","message":"Usage limit reached (five hour)."}}
+{"delay":0,"event":{"type":"turn.completed","status":"error","durationMs":400}}

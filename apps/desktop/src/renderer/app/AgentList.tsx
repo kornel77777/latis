@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { Check, Copy, LogIn, RefreshCw, SquareTerminal } from "lucide-react";
-import type { AgentInfo } from "@latis/shared";
+import { useEffect, useState } from "react";
+import { Check, Copy, LogIn, Plus, RefreshCw, SquareTerminal, Trash2 } from "lucide-react";
+import type { AccountsState, AgentInfo } from "@latis/shared";
+import { latis } from "../api";
 import { Button, cn } from "@latis/ui";
 import { useWorkspace } from "../stores/workspace";
 
@@ -31,11 +32,98 @@ function CopyCommand({ text }: { text: string }) {
   );
 }
 
+/** Agents whose CLI can be pointed at a separate home folder (main: HOME_ENV). */
+const ACCOUNT_AGENTS = new Set(["claude-code", "codex", "gemini"]);
+
+const errorText = (err: unknown) =>
+  err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(err);
+
+/** Accounts for one agent (§9.12 AC3): add, label, switch. */
+function AccountsRow({ agent, state, onChange }: { agent: AgentInfo; state: AccountsState; onChange: (s: AccountsState) => void }) {
+  const mine = state.accounts.filter((x) => x.agentId === agent.id);
+  const active = state.active[agent.id] ?? "";
+  const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const toast = useWorkspace.getState().toast;
+  const run = (p: Promise<AccountsState>) => p.then(onChange).catch((err: unknown) => toast(errorText(err)));
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px] text-text-2" data-testid="accounts">
+      <span>Account</span>
+      <select
+        value={active}
+        disabled={switching}
+        aria-label={`${agent.displayName} account`}
+        className="h-7 rounded-control border border-line bg-surface px-1.5 text-[12px] text-text-1"
+        onChange={(e) => {
+          setSwitching(true);
+          toast("Switching once running turns have finished…");
+          void run(latis.invoke("accounts:switch", { agentId: agent.id, accountId: e.target.value || null })).finally(() =>
+            setSwitching(false),
+          );
+        }}
+      >
+        <option value="">Default</option>
+        {mine.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.label}
+          </option>
+        ))}
+      </select>
+      {active && (
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label="Forget this account"
+          title="Forget this account (its folder stays on disk)"
+          onClick={() => void run(latis.invoke("accounts:remove", { id: active }))}
+        >
+          <Trash2 size={12} />
+        </Button>
+      )}
+      {adding ? (
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!label.trim()) return;
+            void run(latis.invoke("accounts:add", { agentId: agent.id, label: label.trim() })).then(() => {
+              setAdding(false);
+              setLabel("");
+              useWorkspace.getState().setSettingsOpen(false);
+            });
+          }}
+        >
+          <input
+            autoFocus
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Work"
+            aria-label="Account label"
+            className="h-7 w-28 rounded-control border border-line bg-bg-1 px-2 text-[12px] text-text-1"
+          />
+          <Button size="sm" variant="secondary" type="submit">
+            Add and sign in
+          </Button>
+        </form>
+      ) : (
+        <Button size="sm" variant="ghost" onClick={() => setAdding(true)}>
+          <Plus size={12} /> Add account
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function AgentList({ hideDemo = false, compact = false }: { hideDemo?: boolean; compact?: boolean }) {
   const agents = useWorkspace((s) => s.agents);
   const loadAgents = useWorkspace((s) => s.loadAgents);
   const signIn = useWorkspace((s) => s.signIn);
   const [checking, setChecking] = useState(false);
+  const [accounts, setAccounts] = useState<AccountsState | null>(null);
+  useEffect(() => {
+    if (!compact) void latis.invoke("accounts:list").then(setAccounts);
+  }, [compact]);
   const list = agents
     .filter((a) => !hideDemo || a.id !== "fake")
     // Installed first; then the rest in their built-in order.
@@ -69,6 +157,9 @@ export function AgentList({ hideDemo = false, compact = false }: { hideDemo?: bo
               >
                 {st.label}
               </div>
+              {!compact && a.installed && accounts && ACCOUNT_AGENTS.has(a.id) && (
+                <AccountsRow agent={a} state={accounts} onChange={setAccounts} />
+              )}
               {!a.installed && a.installHint && (
                 <div className="mt-1.5">
                   <CopyCommand text={a.installHint} />
@@ -77,7 +168,7 @@ export function AgentList({ hideDemo = false, compact = false }: { hideDemo?: bo
             </div>
             {a.installed && a.canSignIn && (
               <Button size="sm" variant={a.signedIn ? "ghost" : "primary"} onClick={() => void signIn(a.id)} data-testid="sign-in">
-                <LogIn size={12} /> {a.signedIn ? "Switch account" : "Sign in"}
+                <LogIn size={12} /> {a.signedIn ? "Sign in again" : "Sign in"}
               </Button>
             )}
           </div>

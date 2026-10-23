@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ChatStatus, StoredEvent } from "./agent-events";
+import { ChatStatus, StoredEvent, UsageWindow } from "./agent-events";
 
 // Single source of truth for every IPC channel (SPEC §5.2).
 // `invoke` = request/response, `events` = main → renderer streams.
@@ -79,6 +79,8 @@ export const ChatSummary = z.object({
   spawnedBy: z.string().nullable(),
   /** MCP connections attached to this chat on top of the shared ones (§9.15). */
   connections: z.array(z.string()),
+  /** The chat this one continues (handoff, §9.11). */
+  continuedFrom: z.string().nullable(),
 });
 export type ChatSummary = z.infer<typeof ChatSummary>;
 
@@ -147,6 +149,36 @@ export const PtyInfo = z.object({
   running: z.boolean(),
 });
 export type PtyInfo = z.infer<typeof PtyInfo>;
+
+/** A message waiting to be sent later (§9.10). */
+export const ScheduledMessage = z.object({
+  id: z.string(),
+  chatId: z.string(),
+  text: z.string(),
+  fireAt: z.number(),
+  repeatMs: z.number().nullable(),
+  onReset: z.boolean(),
+});
+export type ScheduledMessage = z.infer<typeof ScheduledMessage>;
+
+/** What Latis knows about each agent's usage (§9.12), by agent id. Unknown stays unknown. */
+export const UsageState = z.record(
+  z.string(),
+  z.object({
+    windows: z.array(UsageWindow),
+    /** Set while the agent reported a usage limit; when it resets, if it said. */
+    limited: z.object({ resetsAt: z.string().nullable(), message: z.string() }).nullable(),
+    updatedAt: z.number(),
+  }),
+);
+export type UsageState = z.infer<typeof UsageState>;
+
+/** An extra account for an agent (§9.12 AC3): a separate home folder for its CLI. */
+export const Account = z.object({ id: z.string(), agentId: z.string(), label: z.string(), home: z.string() });
+export type Account = z.infer<typeof Account>;
+/** `active[agentId]` is the account in use; null or missing is the CLI's default home. */
+export const AccountsState = z.object({ accounts: z.array(Account), active: z.record(z.string(), z.string().nullable()) });
+export type AccountsState = z.infer<typeof AccountsState>;
 
 /** An MCP connection (§9.15). Secret values never leave main; only their names do. */
 export const McpConnection = z.object({
@@ -594,6 +626,33 @@ export const invokeContract = {
   "skills:read": { req: z.object({ path: z.string() }), res: z.object({ body: z.string() }) },
   "conductor:setAgent": { req: z.object({ agentId: z.string() }), res: ChatSummary },
   "conductor:openPrefs": { req: none, res: ok },
+  /** Send later (§9.10): at `fireAt`, or when the agent's limit resets (`onReset`). */
+  "schedule:create": {
+    req: z.object({
+      chatId: z.string(),
+      text: z.string().min(1),
+      fireAt: z.number().optional(),
+      onReset: z.boolean().optional(),
+      repeatMs: z.number().int().min(60_000).nullable().optional(),
+    }),
+    res: ScheduledMessage,
+  },
+  "schedule:list": { req: none, res: z.array(ScheduledMessage) },
+  "schedule:cancel": { req: z.object({ id: z.string() }), res: ok },
+  "usage:get": { req: none, res: UsageState },
+  "accounts:list": { req: none, res: AccountsState },
+  /** Adds an account and opens its sign-in terminal. */
+  "accounts:add": { req: z.object({ agentId: z.string(), label: z.string().min(1).max(40) }), res: AccountsState },
+  "accounts:signIn": { req: z.object({ id: z.string() }), res: PtyInfo },
+  /** Switches once the agent's running turns have finished (§9.12 AC3). */
+  "accounts:switch": { req: z.object({ agentId: z.string(), accountId: z.string().nullable() }), res: AccountsState },
+  "accounts:remove": { req: z.object({ id: z.string() }), res: AccountsState },
+  /** The handoff brief for continuing a chat with another agent (§9.11 AC2). */
+  "handoff:brief": { req: z.object({ chatId: z.string() }), res: z.object({ brief: z.string() }) },
+  "handoff:start": {
+    req: z.object({ chatId: z.string(), agentId: z.string(), brief: z.string().min(1) }),
+    res: z.object({ node: CanvasNode, chat: ChatSummary, frame: NodeGeometry.nullable() }),
+  },
   "prefs:get": { req: none, res: Prefs },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */
@@ -628,6 +687,8 @@ export const eventContract = {
     /** Bring this node into view. */
     reveal: z.string().nullable(),
   }),
+  "schedule:changed": z.array(ScheduledMessage),
+  "usage:changed": UsageState,
   /** The workspace tools opened a focus view or asked for a canvas action. */
   "canvas:command": z.discriminatedUnion("type", [
     z.object({ type: z.literal("focus"), view: FocusView }),

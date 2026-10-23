@@ -65,3 +65,16 @@ export async function versionOf(binary: string, args = ["--version"]): Promise<s
     return undefined;
   }
 }
+
+// Multiple accounts (§9.12 AC3): an agent's active account is a home folder the CLI is pointed at
+// through its own env var. Set by main; adapters ask for an agent's env when they start a process.
+let accountEnv: (agentId: string) => Record<string, string> = () => ({});
+
+export function setAccountEnv(fn: (agentId: string) => Record<string, string>): void {
+  accountEnv = fn;
+}
+
+/** The login-shell env plus the agent's active account. */
+export async function agentEnv(agentId: string): Promise<NodeJS.ProcessEnv> {
+  return { ...(await shellEnv()), ...accountEnv(agentId) };
+}

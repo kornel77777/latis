@@ -35,6 +35,11 @@ import { Connections } from "./mcp/connections";
 import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer } from "./mcp/server";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
+import { buildBrief } from "./handoff";
+import { Scheduler } from "./scheduler";
+import { UsageMeter } from "./usage";
+import { Accounts, HOME_ENV } from "./accounts";
+import { agentEnv, setAccountEnv } from "./agents/shell-env";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 let win: BrowserWindow | null = null;
@@ -53,6 +58,9 @@ const canvasId = store.ensureDefaultCanvas();
 for (const chat of store.loadCanvas(canvasId).chats) {
   if (chat.status === "working" || chat.status === "needs-you") store.updateChat(chat.id, { status: "idle" });
 }
+
+const accounts = new Accounts(store, dataDir);
+setAccountEnv((agentId) => accounts.env(agentId));
 
 const ptys = new PtyManager(() => import("node-pty"), {
   data: (id, data) => emit(win?.webContents, "pty:data", { id, data }),
@@ -142,6 +150,8 @@ const changes = new Changes(store, dataDir, {
   },
 });
 
+const usage = new UsageMeter(store, (state) => emit(win?.webContents, "usage:changed", state));
+
 const coalescer = new EventCoalescer((chatId, events) => emit(win?.webContents, "chat:events", { chatId, events }));
 const supervisor = new SessionSupervisor(
   store,
@@ -161,6 +171,7 @@ const supervisor = new SessionSupervisor(
       emit(win?.webContents, "attention:changed", items);
     },
     raised: (item) => notifier.raised(item),
+    usage: (agentId, patch) => usage.update(agentId, patch),
   },
   {
     beforeTurn: (chatId, turnId) => changes.beforeTurn(chatId, turnId),
@@ -275,6 +286,48 @@ async function sessionOptions(chat: ChatSummary): Promise<Partial<SessionOptions
   };
 }
 
+const scheduler = new Scheduler({
+  store,
+  deliver: (chatId, text) => supervisor.enqueue(chatId, text),
+  note: (chatId, text) => supervisor.addNote(chatId, text),
+  changed: (list) => emit(win?.webContents, "schedule:changed", list),
+});
+
+/** Opens an account's sign-in in the dock, with the CLI pointed at the account's folder. */
+async function signInAccount(id: string) {
+  const acc = accounts.get(id);
+  const a = acc && agents.get(acc.agentId);
+  if (!acc || !a?.login) throw new Error("This agent signs in inside its own terminal.");
+  const { pty } = await a.login();
+  const info = await dockTerminal({
+    ...pty,
+    cwd: homedir(),
+    title: `Sign in · ${a.displayName} · ${acc.label}`,
+    projectId: null,
+    chatId: null,
+    env: { ...(await shellEnv()), [HOME_ENV[acc.agentId]!]: acc.home },
+  });
+  const unsub = ptys.subscribe(info.id, (e) => {
+    if (e.exit === undefined) return;
+    unsub();
+    void agents.list(true).then((list) => emit(win?.webContents, "agents:changed", list));
+  });
+  return info;
+}
+
+/** Asks agents that can tell without spending tokens how much of their usage is left (Codex). */
+async function probeUsage() {
+  for (const a of await agents.list()) {
+    const adapter = agents.get(a.id);
+    if (!a.installed || !a.signedIn || !adapter?.usage) continue;
+    try {
+      usage.update(a.id, { windows: await adapter.usage() });
+    } catch (err) {
+      console.warn(`[usage] ${a.id} didn't report usage`, err instanceof Error ? err.message : err);
+    }
+  }
+}
+
 const CONDUCTOR_ORDER = ["claude-code", "codex", "gemini"];
 
 /** The pinned Conductor chat (§10.2), created once at the canvas's top left. */
@@ -329,8 +382,9 @@ async function dockTerminal(spec: {
   title: string;
   projectId: string | null;
   chatId: string | null;
+  env?: NodeJS.ProcessEnv;
 }) {
-  const info = await ptys.create({ ...spec, env: await shellEnv(), place: "dock" });
+  const info = await ptys.create({ ...spec, env: spec.env ?? (await shellEnv()), place: "dock" });
   emit(win?.webContents, "pty:opened", info);
   return info;
 }
@@ -398,7 +452,15 @@ registerHandlers({
     const a = agents.get(agentId);
     if (!a?.login) throw new Error("This agent signs in inside its own terminal.");
     const { pty } = await a.login();
-    const info = await dockTerminal({ ...pty, cwd: homedir(), title: `Sign in · ${a.displayName}`, projectId: null, chatId: null });
+    const info = await dockTerminal({
+      ...pty,
+      cwd: homedir(),
+      title: `Sign in · ${a.displayName}`,
+      projectId: null,
+      chatId: null,
+      // Signs in the active account (§9.12 AC3).
+      env: await agentEnv(agentId),
+    });
     // Re-check once the sign-in terminal closes, so the agent shows as signed in.
     const unsub = ptys.subscribe(info.id, (e) => {
       if (e.exit === undefined) return;
@@ -610,6 +672,7 @@ registerHandlers({
       return n?.type === "chat" && typeof n.data.chatId === "string" ? [n.data.chatId] : [];
     });
     await Promise.all(chatIds.map((c) => supervisor.release(c)));
+    chatIds.forEach((c) => scheduler.forgetChat(c));
     emit(win?.webContents, "attention:changed", store.openAttention());
     emit(win?.webContents, "reviews:changed", store.listReviews());
     return { deleted };
@@ -669,6 +732,85 @@ registerHandlers({
   },
   "browser:detect": () => detectDevPorts(),
   "browser:pick": () => browserDock.pick(),
+  "schedule:create": ({ chatId, text, fireAt, onReset, repeatMs }) => {
+    const chat = store.getChat(chatId);
+    if (!chat) throw new Error("That chat no longer exists.");
+    let at = fireAt;
+    if (onReset) {
+      const resets = usage.resetsAt(chat.agentId);
+      if (!resets) throw new Error("Latis doesn't know when this agent's limit resets. Pick a time instead.");
+      // A minute of slack: limits reset on the provider's clock.
+      at = Date.parse(resets) + 60_000;
+    }
+    if (at === undefined) throw new Error("Pick when to send it.");
+    return scheduler.add({ chatId, text, fireAt: at, repeatMs: repeatMs ?? null, onReset: Boolean(onReset) });
+  },
+  "schedule:list": () => scheduler.list(),
+  "schedule:cancel": ({ id }) => ({ ok: scheduler.cancel(id) }),
+  "usage:get": () => usage.get(),
+  "accounts:list": () => accounts.state(),
+  "accounts:add": async ({ agentId, label }) => {
+    const acc = accounts.add(agentId, label);
+    await signInAccount(acc.id);
+    return accounts.state();
+  },
+  "accounts:signIn": ({ id }) => signInAccount(id),
+  "accounts:switch": async ({ agentId, accountId }) => {
+    // §9.12 AC3: running turns finish on the old account first.
+    while (store.liveChats().some((c) => c.agentId === agentId && supervisor.busy(c.id))) await new Promise((r) => setTimeout(r, 1000));
+    accounts.setActive(agentId, accountId);
+    await Promise.all(store.liveChats().flatMap((c) => (c.agentId === agentId ? [supervisor.release(c.id)] : [])));
+    // The new account's usage is unknown until it reports.
+    usage.update(agentId, { windows: [], limited: null });
+    emit(win?.webContents, "agents:changed", await agents.list(true));
+    void probeUsage();
+    return accounts.state();
+  },
+  "accounts:remove": async ({ id }) => {
+    const acc = accounts.get(id);
+    if (acc && accounts.state().active[acc.agentId] === id) {
+      accounts.setActive(acc.agentId, null);
+      emit(win?.webContents, "agents:changed", await agents.list(true));
+    }
+    accounts.remove(id);
+    return accounts.state();
+  },
+  "handoff:brief": async ({ chatId }) => {
+    const chat = store.getChat(chatId);
+    if (!chat) throw new Error("That chat no longer exists.");
+    eventLog.flush();
+    const files = await changes.chatDiff(chatId).catch(() => []);
+    return { brief: buildBrief(store, chat, agents.get(chat.agentId)?.displayName ?? chat.agentId, files) };
+  },
+  "handoff:start": async ({ chatId, agentId, brief }) => {
+    const from = store.getChat(chatId);
+    if (!from) throw new Error("That chat no longer exists.");
+    const a = agents.get(agentId);
+    if (!a || agents.isTerminal(agentId)) throw new Error("Pick an agent Latis can chat with.");
+    if (agentId === from.agentId) throw new Error("Pick a different agent to continue with.");
+    const project = from.projectId ? store.getProject(from.projectId) : undefined;
+    const r = store.absoluteRect(from.nodeId);
+    const place = project ? store.placeInFrame(project.frameNodeId) : { x: (r?.x ?? 0) + (r?.w ?? 0) + 60, y: r?.y ?? 0, frame: null };
+    const created = store.createChatNode({
+      canvasId,
+      projectId: project?.id ?? null,
+      parentId: project?.frameNodeId ?? null,
+      x: place.x,
+      y: place.y,
+      agentId,
+      model: agentId === "fake" ? "demo-1" : null,
+      reasoning: null,
+      permissionMode: from.permissionMode,
+      cwd: from.cwd,
+      // Same folder or worktree: the work continues where it is (§9.11 AC3).
+      worktreeId: from.worktree && !from.worktree.removed ? from.worktree.id : null,
+      title: `${from.title} (cont.)`.slice(0, 120),
+      continuedFrom: from.id,
+    });
+    store.updateChat(created.chat.id, { titleLocked: true });
+    await supervisor.send(created.chat.id, brief);
+    return { ...created, chat: store.getChat(created.chat.id)!, frame: place.frame };
+  },
   "prefs:get": () => prefs(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };
@@ -799,6 +941,9 @@ function createWindow() {
 void app.whenReady().then(() => {
   createWindow();
   void ensureConductor().catch((err: unknown) => console.error("[conductor] couldn't create the Conductor", err));
+  scheduler.start();
+  void probeUsage();
+  setInterval(() => void probeUsage(), 15 * 60_000);
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -828,6 +973,7 @@ app.on("before-quit", (e) => {
   void supervisor.disposeAll().finally(() => {
     ptys.disposeAll();
     mcpServer.stop();
+    scheduler.stop();
     app.quit();
   });
 });

@@ -9,13 +9,14 @@ import type {
   PermissionMode,
   RequestResponse,
   SessionOptions,
+  UsageSnapshot,
   UserTurn,
 } from "@latis/shared";
 import { JsonRpcPeer, RpcError, type Params } from "../../rpc/peer";
 import { spawnTransport, type LineTransport } from "../../rpc/transport";
 import { SessionBase } from "../../session-base";
-import { shellEnv, versionOf, which } from "../../shell-env";
-import { CodexMapper, type CodexRequest } from "./mapper";
+import { agentEnv, versionOf, which } from "../../shell-env";
+import { CodexMapper, codexWindows, type CodexRequest } from "./mapper";
 
 // Codex via `codex app-server` (SPEC §6.3, docs/adapters/codex.md).
 
@@ -112,7 +113,7 @@ export class CodexAdapter implements AgentAdapter {
     if (this.opts.transport) return this.opts.transport(cwd);
     const bin = await this.executable();
     if (!bin) throw new Error(`Codex isn't installed. Install it with: ${this.installHint}`);
-    return spawnTransport({ file: bin, args: ["app-server"], cwd, env: await shellEnv() });
+    return spawnTransport({ file: bin, args: ["app-server"], cwd, env: await agentEnv(this.id) });
   }
 
   async detect(): Promise<DetectResult> {
@@ -156,6 +157,12 @@ export class CodexAdapter implements AgentAdapter {
       this.auth = { signedIn: false, method: "none" };
     }
     return this.auth;
+  }
+
+  /** The account's usage windows, read without starting a thread (§9.12). */
+  async usage(): Promise<UsageSnapshot> {
+    const res = await this.probe((p) => p.request<{ rateLimits?: unknown }>("account/rateLimits/read", {}));
+    return codexWindows(res.rateLimits);
   }
 
   async listModels(): Promise<ModelInfo[]> {

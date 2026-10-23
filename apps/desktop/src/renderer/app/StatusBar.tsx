@@ -29,7 +29,55 @@ export function StatusBar() {
       <button className="flex items-center gap-1 rounded px-1 hover:bg-surface-2 hover:text-text-1" onClick={() => setSidebarTab("inbox")}>
         Inbox {inbox}
       </button>
-      <span className="ml-auto text-text-3">Usage meters arrive in M6 · v0.1</span>
+      <UsageMeters />
     </footer>
+  );
+}
+
+const time = (iso: string) => {
+  const d = new Date(iso);
+  const sameDay = d.toDateString() === new Date().toDateString();
+  return sameDay
+    ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : d.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+};
+
+/** Per-agent usage as the agents report it (§9.12 AC1). Unknown is "—", never a guess. */
+function UsageMeters() {
+  const usage = useWorkspace((s) => s.usage);
+  const agents = useWorkspace(
+    useShallow((s) => s.agents.filter((a) => a.installed && a.signedIn && a.kind === "structured" && a.id !== "fake")),
+  );
+  return (
+    <div className="ml-auto flex items-center gap-3" data-testid="usage-meters">
+      {agents.map((a) => {
+        const u = usage[a.id];
+        const name = a.displayName.replace(/ (CLI|Code)$/, "");
+        if (u?.limited)
+          return (
+            <span key={a.id} className="text-state-error" title={u.limited.message} data-testid={`usage-${a.id}`}>
+              {name}: limit{u.limited.resetsAt ? ` · resets ${time(u.limited.resetsAt)}` : ""}
+            </span>
+          );
+        const ws = u?.windows ?? [];
+        const title = ws.map((w) => `${w.label}: ${w.usedPct ?? "—"}% used${w.resetsAt ? `, resets ${time(w.resetsAt)}` : ""}`).join("\n");
+        return (
+          <span key={a.id} className="text-text-3" title={title || `${a.displayName} doesn't report usage`} data-testid={`usage-${a.id}`}>
+            {name}{" "}
+            {ws.length ? (
+              ws.map((w, i) => (
+                <span key={w.id} className={(w.usedPct ?? 0) >= 90 ? "text-state-needs-you" : "text-text-2"}>
+                  {i > 0 && " · "}
+                  {w.label} {w.usedPct === undefined ? "—" : `${w.usedPct}%`}
+                </span>
+              ))
+            ) : (
+              <span className="text-text-2">—</span>
+            )}
+          </span>
+        );
+      })}
+      <span className="text-text-3">v0.1</span>
+    </div>
   );
 }

@@ -24,6 +24,15 @@ export const QuestionSpec = z.object({
 });
 export type QuestionSpec = z.infer<typeof QuestionSpec>;
 
+/** One usage window of an agent account (§9.12), e.g. Claude's 5-hour window or Codex's weekly one. */
+export const UsageWindow = z.object({
+  id: z.string(),
+  label: z.string(),
+  usedPct: z.number().optional(),
+  resetsAt: z.string().optional(),
+});
+export type UsageWindow = z.infer<typeof UsageWindow>;
+
 export const AgentEvent = z.discriminatedUnion("type", [
   z.object({ type: z.literal("session.started"), nativeSessionId: z.string().optional(), model: z.string() }),
   z.object({ type: z.literal("message.delta"), text: z.string() }),
@@ -80,6 +89,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     costUsd: z.number().optional(),
   }),
   z.object({ type: z.literal("rate_limited"), resetsAt: z.string().optional(), message: z.string() }),
+  // Latis extension: the account's usage windows as the agent reports them (§9.12). Not stored in transcripts.
+  z.object({ type: z.literal("usage.window"), windows: z.array(UsageWindow) }),
   z.object({
     type: z.literal("turn.completed"),
     status: z.enum(["ok", "interrupted", "error"]),
@@ -123,6 +134,7 @@ export function nextStatus(prev: ChatStatus, e: AgentEvent): ChatStatus {
       return e.status === "idle" ? "done" : e.status;
     case "session.started":
     case "usage":
+    case "usage.window":
       return prev;
     default:
       return "working";

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ChevronDown, Gauge, ShieldAlert, ShieldCheck, ShieldHalf, ShieldOff } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, Gauge, ShieldAlert, ShieldCheck, ShieldHalf, ShieldOff } from "lucide-react";
 import type { AgentModel, ChatSummary } from "@latis/shared";
-import { Menu, MenuItem, MenuLabel, cn } from "@latis/ui";
+import { Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@latis/ui";
 import { useWorkspace } from "../stores/workspace";
 
 type Mode = ChatSummary["permissionMode"];
@@ -55,6 +55,14 @@ export function ModelPicker({ chat, agentLabel }: { chat: ChatSummary; agentLabe
           {(chat.model ?? "default") === m.id && <span className="text-accent">●</span>}
         </MenuItem>
       ))}
+      {chat.role !== "conductor" && (
+        <>
+          <MenuSeparator />
+          <MenuItem onSelect={() => useWorkspace.setState({ handoffFor: chat.id })}>
+            <ArrowRightLeft size={13} /> Continue with another agent…
+          </MenuItem>
+        </>
+      )}
     </Menu>
   );
 }

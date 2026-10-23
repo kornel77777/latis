@@ -1,5 +1,5 @@
 import { isAbsolute, relative } from "node:path";
-import { countChanges, parseUnifiedDiff, type AgentEvent, type QuestionSpec, type ToolKind } from "@latis/shared";
+import { countChanges, parseUnifiedDiff, type AgentEvent, type QuestionSpec, type ToolKind, type UsageWindow } from "@latis/shared";
 import type { Params } from "../../rpc/peer";
 
 // Codex app-server notifications → AgentEvents (docs/adapters/codex.md).
@@ -171,6 +171,10 @@ export class CodexMapper {
   /** Maps one notification. Unknown or uninteresting notifications map to nothing. */
   notification(method: string, params: Params): AgentEvent[] {
     switch (method) {
+      case "account/rateLimits/updated": {
+        const windows = codexWindows(params.rateLimits);
+        return windows.length ? [{ type: "usage.window", windows }] : [];
+      }
       case "turn/started":
         this.turnStart = Date.now();
         this.usageAtTurnStart = this.usage;
@@ -286,4 +290,30 @@ export class CodexMapper {
     }
     return null;
   }
+}
+
+interface CodexWindow {
+  usedPercent?: number;
+  windowDurationMins?: number | null;
+  resetsAt?: number | null;
+}
+
+const minsLabel = (m: number | null | undefined, fallback: string) =>
+  !m ? fallback : m % 1440 === 0 ? `${m / 1440}d` : m % 60 === 0 ? `${m / 60}h` : `${m}m`;
+
+/** Codex's `rateLimits` (`primary`, `secondary`) as usage windows (§9.12). */
+export function codexWindows(raw: unknown): UsageWindow[] {
+  const r = (raw ?? {}) as { primary?: CodexWindow | null; secondary?: CodexWindow | null };
+  return (["primary", "secondary"] as const).flatMap((id) => {
+    const w = r[id];
+    if (!w) return [];
+    return [
+      {
+        id,
+        label: minsLabel(w.windowDurationMins, id),
+        ...(typeof w.usedPercent === "number" && { usedPct: Math.round(w.usedPercent) }),
+        ...(typeof w.resetsAt === "number" && { resetsAt: new Date(w.resetsAt * 1000).toISOString() }),
+      },
+    ];
+  });
 }

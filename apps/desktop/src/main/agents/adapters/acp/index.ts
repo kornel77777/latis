@@ -17,7 +17,7 @@ import type { AgentManifest } from "../../manifests";
 import { JsonRpcPeer, RpcError, type Params } from "../../rpc/peer";
 import { spawnTransport, type LineTransport } from "../../rpc/transport";
 import { SessionBase } from "../../session-base";
-import { shellEnv, versionOf, which } from "../../shell-env";
+import { agentEnv, versionOf, which } from "../../shell-env";
 import { AcpMapper, type SessionUpdate, type ToolCall } from "./mapper";
 
 // Any agent speaking the Agent Client Protocol, described by a manifest (SPEC §6.3–6.4, docs/adapters/acp.md).
@@ -130,7 +130,7 @@ export class AcpAdapter implements AgentAdapter {
     if (this.opts.transport) return this.opts.transport(cwd);
     const bin = await this.executable();
     if (!bin) throw new Error(`${this.displayName} isn't installed.${this.installHint ? ` Install it with: ${this.installHint}` : ""}`);
-    return spawnTransport({ file: bin, args: this.manifest.args, cwd, env: await shellEnv() });
+    return spawnTransport({ file: bin, args: this.manifest.args, cwd, env: await agentEnv(this.id) });
   }
 
   async detect(): Promise<DetectResult> {

@@ -26,7 +26,7 @@ import type {
   SessionOptions,
   UserTurn,
 } from "@latis/shared";
-import { shellEnv, versionOf, which } from "../../shell-env";
+import { agentEnv, versionOf, which } from "../../shell-env";
 import { ClaudeMapper, toolKind } from "./mapper";
 
 export type QueryFn = typeof sdkQuery;
@@ -116,7 +116,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     const input = new InputQueue();
     const q = (await this.queryFn())({
       prompt: input,
-      options: { pathToClaudeCodeExecutable: bin, env: await shellEnv(), persistSession: false },
+      options: { pathToClaudeCodeExecutable: bin, env: await agentEnv(this.id), persistSession: false },
     });
     try {
       return await fn(q);
@@ -176,7 +176,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   private async open(opts: SessionOptions, resume: string | undefined): Promise<AgentSession> {
     const bin = await this.executable();
     if (!bin) throw new Error(`Claude Code isn't installed. Install it with: ${this.installHint}`);
-    return new ClaudeSession(await this.queryFn(), bin, { ...process.env, ...(await shellEnv()), ...opts.env }, opts, resume);
+    return new ClaudeSession(await this.queryFn(), bin, { ...process.env, ...(await agentEnv(this.id)), ...opts.env }, opts, resume);
   }
 }
 

@@ -37,7 +37,11 @@ export function BrowserPanel() {
   // Native views draw above the DOM, so the page steps aside while any dialog is open.
   const covered = useWorkspace(
     (s) =>
-      s.paletteOpen || s.settingsOpen || s.reviewPanel.open || s.onboardingOpen || Boolean(s.mergeFor || s.timelineFor || s.isolateOffer),
+      s.paletteOpen ||
+      s.settingsOpen ||
+      s.reviewPanel.open ||
+      s.onboardingOpen ||
+      Boolean(s.mergeFor || s.timelineFor || s.isolateOffer || s.handoffFor),
   );
   const area = useRef<HTMLDivElement>(null);
   /** What the user is typing in the address bar; null shows the page's URL. */

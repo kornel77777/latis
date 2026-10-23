@@ -10,7 +10,9 @@ import {
   type ImageAttachment,
   type McpConnection,
   type Prefs,
+  type ScheduledMessage,
   type Skill,
+  type UsageState,
   type PtyInfo,
   type QueuedMessage,
   type ReviewItem,
@@ -108,6 +110,11 @@ interface WorkspaceState {
   connections: McpConnection[];
   /** Skills by project id ("" = no project), loaded when a composer is used (§9.14). */
   skills: Record<string, Skill[]>;
+  /** Messages waiting to be sent later (§9.10). */
+  scheduled: ScheduledMessage[];
+  usage: UsageState;
+  /** Chat whose "Continue with…" dialog is open (§9.11). */
+  handoffFor: string | null;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -124,6 +131,8 @@ interface WorkspaceState {
     isolate?: boolean;
   }): Promise<string | null>;
   focusNode(nodeId: string): void;
+  /** Puts a chat main created onto the canvas, selects it and focuses its composer. */
+  addCreatedChat(node: CanvasNode, chat: ChatSummary, frame: NodeGeometry | null, draft?: string): void;
   loadTranscript(chatId: string): Promise<void>;
   send(chatId: string, text: string, images?: ImageAttachment[]): Promise<void>;
   respond(chatId: string, requestId: string, response: RespondPayload): Promise<void>;
@@ -331,10 +340,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   settingsSection: "Agents",
   connections: [],
   skills: {},
+  scheduled: [],
+  usage: {},
+  handoffFor: null,
 
   async load() {
     try {
-      const [canvas, theme, attention, ptys, prefs, reviews, views, info] = await Promise.all([
+      const [canvas, theme, attention, ptys, prefs, reviews, views, info, scheduled, usage] = await Promise.all([
         latis.invoke("canvas:load"),
         latis.invoke("settings:getTheme"),
         latis.invoke("attention:list"),
@@ -343,6 +355,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         latis.invoke("reviews:list"),
         latis.invoke("views:get"),
         latis.invoke("app:info"),
+        latis.invoke("schedule:list"),
+        latis.invoke("usage:get"),
       ]);
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
@@ -360,6 +374,8 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         prefs,
         reviews,
         views,
+        scheduled,
+        usage,
         demoInProjects: info.demoInProjects,
         // First run: nothing on the canvas and onboarding never finished (§8.10).
         onboardingOpen: !prefs.onboarded && canvas.chats.every((c) => c.role === "conductor") && !canvas.projects.length,
@@ -458,24 +474,28 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         y: Math.round(y),
         ...(isolate && { isolate }),
       });
-      set((s) => ({
-        nodes: sortNodes([
-          ...s.nodes.map((n) => {
-            const base = { ...n, selected: false };
-            return frame && n.id === frame.id ? { ...base, width: frame.w, height: frame.h } : base;
-          }),
-          { ...toFlowNode(node), selected: true, className: "latis-appear" },
-        ]),
-        chats: { ...s.chats, [chat.id]: { summary: chat, turns: [], events: [], lastSeq: -1, loaded: true } },
-        ...(draft && { drafts: { ...s.drafts, [chat.id]: draft } }),
-        focusComposer: chat.id,
-      }));
-      get().focusNode(node.id);
+      get().addCreatedChat(node, chat, frame, draft);
       return chat.id;
     } catch (err) {
       get().toast(errorText(err));
       return null;
     }
+  },
+
+  addCreatedChat(node, chat, frame, draft) {
+    set((s) => ({
+      nodes: sortNodes([
+        ...s.nodes.map((n) => {
+          const base = { ...n, selected: false };
+          return frame && n.id === frame.id ? { ...base, width: frame.w, height: frame.h } : base;
+        }),
+        { ...toFlowNode(node), selected: true, className: "latis-appear" },
+      ]),
+      chats: { ...s.chats, [chat.id]: { summary: chat, turns: [], events: [], lastSeq: -1, loaded: true } },
+      ...(draft && { drafts: { ...s.drafts, [chat.id]: draft } }),
+      focusComposer: chat.id,
+    }));
+    get().focusNode(node.id);
   },
 
   focusNode(nodeId) {
@@ -1062,6 +1082,14 @@ export function subscribeToMain(): void {
       };
     });
     if (reveal) useWorkspace.getState().focusNode(reveal);
+  });
+  latis.on("schedule:changed", (raw) => {
+    const parsed = eventContract["schedule:changed"].safeParse(raw);
+    if (parsed.success) useWorkspace.setState({ scheduled: parsed.data });
+  });
+  latis.on("usage:changed", (raw) => {
+    const parsed = eventContract["usage:changed"].safeParse(raw);
+    if (parsed.success) useWorkspace.setState({ usage: parsed.data });
   });
   latis.on("canvas:command", (raw) => {
     const parsed = eventContract["canvas:command"].safeParse(raw);

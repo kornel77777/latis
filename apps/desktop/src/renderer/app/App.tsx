@@ -13,6 +13,7 @@ import { Announcer } from "./Announcer";
 import { Onboarding } from "./Onboarding";
 import { PerfOverlay } from "./PerfOverlay";
 import { Palette } from "../palette/Palette";
+import { HandoffDialog } from "../chat/Later";
 import { SettingsDialog } from "./Settings";
 import { Toasts } from "./Toasts";
 import { useAppearance } from "./useAppearance";
@@ -97,6 +98,7 @@ export function App() {
         <IsolateDialog />
         <MergeDialog />
         <TimelineDialog />
+        <HandoffDialog />
         <ReviewPanel />
         <Onboarding />
         <PerfOverlay />

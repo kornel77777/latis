@@ -65,6 +65,8 @@ export const chats = sqliteTable("chats", {
   spawnedBy: text("spawned_by"),
   /** MCP connections attached to this chat on top of the shared ones (§9.15). */
   connectionsJson: text("connections_json").notNull().default("[]"),
+  /** The chat this one continues (handoff, §9.11). */
+  continuedFrom: text("continued_from"),
 });
 
 export const turns = sqliteTable(
@@ -178,3 +180,19 @@ export const mcpServers = sqliteTable("mcp_servers", {
   shared: integer("shared", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
 });
+
+// Send later (§9.10). `fire_at` is when it goes out next; `repeat_ms` re-arms it after each send.
+export const scheduled = sqliteTable(
+  "scheduled",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id").notNull(),
+    text: text("text").notNull(),
+    fireAt: integer("fire_at").notNull(),
+    repeatMs: integer("repeat_ms"),
+    /** Scheduled for when the agent's usage limit resets. */
+    onReset: integer("on_reset", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("created_at").notNull(),
+  },
+  (t) => [index("scheduled_fire").on(t.fireAt)],
+);

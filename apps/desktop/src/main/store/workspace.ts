@@ -16,6 +16,7 @@ import {
   type Project,
   type ReviewDecisions,
   type ReviewItem,
+  type ScheduledMessage,
   type FileStat,
   type StoredEvent,
   type Transcript,
@@ -32,6 +33,7 @@ import {
   nodes,
   projects,
   reviews,
+  scheduled,
   settings,
   turns,
   worktrees,
@@ -231,6 +233,7 @@ export class WorkspaceStore {
     role?: "conductor" | null;
     spawnedBy?: string | null;
     workspaceTools?: boolean;
+    continuedFrom?: string | null;
   }): { node: CanvasNode; chat: ChatSummary } {
     const now = Date.now();
     const nodeId = randomUUID();
@@ -270,6 +273,7 @@ export class WorkspaceStore {
           role: input.role ?? null,
           spawnedBy: input.spawnedBy ?? null,
           workspaceTools: input.workspaceTools ?? false,
+          continuedFrom: input.continuedFrom ?? null,
         })
         .returning()
         .get();
@@ -355,6 +359,31 @@ export class WorkspaceStore {
       .orderBy(asc(projects.createdAt))
       .all();
     return rows.flatMap((r) => this.getProject(r.id) ?? []);
+  }
+
+  // ── Send later (§9.10) ─────────────────────────────────────────────────────
+
+  scheduledAll(): ScheduledMessage[] {
+    return this.db
+      .select()
+      .from(scheduled)
+      .orderBy(asc(scheduled.fireAt))
+      .all()
+      .map((r) => ({ id: r.id, chatId: r.chatId, text: r.text, fireAt: r.fireAt, repeatMs: r.repeatMs, onReset: r.onReset }));
+  }
+
+  addScheduled(input: Omit<ScheduledMessage, "id">): ScheduledMessage {
+    const row = { id: randomUUID(), ...input, createdAt: Date.now() };
+    this.db.insert(scheduled).values(row).run();
+    return { id: row.id, ...input };
+  }
+
+  rescheduled(id: string, fireAt: number): void {
+    this.db.update(scheduled).set({ fireAt }).where(eq(scheduled.id, id)).run();
+  }
+
+  removeScheduled(id: string): boolean {
+    return this.db.delete(scheduled).where(eq(scheduled.id, id)).run().changes > 0;
   }
 
   // ── MCP connections (§9.15) ────────────────────────────────────────────────
@@ -875,6 +904,7 @@ function toChatSummary(r: typeof chats.$inferSelect, projectId: string | null, w
     workspaceTools: r.workspaceTools,
     spawnedBy: r.spawnedBy,
     connections: JSON.parse(r.connectionsJson) as string[],
+    continuedFrom: r.continuedFrom,
   };
 }
 

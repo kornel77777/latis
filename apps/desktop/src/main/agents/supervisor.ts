@@ -14,6 +14,7 @@ import {
   type SessionOptions,
   type StoredEvent,
   type Turn,
+  type UsageWindow,
   type UserTurn,
 } from "@latis/shared";
 import type { EventLog } from "../store/event-log";
@@ -26,6 +27,8 @@ interface Live {
   resuming: boolean;
   /** An error item was already raised this turn, so a failed turn end doesn't add a second. */
   erroredThisTurn: boolean;
+  /** The agent reported a usage limit this turn. */
+  limitedThisTurn: boolean;
   unsubs: (() => void)[];
 }
 
@@ -39,6 +42,8 @@ export interface SupervisorSinks {
   attention(items: AttentionItem[]): void;
   /** A new item worth a notification. */
   raised(item: AttentionItem): void;
+  /** Usage windows or a limit the agent reported (§9.12). */
+  usage?(agentId: string, patch: { windows?: UsageWindow[]; limited?: { resetsAt: string | null; message: string } | null }): void;
 }
 
 /** Checkpoints around turns (§9.4); failures are logged, never block the agent. */
@@ -137,6 +142,7 @@ export class SessionSupervisor {
     const turn = this.store.createTurn(chatId, text);
     live.turnId = turn.id;
     live.erroredThisTurn = false;
+    live.limitedThisTurn = false;
     this.sinks.turn(turn);
     this.setStatus(chatId, "working");
     await this.hooks?.beforeTurn(chatId, turn.id).catch((err: unknown) => console.warn("[supervisor] checkpoint failed", err));
@@ -344,7 +350,7 @@ export class SessionSupervisor {
     const native = this.store.nativeSessionId(chatId);
     const resuming = Boolean(native && adapter.resumeSession);
     const session = resuming ? await adapter.resumeSession!(native!, opts) : await adapter.startSession(opts);
-    const live: Live = { session, turnId: null, resuming, erroredThisTurn: false, unsubs: [] };
+    const live: Live = { session, turnId: null, resuming, erroredThisTurn: false, limitedThisTurn: false, unsubs: [] };
     live.unsubs.push(
       session.onEvent((e) => this.onEvent(chatId, live, e)),
       session.onExit(({ code, signal }) => this.onCrash(chatId, live, code, signal)),
@@ -355,6 +361,18 @@ export class SessionSupervisor {
 
   private onEvent(chatId: string, live: Live, e: AgentEvent) {
     try {
+      const agentId = this.store.getChat(chatId)?.agentId;
+      // The meter isn't part of the conversation, so it doesn't go into the transcript.
+      if (e.type === "usage.window") {
+        if (agentId) this.sinks.usage?.(agentId, { windows: e.windows });
+        return;
+      }
+      if (e.type === "rate_limited") {
+        live.limitedThisTurn = true;
+        if (agentId) this.sinks.usage?.(agentId, { limited: { resetsAt: e.resetsAt ?? null, message: e.message } });
+      }
+      if (e.type === "turn.completed" && e.status === "ok" && !live.limitedThisTurn && agentId)
+        this.sinks.usage?.(agentId, { limited: null });
       if (e.type === "session.started" && e.nativeSessionId) {
         live.resuming = false;
         if (this.store.nativeSessionId(chatId) !== e.nativeSessionId) {

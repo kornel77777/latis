@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentEvent, DiffHunk, QuestionSpec, ToolKind } from "@latis/shared";
+import type { AgentEvent, DiffHunk, QuestionSpec, ToolKind, UsageWindow } from "@latis/shared";
 
 // Maps Claude Agent SDK messages onto the normalised AgentEvent schema.
 // Verified against fixtures/claude-code/*.jsonl; see docs/adapters/claude-code.md.
@@ -157,8 +157,11 @@ export class ClaudeMapper {
 
       case "rate_limit_event": {
         const info = m.rate_limit_info;
-        if (info.status !== "rejected") return [];
+        const windows = claudeWindows(info);
+        const meter: AgentEvent[] = windows.length ? [{ type: "usage.window", windows }] : [];
+        if (info.status !== "rejected") return meter;
         return [
+          ...meter,
           {
             type: "rate_limited",
             ...(info.resetsAt !== undefined && { resetsAt: new Date(info.resetsAt * 1000).toISOString() }),
@@ -244,4 +247,22 @@ function summarise(content: unknown): string {
       .join("\n");
   else text = "";
   return text.length > 4000 ? `${text.slice(0, 4000)}\n…(${text.length - 4000} more characters)` : text;
+}
+
+const WINDOW_LABELS: Record<string, string> = {
+  five_hour: "5h",
+  seven_day: "7d",
+  seven_day_opus: "7d Opus",
+  seven_day_sonnet: "7d Sonnet",
+};
+
+/** Claude's `unifiedWindows` (utilisation 0–1, resetsAt in seconds) as usage windows (§9.12). */
+export function claudeWindows(info: unknown): UsageWindow[] {
+  const raw = (info as { unifiedWindows?: Record<string, { utilization?: number; resetsAt?: number }> }).unifiedWindows ?? {};
+  return Object.entries(raw).map(([id, w]) => ({
+    id,
+    label: WINDOW_LABELS[id] ?? id.replaceAll("_", " "),
+    ...(typeof w.utilization === "number" && { usedPct: Math.round(w.utilization * 100) }),
+    ...(typeof w.resetsAt === "number" && { resetsAt: new Date(w.resetsAt * 1000).toISOString() }),
+  }));
 }

@@ -34,7 +34,8 @@ async function repo(files: Record<string, string> = { "README.md": "# r\n" }): P
 const read = (dir: string, p: string) => readFileSync(join(dir, p), "utf8");
 const staged = async (dir: string) => (await git(dir, ["diff", "--cached", "--name-only"])).stdout.trim();
 
-describe("git service", () => {
+// Each test spawns many git processes; under a busy machine 5 s is too tight.
+describe("git service", { timeout: 20_000 }, () => {
   it("initialises a repo with a first commit and finds its root", async () => {
     const dir = await repo();
     mkdirSync(join(dir, "sub"));

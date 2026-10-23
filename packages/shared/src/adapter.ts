@@ -1,4 +1,4 @@
-import type { AgentEvent } from "./agent-events";
+import type { AgentEvent, UsageWindow } from "./agent-events";
 
 // Agent adapter layer (SPEC §6.1). All agents look identical to the rest of the app.
 
@@ -78,11 +78,7 @@ export interface LoginHandle {
   done: Promise<AuthStatus>;
 }
 
-export interface UsageSnapshot {
-  window: string;
-  usedPct?: number;
-  resetsAt?: string;
-}
+export type UsageSnapshot = UsageWindow[];
 
 export interface UserTurn {
   text: string;

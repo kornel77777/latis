@@ -2,7 +2,9 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { NodeResizer, type NodeProps } from "@xyflow/react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import {
+  AlarmClock,
   AlertTriangle,
+  ArrowRightLeft,
   Check,
   CornerDownRight,
   Network,
@@ -32,6 +34,7 @@ import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { ChatCondensed, ChatTile } from "./ChatCompact";
 import { Item, type ItemActions } from "./items";
 import { ModelPicker, PermissionPicker, ReasoningPicker } from "./pickers";
+import { LimitBanner, ScheduledList, SendLaterDialog } from "./Later";
 import { SkillSuggestions, useSkillSuggestions } from "./SkillSuggestions";
 import { TerminalChatBody } from "./TerminalChatBody";
 
@@ -80,6 +83,11 @@ export const FullChat = memo(function FullChat({
   const list = useRef<VirtuosoHandle>(null);
   const connections = useWorkspace((st) => st.connections);
   const suggest = useSkillSuggestions(draft, chat?.summary.projectId ?? null);
+  const [later, setLater] = useState(false);
+  const continuedFrom = useWorkspace((st) => {
+    const id = st.chats[chatId]?.summary.continuedFrom;
+    return id ? (st.chats[id]?.summary.title ?? "a deleted chat") : null;
+  });
 
   const actions = useMemo<ItemActions>(
     () => ({
@@ -328,6 +336,15 @@ export const FullChat = memo(function FullChat({
           </div>
         </header>
 
+        {s.continuedFrom && (
+          <button
+            className="nodrag flex shrink-0 items-center gap-1.5 border-b border-line bg-bg-1 px-3 py-1 text-left text-[11.5px] text-text-3 hover:text-text-1"
+            onClick={() => useWorkspace.getState().focusChat(s.continuedFrom!)}
+            data-testid="continued-from"
+          >
+            <ArrowRightLeft size={11} /> Continued from {continuedFrom}
+          </button>
+        )}
         {terminalAgent ? (
           <TerminalChatBody chatId={chatId} />
         ) : (
@@ -403,6 +420,8 @@ export const FullChat = memo(function FullChat({
             </div>
 
             <footer className="nodrag shrink-0 border-t border-line p-2">
+              <LimitBanner chatId={chatId} />
+              <ScheduledList chatId={chatId} />
               {queue && queue.length > 0 && <QueueList chatId={chatId} queue={queue} />}
               <SkillSuggestions matches={suggest.matches} index={suggest.index} onPick={(sk) => setDraft(suggest.pick(sk))} />
               <div className="rounded-control border border-line bg-bg-1 focus-within:border-line-strong">
@@ -475,10 +494,27 @@ export const FullChat = memo(function FullChat({
                       <Square size={12} />
                     </Button>
                   )}
+                  {draft.trim() && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Send later"
+                      title="Send later"
+                      onClick={() => setLater(true)}
+                      data-testid="send-later"
+                    >
+                      <AlarmClock size={13} />
+                    </Button>
+                  )}
                   {(!working || draft.trim()) && (
                     <Button
                       size="icon"
                       variant="primary"
+                      onContextMenu={(e) => {
+                        // Right-click Send → Send later (§9.10 AC1).
+                        e.preventDefault();
+                        if (draft.trim()) setLater(true);
+                      }}
                       aria-label={working ? (agent?.steering ? "Steer" : "Queue") : "Send"}
                       onClick={submit}
                       disabled={!draft.trim()}
@@ -490,6 +526,17 @@ export const FullChat = memo(function FullChat({
                 </div>
               </div>
             </footer>
+            {later && (
+              <SendLaterDialog
+                chatId={chatId}
+                text={draft.trim()}
+                open={later}
+                onClose={(sent) => {
+                  setLater(false);
+                  if (sent) setDraft("");
+                }}
+              />
+            )}
           </>
         )}
       </article>
