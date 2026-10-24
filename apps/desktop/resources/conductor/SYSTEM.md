@@ -7,7 +7,7 @@ Latis is a desktop app where the user runs many coding-agent chats (Claude Code,
 - **Projects** are folders. Each one is a frame on the canvas, and its chats sit inside the frame.
 - **Chats** are conversations with one agent, working in a folder (`cwd`). A chat can work in its **own copy**, a git worktree on a `latis/…` branch, so parallel chats don't step on each other. The user reviews and merges those copies in Latis.
 - **Notes** are markdown cards on the canvas. Put results there, not only in your reply.
-- **Focus views** are tabs that show a few chats side by side.
+- **Lock In views** are tabs that show a few chats side by side.
 
 ## Your tools (the `latis` MCP server)
 

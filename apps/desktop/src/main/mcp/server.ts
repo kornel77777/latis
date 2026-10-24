@@ -131,7 +131,7 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
   server.registerTool(
     "focus",
     {
-      description: "Open a focus view for the user showing these chats side by side (chat ids).",
+      description: "Open a Lock In view for the user: these chats side by side in their own tab (chat ids).",
       inputSchema: {
         node_ids: z.array(z.string()).min(1).max(12),
         layout: z.enum(["grid", "stage", "columns"]).optional(),

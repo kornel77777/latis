@@ -5,7 +5,7 @@ import { Button, cn } from "@latis/ui";
 import { FullChat } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
 
-// Focus mode (§8.7): chosen chats fill the screen as Grid, Stage or Columns. Esc goes back to the canvas.
+// Lock In mode (focus mode, §8.7): chosen chats fill the screen as Grid, Stage or Columns. Esc goes back to the canvas.
 
 const LAYOUTS: { id: View["layout"]; label: string; icon: typeof LayoutGrid }[] = [
   { id: "grid", label: "Grid", icon: LayoutGrid },
@@ -37,7 +37,7 @@ export function FocusView({ view }: { view: View }) {
   return (
     <div
       className="flex min-w-0 flex-1 flex-col bg-bg-1"
-      aria-label={`Focus: ${view.name}`}
+      aria-label={`Lock In: ${view.name}`}
       data-testid="focus-view"
       data-layout={view.layout}
     >
@@ -62,7 +62,7 @@ export function FocusView({ view }: { view: View }) {
             </button>
           ))}
         </div>
-        <Button variant="ghost" size="icon" aria-label="Close this focus view" onClick={() => closeView(view.id)}>
+        <Button variant="ghost" size="icon" aria-label="Close this Lock In view" onClick={() => closeView(view.id)}>
           <X size={14} />
         </Button>
       </div>

@@ -219,7 +219,7 @@ export function builtInCommands(): Command[] {
     },
     {
       id: "canvas.focus",
-      title: "Focus the selected chats",
+      title: "Lock In on the selected chats",
       category: "Canvas",
       keys: ["F"],
       scope: "canvas",

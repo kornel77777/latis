@@ -377,3 +377,7 @@ A second layout next to the canvas (`prefs.layoutMode`): every chat tiled in a t
 - **Sidebar:** Workspace (Canvas, Lattice, focus views), loose chats (the Conductor and demo chats now appear), collapsible projects. The Files tab is now a filterable file list.
 - **Design:** influenced by the reference screenshots (tinted cards, floating toolbar, section pills) but keeps Latis's own identity: the teal accent, the lattice motif and its own layout.
 - **Bug found:** the tint CSS first used a non-existent `--line` token, which made borders fall back to the text colour. The card bridge had the same mistake. Both use `--border` now.
+
+### 2026-10-23: Focus mode is called "Lock In"
+
+At the user's request, the focus views of §8.7 are called **Lock In** everywhere a person or agent reads it: the title-bar button and tabs, the command ("Lock In on the selected chats", F), the view's labels, the `focus` tool's description and the Conductor's prompt. The code keeps its `FocusView`/`focus` names. "Focus" still means keyboard focus where that's the sense (the focused pane in the lattice).
