@@ -349,6 +349,7 @@ An extra account is a folder under `<dataDir>/accounts/<agent>/<id>`. While it's
 ### 2026-10-23: Commands and rebindable shortcuts
 
 Every keyboard action is a command in one registry (`renderer/commands`): an id, a title, a category, default chords, a scope (anywhere, canvas or lattice) and an optional condition. One dispatcher runs them; the old per-component key handlers are gone.
+
 - **Chord notation:** written like `Mod+Shift+R`. `Mod` is ⌘ on macOS and Ctrl elsewhere. Letters and digits are read from `event.code`, so Shift and keyboard layouts don't change them.
 - **Where chords fire:** plain-key chords (N, F, Delete…) never fire while typing or when a button or menu item has focus. Canvas and lattice commands only run in their view, with no dialog or menu open.
 - **Ctrl on macOS:** an unclaimed Ctrl chord also triggers the ⌘ one, as before (Ctrl+` opens the dock).
@@ -358,6 +359,7 @@ Every keyboard action is a command in one registry (`renderer/commands`): an id,
 ### 2026-10-23: The lattice
 
 A second layout next to the canvas (`prefs.layoutMode`): every chat tiled in a tree of row and column splits, saved as `settings.lattice`.
+
 - **New chats** split the largest pane along its longer side, so the tiling balances itself.
 - **Rearranging:**
   - Drag a pane by its grip onto another pane's outer quarter to split there, or its centre to swap.
