@@ -123,31 +123,30 @@ test("commands: every shortcut is listed, can be re-bound by pressing keys, warn
   await app.close();
 });
 
-test("canvas: the mouse wheel zooms by default, and pans when set to", async () => {
+test("canvas: two-finger scroll / the wheel pans by default, and zooms when set to", async () => {
   const { app, page } = await launch(tempDataDir());
   await demoChats(page, 1);
   const badge = page.getByTestId("zoom-badge");
-  const pane = page.locator(".react-flow__pane");
-  const box = (await pane.boundingBox())!;
+  const box = (await page.locator(".react-flow__pane").boundingBox())!;
+  const vp = () => page.locator(".react-flow__viewport").getAttribute("style");
+  await page.mouse.move(box.x + 60, box.y + box.height - 60);
+  const zoom = await badge.textContent();
+  const at = await vp();
+  await page.mouse.wheel(0, 300);
+  await expect.poll(vp).not.toBe(at);
+  await expect(badge).toHaveText(zoom!);
+
+  // Appearance → Scroll wheel → Zoom.
+  await page.evaluate(async () => {
+    const api = (globalThis as unknown as Api).latis;
+    const p = await api.invoke("prefs:get");
+    await api.invoke("prefs:set", { appearance: { ...p.appearance, wheel: "zoom" } });
+  });
+  await page.reload();
+  await page.waitForSelector("[aria-label='Canvas']");
   await page.mouse.move(box.x + 60, box.y + box.height - 60);
   const before = await badge.textContent();
   await page.mouse.wheel(0, -400);
   await expect(badge).not.toHaveText(before!);
-
-  // Appearance → Scroll wheel → Pan: the wheel moves the canvas and leaves the zoom alone.
-  await page.evaluate(async () => {
-    const api = (globalThis as unknown as Api).latis;
-    const p = await api.invoke("prefs:get");
-    await api.invoke("prefs:set", { appearance: { ...p.appearance, wheel: "pan" } });
-  });
-  await page.reload();
-  await page.waitForSelector("[aria-label='Canvas']");
-  const vp = () => page.locator(".react-flow__viewport").getAttribute("style");
-  const at = await vp();
-  const zoomed = await badge.textContent();
-  await page.mouse.move(box.x + 60, box.y + box.height - 60);
-  await page.mouse.wheel(0, 300);
-  await expect.poll(vp).not.toBe(at);
-  await expect(badge).toHaveText(zoomed!);
   await app.close();
 });

@@ -257,13 +257,13 @@ function AppearanceSection() {
           className="accent-[var(--accent)]"
         />
       </Row>
-      <Row label="Scroll wheel" hint="On the canvas. ⌘/Ctrl + wheel always zooms; inside a chat the wheel scrolls it.">
+      <Row label="Scroll wheel" hint="On the canvas: two-finger scroll or the wheel. Pinch and ⌘/Ctrl + wheel always zoom.">
         <Segmented
           label="Scroll wheel"
           value={a.wheel}
           options={[
-            { id: "zoom", label: "Zoom" },
             { id: "pan", label: "Pan" },
+            { id: "zoom", label: "Zoom" },
           ]}
           onChange={(wheel) => set({ wheel })}
         />

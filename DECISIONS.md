@@ -381,3 +381,7 @@ A second layout next to the canvas (`prefs.layoutMode`): every chat tiled in a t
 ### 2026-10-23: Focus mode is called "Lock In"
 
 At the user's request, the focus views of §8.7 are called **Lock In** everywhere a person or agent reads it: the title-bar button and tabs, the command ("Lock In on the selected chats", F), the view's labels, the `focus` tool's description and the Conductor's prompt. The code keeps its `FocusView`/`focus` names. "Focus" still means keyboard focus where that's the sense (the focused pane in the lattice).
+
+### 2026-10-23: Two-finger scroll pans the canvas
+
+The wheel zoomed the canvas for one version. Trackpads send two-finger scroll as wheel events, which made moving around hard, so panning is the default again. Pinch and ⌘/Ctrl + wheel zoom. Appearance → Scroll wheel → Zoom keeps the other behaviour for mouse users who want it.
