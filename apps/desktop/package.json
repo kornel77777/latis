@@ -9,7 +9,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder --dir",
+    "package": "electron-vite build && electron-builder --dir --config electron-builder.config.cjs",
+    "dist": "electron-vite build && electron-builder --config electron-builder.config.cjs --publish never",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "e2e": "electron-vite build && playwright test",
     "postinstall": "electron-builder install-app-deps"

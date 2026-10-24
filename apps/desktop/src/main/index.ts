@@ -35,6 +35,7 @@ import { Connections } from "./mcp/connections";
 import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer } from "./mcp/server";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
+import { openLink } from "./security/links";
 import { CARD_SIZE, Cards } from "./cards/cards";
 import { gateCard, starters } from "./cards/library";
 import { FlowEngine, nextRun } from "./flows/engine";
@@ -1171,12 +1172,19 @@ function createWindow() {
   });
   win.once("ready-to-show", () => win?.show());
   win.webContents.on("did-finish-load", applyUiScale);
+  const links = {
+    openExternal: (url: string) => shell.openExternal(url),
+    confirm: (message: string, detail: string) => confirmDialog(message, detail, "Open"),
+  };
+  // §13: Latis's own window never navigates or opens windows; links go out through openLink.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^(https?:|mailto:)/.test(url)) void shell.openExternal(url);
+    void openLink(url, links);
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (e, url) => {
-    if (url !== win?.webContents.getURL()) e.preventDefault();
+    if (url === win?.webContents.getURL()) return;
+    e.preventDefault();
+    void openLink(url, links);
   });
   win.on("closed", () => (win = null));
 
