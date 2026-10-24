@@ -391,6 +391,8 @@ export const Appearance = z.object({
   reduceMotion: z.boolean(),
   /** Chats take a wash of their agent's colour. */
   tintChats: z.boolean(),
+  /** What the mouse wheel does on the canvas. */
+  wheel: z.enum(["zoom", "pan"]),
 });
 export type Appearance = z.infer<typeof Appearance>;
 

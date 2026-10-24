@@ -187,6 +187,9 @@ test("S1 with the keyboard only: two agents in their own copies, reviewed and me
   const palette = async (query: string) => {
     await kb.press("ControlOrMeta+k");
     await kb.type(query);
+    // Search results arrive after a short debounce and can reorder the list; let it settle first.
+    await expect(page.getByTestId("palette").locator("input")).toHaveValue(query);
+    await page.waitForTimeout(250);
     await kb.press("Enter");
   };
   const cards = page.getByTestId("chat-card");

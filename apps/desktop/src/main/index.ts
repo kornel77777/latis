@@ -97,6 +97,7 @@ const DEFAULT_APPEARANCE: Appearance = {
   cardStyle: "solid",
   cardOpacity: 0.85,
   tintChats: true,
+  wheel: "zoom",
   grid: "dots",
   wallpaper: null,
   reduceMotion: false,

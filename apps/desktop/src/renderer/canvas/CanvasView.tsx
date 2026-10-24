@@ -65,6 +65,7 @@ export function CanvasView() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const container = useRef<HTMLDivElement>(null);
   const grid = useWorkspace((s) => s.prefs?.appearance.grid ?? "dots");
+  const wheel = useWorkspace((s) => s.prefs?.appearance.wheel ?? "zoom");
   const wallpaper = useWorkspace((s) => s.prefs?.appearance.wallpaper ?? null);
   const nodeCount = nodes.length;
   const flowEdges = useWorkspace((s) => s.flowEdges);
@@ -145,7 +146,9 @@ export function CanvasView() {
         maxZoom={4}
         // §8.3 virtualisation: only nodes in the viewport mount; agents keep running in main.
         onlyRenderVisibleElements
-        panOnScroll
+        // The wheel zooms (default) or pans (Appearance → Scroll wheel); ⌘/Ctrl + wheel always zooms.
+        panOnScroll={wheel === "pan"}
+        zoomOnScroll={wheel === "zoom"}
         selectionOnDrag
         panOnDrag={[1]}
         panActivationKeyCode="Space"
