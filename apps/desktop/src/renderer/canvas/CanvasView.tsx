@@ -6,7 +6,6 @@ import {
   MiniMap,
   ReactFlow,
   useReactFlow,
-  useViewport,
   type Connection,
   type Edge,
   type EdgeTypes,
@@ -21,11 +20,21 @@ import { useWorkspace } from "../stores/workspace";
 import { Checklist } from "../app/Checklist";
 import { NoteNode } from "./NoteNode";
 import { CardNode } from "./CardNode";
+import { LabelNode } from "./LabelNode";
+import { CanvasToolbar } from "./CanvasToolbar";
 import { FlowEdgeView, FlowFrame, StartNode } from "./flows";
 import { ProjectFrame } from "./ProjectFrame";
 import { useCanvasActions } from "./useCanvasActions";
 
-const nodeTypes: NodeTypes = { chat: ChatNode, frame: ProjectFrame, note: NoteNode, card: CardNode, flow: FlowFrame, start: StartNode };
+const nodeTypes: NodeTypes = {
+  chat: ChatNode,
+  frame: ProjectFrame,
+  note: NoteNode,
+  card: CardNode,
+  flow: FlowFrame,
+  start: StartNode,
+  label: LabelNode,
+};
 const edgeTypes: EdgeTypes = { flow: FlowEdgeView };
 
 let visibleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -161,7 +170,7 @@ export function CanvasView() {
           />
         )}
         <MiniMap pannable zoomable position="bottom-right" nodeBorderRadius={6} />
-        <ZoomBadge />
+        <CanvasToolbar />
       </ReactFlow>
 
       <Checklist />
@@ -258,20 +267,5 @@ export function CanvasView() {
         </div>
       )}
     </div>
-  );
-}
-
-function ZoomBadge() {
-  const { zoom } = useViewport();
-  const flow = useReactFlow();
-  return (
-    <button
-      onClick={() => void flow.zoomTo(1, { duration: 200 })}
-      className="absolute bottom-[172px] right-[15px] z-10 rounded-control border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-text-2 hover:text-text-1"
-      aria-label="Reset zoom to 100%"
-      data-testid="zoom-badge"
-    >
-      {Math.round(zoom * 100)}%
-    </button>
   );
 }

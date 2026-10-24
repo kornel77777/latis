@@ -30,7 +30,7 @@ select {
   font: inherit;
   color: inherit;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 4px 8px;
 }

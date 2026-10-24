@@ -20,7 +20,7 @@ const TOKENS: Record<string, string> = {
   "text-2": "--text-2",
   muted: "--text-3",
   accent: "--accent",
-  line: "--line",
+  line: "--border",
 };
 
 /** The current theme as the card bridge shares it (§12.2 `theme`). */

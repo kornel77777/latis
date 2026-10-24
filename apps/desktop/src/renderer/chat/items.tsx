@@ -42,7 +42,10 @@ export function Item({ item, actions }: { item: TranscriptItem; actions: ItemAct
   switch (item.kind) {
     case "user":
       return (
-        <div className="ml-10 whitespace-pre-wrap rounded-card bg-surface-2 px-3 py-2 text-text-1" data-testid="user-message">
+        <div
+          className="latis-bubble ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-[14px] rounded-br-[5px] bg-surface-2 px-3 py-2 text-text-1"
+          data-testid="user-message"
+        >
           {item.text}
         </div>
       );

@@ -6,7 +6,7 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 .item {
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px;
   display: flex;
@@ -30,7 +30,7 @@ textarea {
   font: inherit;
   color: inherit;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px;
 }

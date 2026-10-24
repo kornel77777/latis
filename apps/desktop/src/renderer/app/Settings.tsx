@@ -248,6 +248,15 @@ function AppearanceSection() {
           onChange={(cardStyle) => set({ cardStyle })}
         />
       </Row>
+      <Row label="Tint chats by agent" hint="Each chat takes a wash of its agent's colour.">
+        <input
+          type="checkbox"
+          checked={a.tintChats}
+          onChange={(e) => set({ tintChats: e.target.checked })}
+          aria-label="Tint chats by agent"
+          className="accent-[var(--accent)]"
+        />
+      </Row>
       <Row label="Canvas grid">
         <Segmented
           label="Canvas grid"

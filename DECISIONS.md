@@ -345,3 +345,33 @@ An extra account is a folder under `<dataDir>/accounts/<agent>/<id>`. While it's
 - **Building flows:** the builder lays nodes out by longest path from the Start node (cycles fall back to spec order). A spec can set `cwd` and `permissionMode`; without `cwd` the chats work in `<dataDir>/flows/<id>/`. `agent: "auto"` spreads chats across ready agents in the order Claude Code, Codex, Gemini.
 - **Added beyond the spec:** a `start_flow` tool, so the Conductor can run what it builds. `LATIS_FLOW_AGENT=<id>` makes every flow chat use one agent (tests).
 - **Not done:** flow chats raise "finished" Inbox items like any chat, which is noisy for big flows.
+
+### 2026-10-23: Commands and rebindable shortcuts
+
+Every keyboard action is a command in one registry (`renderer/commands`): an id, a title, a category, default chords, a scope (anywhere, canvas or lattice) and an optional condition. One dispatcher runs them; the old per-component key handlers are gone.
+- **Chord notation:** written like `Mod+Shift+R`. `Mod` is ⌘ on macOS and Ctrl elsewhere. Letters and digits are read from `event.code`, so Shift and keyboard layouts don't change them.
+- **Where chords fire:** plain-key chords (N, F, Delete…) never fire while typing or when a button or menu item has focus. Canvas and lattice commands only run in their view, with no dialog or menu open.
+- **Ctrl on macOS:** an unclaimed Ctrl chord also triggers the ⌘ one, as before (Ctrl+` opens the dock).
+- **Your changes:** overrides live in `prefs.keybindings`. Settings → Commands lists every command and lets you search it, add a shortcut by pressing keys, remove one, reset one or all, and see conflicts. Conflicts are chords shared in the same scope, or with an anywhere command.
+- **⌘K** lists the same commands with their current shortcuts.
+
+### 2026-10-23: The lattice
+
+A second layout next to the canvas (`prefs.layoutMode`): every chat tiled in a tree of row and column splits, saved as `settings.lattice`.
+- **New chats** split the largest pane along its longer side, so the tiling balances itself.
+- **Rearranging:**
+  - Drag a pane by its grip onto another pane's outer quarter to split there, or its centre to swap.
+  - Drag a gutter to resize, with a minimum share of 8%; double-click it to even out.
+  - Presets (grid shaped to the window, columns, rows, main + stack) keep the panes in on-screen reading order.
+- **Keyboard:** focus and move are geometric (nearest pane in that direction). The focused pane is the selected chat, so chat commands act on it.
+- **Taking a chat out** only hides it from the lattice; it stays on the canvas.
+- **Why a grip:** narrow panes' headers are mostly buttons, so each pane has a dedicated drag grip.
+
+### 2026-10-23: Visual pass
+
+- Chats take a wash of their agent's colour (`--tint`): on the top of the card, the border, the header and your message bubbles. It can be turned off (Appearance → Tint chats by agent).
+- Your messages are right-aligned bubbles.
+- The canvas has a floating toolbar (fit, zoom, tidy, label, note, card, flow, undo/redo) and section labels (a `label` node type).
+- **Sidebar:** Workspace (Canvas, Lattice, focus views), loose chats (the Conductor and demo chats now appear), collapsible projects. The Files tab is now a filterable file list.
+- **Design:** influenced by the reference screenshots (tinted cards, floating toolbar, section pills) but keeps Latis's own identity: the teal accent, the lattice motif and its own layout.
+- **Bug found:** the tint CSS first used a non-existent `--line` token, which made borders fall back to the text colour. The card bridge had the same mistake. Both use `--border` now.

@@ -10,7 +10,7 @@ export type Theme = z.infer<typeof Theme>;
 export const Viewport = z.object({ x: z.number(), y: z.number(), zoom: z.number().min(0.1).max(4) });
 export type Viewport = z.infer<typeof Viewport>;
 
-export const NodeType = z.enum(["chat", "terminal", "browser", "card", "note", "frame", "image", "flow", "start"]);
+export const NodeType = z.enum(["chat", "terminal", "browser", "card", "note", "frame", "image", "flow", "start", "label"]);
 
 export const CanvasNode = z.object({
   id: z.string(),
@@ -389,6 +389,8 @@ export const Appearance = z.object({
   /** An image as a data: URL, or null. */
   wallpaper: z.string().max(12_000_000).nullable(),
   reduceMotion: z.boolean(),
+  /** Chats take a wash of their agent's colour. */
+  tintChats: z.boolean(),
 });
 export type Appearance = z.infer<typeof Appearance>;
 
@@ -659,6 +661,8 @@ export const invokeContract = {
     req: z.object({ canvasId: z.string(), x: z.number(), y: z.number(), text: z.string().optional() }),
     res: CanvasNode,
   },
+  /** A section label on the canvas ("Agents", "Website"…). Its text is changed with note:update. */
+  "label:create": { req: z.object({ canvasId: z.string(), x: z.number(), y: z.number(), text: z.string().max(80) }), res: CanvasNode },
   "note:update": { req: z.object({ nodeId: z.string(), text: z.string().max(1_000_000) }), res: ok },
   /** Saves a note as a .md file the user picks. */
   "note:export": { req: z.object({ nodeId: z.string() }), res: ok },

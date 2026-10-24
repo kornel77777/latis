@@ -96,6 +96,7 @@ const DEFAULT_APPEARANCE: Appearance = {
   chatTextSize: 14,
   cardStyle: "solid",
   cardOpacity: 0.85,
+  tintChats: true,
   grid: "dots",
   wallpaper: null,
   reduceMotion: false,
@@ -777,6 +778,8 @@ registerHandlers({
   },
   "note:create": ({ canvasId: id, x, y, text }) =>
     store.createNote({ canvasId: id, projectId: null, parentId: null, x, y, ...(text !== undefined && { text }) }),
+  "label:create": ({ canvasId: id, x, y, text }) =>
+    store.createNode({ canvasId: id, parentId: null, type: "label", x, y, w: 260, h: 64, data: { text } }),
   "note:update": ({ nodeId, text }) => {
     store.updateNodeData(nodeId, { text });
     return { ok: true };

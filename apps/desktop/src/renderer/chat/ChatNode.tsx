@@ -103,6 +103,7 @@ export const FullChat = memo(function FullChat({
   const [editingTitle, setEditingTitle] = useState(false);
   const list = useRef<VirtuosoHandle>(null);
   const connections = useWorkspace((st) => st.connections);
+  const tinted = useWorkspace((st) => st.prefs?.appearance.tintChats ?? true);
   const suggest = useSkillSuggestions(draft, chat?.summary.projectId ?? null);
   const [later, setLater] = useState(false);
   const continuedFrom = useWorkspace((st) => {
@@ -177,11 +178,12 @@ export const FullChat = memo(function FullChat({
         data-agent={s.agentId}
         data-completed-turns={items.filter((i) => i.kind === "turn-end").length}
         className={cn(
-          "flex h-full w-full flex-col overflow-hidden rounded-card border bg-surface transition-shadow duration-fast",
+          "latis-chat flex h-full w-full flex-col overflow-hidden rounded-card border bg-surface transition-shadow duration-fast",
           selected ? "border-line-strong shadow-lift" : "border-line",
           s.status === "needs-you" && "ring-1 ring-state-needs-you/50",
         )}
-        style={{ borderTop: `2px solid var(--hue-${hue})` }}
+        data-tinted={tinted || undefined}
+        style={{ "--tint": `var(--hue-${hue})` } as React.CSSProperties}
       >
         <header
           className="latis-drag flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3 active:cursor-grabbing"

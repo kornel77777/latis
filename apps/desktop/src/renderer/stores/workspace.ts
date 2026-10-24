@@ -200,6 +200,8 @@ interface WorkspaceState {
   closeReview(): void;
   updateReview(item: ReviewItem): void;
   createNote(at: { x: number; y: number }, text?: string): Promise<void>;
+  /** A section label at a canvas point (§ canvas labels). */
+  createLabel(at: { x: number; y: number }): Promise<void>;
   updateNote(nodeId: string, text: string): void;
   /** Soft delete with undo (§7.2). */
   deleteNodes(nodeIds: string[]): Promise<void>;
@@ -864,6 +866,19 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
             .then(() => undefined),
         redo: () => get().restoreNodes([node.id]),
       });
+    } catch (err) {
+      get().toast(errorText(err));
+    }
+  },
+  async createLabel(at) {
+    try {
+      const node = await latis.invoke("label:create", {
+        canvasId: get().canvasId,
+        x: Math.round(at.x - 130),
+        y: Math.round(at.y - 32),
+        text: "",
+      });
+      get().addNode(node);
     } catch (err) {
       get().toast(errorText(err));
     }

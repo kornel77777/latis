@@ -6,6 +6,7 @@ import {
   Moon,
   Plus,
   RefreshCw,
+  ScanSearch,
   Search,
   Settings,
   SlidersHorizontal,
@@ -103,8 +104,14 @@ export function TitleBar() {
               </button>
             </div>
           ))}
-          <Button variant="ghost" size="icon" aria-label="Focus the selected chats (F)" onClick={() => focusSelection()}>
-            <Plus size={14} />
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Focus the selected chats (F)"
+            title="Open the selected chats side by side in a focus tab (F)"
+            onClick={() => focusSelection()}
+          >
+            <ScanSearch size={13} /> Focus
           </Button>
         </nav>
       )}

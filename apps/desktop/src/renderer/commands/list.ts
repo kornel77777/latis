@@ -119,6 +119,14 @@ export function builtInCommands(): Command[] {
       scope: "canvas",
       run: () => void ws().createNote({ x: centre().x - 170, y: centre().y - 130 }),
     },
+    {
+      id: "label.new",
+      title: "New section label",
+      category: "Create",
+      keys: ["L"],
+      scope: "canvas",
+      run: () => void ws().createLabel(centre()),
+    },
     { id: "card.new", title: "New card…", category: "Create", run: () => useWorkspace.setState({ cardLibraryAt: centre() }) },
     { id: "flow.new", title: "New flow…", category: "Create", run: () => useWorkspace.setState({ flowTemplatesAt: centre() }) },
     {
