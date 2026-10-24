@@ -32,7 +32,8 @@ export async function launch(dataDir: string, extraEnv: Record<string, string> =
   page.on("console", (m) => {
     if (m.type() === "error") console.log("[renderer]", m.text());
   });
-  await page.waitForSelector("[aria-label='Canvas']");
+  // The canvas, or the lattice when that's the saved layout.
+  await page.waitForSelector("[aria-label='Canvas'], [data-testid='lattice']");
   return { app, page };
 }
 

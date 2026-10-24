@@ -9,6 +9,7 @@ import type {
   AttentionItem,
   ChatSummary,
   FocusView,
+  LatticeState,
   McpServerConfig,
   PermissionMode,
   Prefs,
@@ -107,6 +108,8 @@ const DEFAULT_PREFS: Prefs = {
   // Tests skip the tour, and with it the checklist.
   checklist: process.env.LATIS_SKIP_ONBOARDING === "1" ? null : [],
   maxSpawned: 6,
+  keybindings: {},
+  layoutMode: "canvas",
 };
 function prefs(): Prefs {
   const saved = store.getSetting<Partial<Prefs>>("prefs") ?? {};
@@ -840,6 +843,11 @@ registerHandlers({
     const target = resolve(p.folderPath, path);
     if (!target.startsWith(p.folderPath + sep)) return { ok: false };
     return { ok: (await shell.openPath(target)) === "" };
+  },
+  "lattice:get": () => store.getSetting<LatticeState>("lattice") ?? { root: null, projectId: null, hidden: [] },
+  "lattice:set": (state) => {
+    store.setSetting("lattice", state);
+    return { ok: true };
   },
   "views:get": () => store.getSetting<FocusView[]>("focusViews") ?? [],
   "views:set": (views) => {

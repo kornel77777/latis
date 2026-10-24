@@ -1,4 +1,21 @@
-import { FolderOpen, Moon, Plus, RefreshCw, Search, Settings, SlidersHorizontal, Sparkles, Sun, SunMoon, X } from "lucide-react";
+import {
+  FolderOpen,
+  Grid2x2,
+  Keyboard,
+  LayoutDashboard,
+  Moon,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  SlidersHorizontal,
+  Sparkles,
+  Sun,
+  SunMoon,
+  X,
+} from "lucide-react";
+import { display } from "../commands/keys";
+import { allCommands, bindingsOf, runCommand } from "../commands/registry";
 import { Button, Menu, MenuItem, MenuSeparator, cn } from "@latis/ui";
 import type { Theme } from "@latis/shared";
 import { AgentMenuItems } from "../canvas/AgentMenuItems";
@@ -13,6 +30,13 @@ export function TitleBar() {
   const zen = useWorkspace((s) => s.zen);
   const views = useWorkspace((s) => s.views);
   const activeView = useWorkspace((s) => s.activeView);
+  const mode = useWorkspace((s) => s.prefs?.layoutMode ?? "canvas");
+  const bindings = useWorkspace((s) => s.prefs?.keybindings);
+  const shortcutOf = (id: string) => {
+    const c = allCommands().find((x) => x.id === id);
+    const k = c && bindingsOf(c, bindings)[0];
+    return k ? display(k) : "";
+  };
   const { openView, closeView, focusSelection } = useWorkspace.getState();
   const isMac = window.latis.platform === "darwin";
   const themes: { id: Theme; label: string; icon: typeof Sun }[] = [
@@ -29,17 +53,33 @@ export function TitleBar() {
       <span className="text-[13px] font-semibold tracking-wide text-text-1">Latis</span>
       {!zen && (
         <nav className="no-drag ml-3 flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Canvases and focus views" role="tablist">
-          <button
-            role="tab"
-            aria-selected={!activeView}
-            onClick={() => openView(null)}
-            className={cn(
-              "flex h-7 shrink-0 items-center rounded-control border px-3 text-[12px] font-medium",
-              !activeView ? "border-line bg-surface text-text-1" : "border-transparent text-text-3 hover:text-text-1",
-            )}
-          >
-            Main canvas
-          </button>
+          <div className="flex shrink-0 rounded-control border border-line bg-bg-1 p-0.5" role="radiogroup" aria-label="Layout">
+            {(
+              [
+                ["canvas", LayoutDashboard, "Canvas", "view.canvas"],
+                ["lattice", Grid2x2, "Lattice", "view.lattice"],
+              ] as const
+            ).map(([m, Icon, label, cmd]) => {
+              const on = !activeView && mode === m;
+              const key = shortcutOf(cmd);
+              return (
+                <button
+                  key={m}
+                  role="radio"
+                  aria-checked={on}
+                  title={key ? `${label} (${key})` : label}
+                  onClick={() => runCommand(cmd)}
+                  data-testid={`mode-${m}`}
+                  className={cn(
+                    "flex h-6 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors duration-fast",
+                    on ? "bg-surface text-text-1 shadow-sm" : "text-text-3 hover:text-text-1",
+                  )}
+                >
+                  <Icon size={12} className={on ? "text-accent" : undefined} /> {label}
+                </button>
+              );
+            })}
+          </div>
           {views.map((v) => (
             <div
               key={v.id}
@@ -88,7 +128,7 @@ export function TitleBar() {
           onClick={() => useWorkspace.setState({ paletteOpen: true })}
           data-testid="open-palette"
         >
-          <Search size={13} /> Search <kbd className="ml-auto font-mono text-[11px]">{isMac ? "⌘K" : "Ctrl K"}</kbd>
+          <Search size={13} /> Search and commands <kbd className="ml-auto font-mono text-[11px]">{shortcutOf("palette.toggle")}</kbd>
         </button>
         <Menu
           trigger={
@@ -106,6 +146,9 @@ export function TitleBar() {
           <MenuSeparator />
           <MenuItem onSelect={() => useWorkspace.getState().setSettingsOpen(true)}>
             <SlidersHorizontal size={14} /> Settings…
+          </MenuItem>
+          <MenuItem onSelect={() => useWorkspace.getState().setSettingsOpen(true, "Commands")}>
+            <Keyboard size={14} /> Commands and shortcuts…
           </MenuItem>
           <MenuItem onSelect={() => useWorkspace.setState({ onboardingOpen: true })}>
             <Sparkles size={14} /> Show me around

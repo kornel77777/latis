@@ -11,6 +11,7 @@ import {
   type McpConnection,
   type FlowEdge,
   type FlowInfo,
+  type LatticeState,
   type Prefs,
   type ScheduledMessage,
   type Skill,
@@ -47,7 +48,7 @@ export interface Toast {
   action?: { label: string; run: () => void };
 }
 
-export type SettingsSection = "Agents" | "Conductor" | "Connections" | "Skills" | "Appearance" | "Notifications";
+export type SettingsSection = "Agents" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
 
 export type ChatOptions = Partial<Pick<ChatSummary, "model" | "reasoning" | "permissionMode" | "title">>;
 
@@ -94,6 +95,8 @@ interface WorkspaceState {
   /** Note being edited (one at a time). */
   editingNote: string | null;
   paletteOpen: boolean;
+  /** What the palette opens with (e.g. "New chat with"). */
+  paletteQuery: string;
   /** Tests only: the demo agent may work in project folders (app:info). */
   demoInProjects: boolean;
   /** A chat whose composer should take focus once it's on screen (new chats, keyboard use). */
@@ -124,6 +127,12 @@ interface WorkspaceState {
   flowEdges: FlowEdge[];
   flowDialog: { flowId: string; kind: "log" | "approvals" | "schedule" | "brief" } | null;
   flowTemplatesAt: { x: number; y: number } | null;
+  /** Chats tiled in the lattice view, the focused pane and the maximised one. */
+  lattice: LatticeState;
+  latticeFocus: string | null;
+  latticeMax: string | null;
+  /** Changes the lattice; saved (debounced) unless `save` is false (mid-drag). */
+  setLattice(patch: Partial<LatticeState>, save?: boolean): void;
 
   load(): Promise<void>;
   loadAgents(refresh?: boolean): Promise<void>;
@@ -264,6 +273,7 @@ function scheduleSave(get: () => WorkspaceState, delay = 300) {
 }
 
 let viewportTimer: ReturnType<typeof setTimeout> | null = null;
+let latticeTimer: ReturnType<typeof setTimeout> | null = null;
 const noteTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const gestureStart = new Map<string, NodeGeometry>();
 /** Chat-sized slots for Tidy up (CHAT_SIZE / FRAME_PAD in main). */
@@ -341,6 +351,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   timelineFor: null,
   editingNote: null,
   paletteOpen: false,
+  paletteQuery: "",
   demoInProjects: false,
   focusComposer: null,
   views: [],
@@ -360,10 +371,21 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   flowEdges: [],
   flowDialog: null,
   flowTemplatesAt: null,
+  lattice: { root: null, projectId: null, hidden: [] },
+  latticeFocus: null,
+  latticeMax: null,
+  setLattice(patch, save = true) {
+    set((s) => ({ lattice: { ...s.lattice, ...patch } }));
+    if (!save) return;
+    if (latticeTimer) clearTimeout(latticeTimer);
+    latticeTimer = setTimeout(() => {
+      latis.invoke("lattice:set", get().lattice).catch((err: unknown) => console.error("saving the lattice failed", err));
+    }, 300);
+  },
 
   async load() {
     try {
-      const [canvas, theme, attention, ptys, prefs, reviews, views, info, scheduled, usage] = await Promise.all([
+      const [canvas, theme, attention, ptys, prefs, reviews, views, info, scheduled, usage, lattice] = await Promise.all([
         latis.invoke("canvas:load"),
         latis.invoke("settings:getTheme"),
         latis.invoke("attention:list"),
@@ -374,6 +396,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         latis.invoke("app:info"),
         latis.invoke("schedule:list"),
         latis.invoke("usage:get"),
+        latis.invoke("lattice:get"),
       ]);
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
@@ -395,6 +418,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         views,
         scheduled,
         usage,
+        lattice,
         demoInProjects: info.demoInProjects,
         // First run: nothing on the canvas and onboarding never finished (§8.10).
         onboardingOpen: !prefs.onboarded && canvas.chats.every((c) => c.role === "conductor") && !canvas.projects.length,

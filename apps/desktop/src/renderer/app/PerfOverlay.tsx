@@ -15,14 +15,10 @@ export function PerfOverlay() {
   const [sample, setSample] = useState<Sample | null>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.altKey && e.code === "KeyP") {
-        e.preventDefault();
-        setOpen((v) => !v);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // The perf.toggle command (Ctrl+Alt+P by default).
+    const onToggle = () => setOpen((v) => !v);
+    window.addEventListener("latis-perf-toggle", onToggle);
+    return () => window.removeEventListener("latis-perf-toggle", onToggle);
   }, []);
 
   useEffect(() => {

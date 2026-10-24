@@ -73,10 +73,19 @@ export const FullChat = memo(function FullChat({
   chatId,
   selected,
   inCanvas = true,
+  paneControls,
+  paneGrip,
+  onHeaderPointerDown,
 }: {
   chatId: string;
   selected: boolean;
   inCanvas?: boolean;
+  /** Extra header buttons (the lattice's maximise / take out). */
+  paneControls?: React.ReactNode;
+  /** A drag handle at the start of the header (the lattice). */
+  paneGrip?: React.ReactNode;
+  /** The lattice drags panes by their header. */
+  onHeaderPointerDown?: (e: React.PointerEvent) => void;
 }) {
   const chat = useWorkspace((s) => s.chats[chatId]);
   const agent = useWorkspace((s) => s.agents.find((a) => a.id === chat?.summary.agentId));
@@ -174,7 +183,11 @@ export const FullChat = memo(function FullChat({
         )}
         style={{ borderTop: `2px solid var(--hue-${hue})` }}
       >
-        <header className="latis-drag flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3 active:cursor-grabbing">
+        <header
+          className="latis-drag flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3 active:cursor-grabbing"
+          {...(onHeaderPointerDown && { onPointerDown: onHeaderPointerDown })}
+        >
+          {paneGrip}
           <StatusDot status={s.status} />
           {conductor && (
             <span title="The Conductor is pinned here and can't be deleted." className="text-accent" data-testid="conductor-badge">
@@ -284,6 +297,7 @@ export const FullChat = memo(function FullChat({
                 )}
               </Menu>
             )}
+            {paneControls}
             <Menu
               trigger={
                 <Button variant="ghost" size="icon" aria-label="Chat menu">

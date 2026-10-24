@@ -1,35 +1,32 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as RadixDialog from "@radix-ui/react-dialog";
-import { useReactFlow } from "@xyflow/react";
 import {
-  AppWindow,
   ArchiveRestore,
   Bot,
+  Command,
   File,
   FolderOpen,
   GitBranch,
   GitCompare,
   GitMerge,
+  Grid2x2,
   History,
   LayoutGrid,
   MessageSquare,
-  Moon,
   Network,
-  PanelLeft,
-  RefreshCw,
+  Plus,
   Search,
   Settings,
   Sparkles,
   Square,
-  SquareTerminal,
   StickyNote,
-  Sun,
   TextSearch,
-  Workflow,
 } from "lucide-react";
 import { cn } from "@latis/ui";
 import { latis } from "../api";
 import { useCanvasActions } from "../canvas/useCanvasActions";
+import { display } from "../commands/keys";
+import { allCommands, bindingsOf, runCommand } from "../commands/registry";
 import { useWorkspace } from "../stores/workspace";
 import { fuzzyPositions, fuzzyScore } from "./fuzzy";
 
@@ -49,6 +46,15 @@ interface Item {
 
 type SearchHit = Awaited<ReturnType<typeof latis.invoke<"search:query">>>[number];
 type Deleted = Awaited<ReturnType<typeof latis.invoke<"canvas:deleted">>>[number];
+
+const CATEGORY_ICON: Record<string, ReactNode> = {
+  General: <Settings size={14} />,
+  Navigate: <MessageSquare size={14} />,
+  Create: <Plus size={14} />,
+  Chat: <Bot size={14} />,
+  Canvas: <LayoutGrid size={14} />,
+  Lattice: <Grid2x2 size={14} />,
+};
 
 const GROUP_ORDER = ["Actions", "Chats", "Projects", "Notes", "In chats and notes", "Files", "Settings", "Restore"];
 const MAX_PER_GROUP = 8;
@@ -110,15 +116,14 @@ export function Palette() {
 }
 
 function PaletteBody({ close }: { close: () => void }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(() => useWorkspace.getState().paletteQuery);
   const [active, setActive] = useState(0);
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [deleted, setDeleted] = useState<Deleted[]>([]);
   const [files, setFiles] = useState<{ projectId: string; paths: string[] } | null>(null);
   const list = useRef<HTMLDivElement>(null);
   const ws = useWorkspace();
-  const { openFolder, newChat } = useCanvasActions();
-  const flow = useReactFlow();
+  const { newChat } = useCanvasActions();
   useEffect(() => useWorkspace.getState().markStep("palette"), []);
 
   // The active project: the selected node's, else the only one.
@@ -193,43 +198,23 @@ function PaletteBody({ close }: { close: () => void }) {
           () => void ws.setWorkspaceTools(chat.id, !chat.workspaceTools),
         );
     }
-    const conductor = Object.values(ws.chats).find((c) => c.summary.role === "conductor")?.summary;
-    if (conductor)
-      action("conductor", "Ask the Conductor", <Network size={14} />, () => {
-        ws.focusChat(conductor.id);
-        useWorkspace.setState({ focusComposer: conductor.id });
-      });
     for (const a of ws.agents.filter((x) => x.installed && (x.id !== "fake" || ws.demoInProjects))) {
       action(`chat-${a.id}`, `New chat with ${a.displayName}`, <Bot size={14} />, () => void newChat(a.id));
     }
     if (!ws.demoInProjects) action("demo", "New demo chat", <Sparkles size={14} />, () => void newChat("fake"));
-    action(
-      "note",
-      "New note",
-      <StickyNote size={14} />,
-      () => void ws.createNote(flow.screenToFlowPosition({ x: window.innerWidth / 2 - 170, y: window.innerHeight / 2 - 130 })),
-      "N",
-    );
-    action("card", "New card…", <AppWindow size={14} />, () =>
-      useWorkspace.setState({ cardLibraryAt: flow.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }) }),
-    );
-    action("flow", "New flow…", <Workflow size={14} />, () =>
-      useWorkspace.setState({ flowTemplatesAt: flow.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 }) }),
-    );
-    action("folder", "Open folder as project…", <FolderOpen size={14} />, () => void openFolder());
-    action("terminal", "New terminal", <SquareTerminal size={14} />, () => void ws.newTerminal(activeProject ?? null), "Ctrl `");
-    action("review", "Review changes", <GitCompare size={14} />, () => ws.openReview(), "Ctrl ⇧ R");
-    action("inbox", "Show the Inbox", <MessageSquare size={14} />, () => ws.setSidebarTab("inbox"), "Ctrl J");
-    action(
-      "theme",
-      ws.theme === "light" ? "Switch to dark theme" : "Switch to light theme",
-      ws.theme === "light" ? <Moon size={14} /> : <Sun size={14} />,
-      () => void ws.setTheme(ws.theme === "light" ? "dark" : "light"),
-    );
-    action("tidy", "Tidy canvas", <LayoutGrid size={14} />, () => ws.tidyUp());
-    action("sidebar", "Toggle sidebar", <PanelLeft size={14} />, () => ws.toggleSidebar(), "Ctrl B");
-    action("tour", "Show me around", <Sparkles size={14} />, () => useWorkspace.setState({ onboardingOpen: true }));
-    action("agents", "Re-check agents", <RefreshCw size={14} />, () => void ws.loadAgents(true));
+    // Every command from the registry, with its current shortcut (Settings → Commands).
+    for (const c of allCommands()) {
+      if (c.palette === false || c.id === "chat.new" || (c.when && !c.when())) continue;
+      const key = bindingsOf(c, ws.prefs?.keybindings)[0];
+      out.push({
+        id: `cmd:${c.id}`,
+        group: "Actions",
+        label: c.title,
+        icon: CATEGORY_ICON[c.category] ?? <Command size={14} />,
+        run: run(() => runCommand(c.id)),
+        ...(key && { hint: display(key) }),
+      });
+    }
 
     for (const p of Object.values(ws.projects)) {
       out.push({
@@ -297,7 +282,7 @@ function PaletteBody({ close }: { close: () => void }) {
       });
     }
     return out;
-  }, [ws, files, deleted, activeProject, close, newChat, openFolder, flow]);
+  }, [ws, files, deleted, activeProject, close, newChat]);
 
   const shown = useMemo(() => {
     const q = query.trim();

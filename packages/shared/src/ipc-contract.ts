@@ -230,6 +230,26 @@ export const FlowInfo = z.object({
 });
 export type FlowInfo = z.infer<typeof FlowInfo>;
 
+// ── Lattice: chats tiled in splits ────────────────────────────────────────────
+
+export type LatticeNode =
+  { kind: "pane"; chatId: string } | { kind: "split"; dir: "row" | "col"; sizes: number[]; children: LatticeNode[] };
+export const LatticeNode: z.ZodType<LatticeNode> = z.lazy(() =>
+  z.union([
+    z.object({ kind: z.literal("pane"), chatId: z.string() }),
+    z.object({ kind: z.literal("split"), dir: z.enum(["row", "col"]), sizes: z.array(z.number()), children: z.array(LatticeNode) }),
+  ]),
+);
+
+export const LatticeState = z.object({
+  root: LatticeNode.nullable(),
+  /** Only this project's chats (null: every chat). */
+  projectId: z.string().nullable(),
+  /** Chats taken out of the lattice; they stay on the canvas. */
+  hidden: z.array(z.string()),
+});
+export type LatticeState = z.infer<typeof LatticeState>;
+
 /** A message waiting to be sent later (§9.10). */
 export const ScheduledMessage = z.object({
   id: z.string(),
@@ -381,6 +401,10 @@ export const Prefs = z.object({
   checklist: z.array(z.enum(["send", "approve", "diff", "zoom", "palette"])).nullable(),
   /** Most chats one chat may have running through spawn_chat (§10.1 guardrails). */
   maxSpawned: z.number().int().min(1).max(20),
+  /** Shortcut overrides by command id; an empty list unbinds the command. */
+  keybindings: z.record(z.string(), z.array(z.string().max(40)).max(4)),
+  /** Canvas or the tiled lattice. */
+  layoutMode: z.enum(["canvas", "lattice"]),
 });
 export type Prefs = z.infer<typeof Prefs>;
 
@@ -667,6 +691,8 @@ export const invokeContract = {
   /** Files in a project (git-tracked and untracked-but-not-ignored, or a bounded walk), for the palette. */
   "project:files": { req: z.object({ projectId: z.string() }), res: z.array(z.string()) },
   "project:openFile": { req: z.object({ projectId: z.string(), path: z.string() }), res: ok },
+  "lattice:get": { req: none, res: LatticeState },
+  "lattice:set": { req: LatticeState, res: ok },
   "views:get": { req: none, res: z.array(FocusView) },
   "views:set": { req: z.array(FocusView).max(30), res: ok },
   /** Where the dock's browser area is, in window coordinates; hidden under dialogs and other dock tabs. */

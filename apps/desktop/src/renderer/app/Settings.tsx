@@ -6,14 +6,16 @@ import { Button, Dialog, cn } from "@latis/ui";
 import { latis } from "../api";
 import { useWorkspace, type SettingsSection } from "../stores/workspace";
 import { AgentList } from "./AgentList";
+import { CommandsSection } from "./CommandsSettings";
 import { ConductorSection, ConnectionsSection, SkillsSection } from "./SettingsOrchestration";
 
-const sections: SettingsSection[] = ["Agents", "Conductor", "Connections", "Skills", "Appearance", "Notifications"];
+const sections: SettingsSection[] = ["Agents", "Conductor", "Connections", "Skills", "Commands", "Appearance", "Notifications"];
 const BODY: Record<SettingsSection, () => React.ReactNode> = {
   Agents: AgentsSection,
   Conductor: ConductorSection,
   Connections: ConnectionsSection,
   Skills: SkillsSection,
+  Commands: CommandsSection,
   Appearance: AppearanceSection,
   Notifications: NotificationsSection,
 };

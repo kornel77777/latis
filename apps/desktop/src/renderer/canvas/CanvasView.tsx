@@ -13,6 +13,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import { latis } from "../api";
+import { surfaces } from "../commands/registry";
 import { AppWindow, FolderOpen, LayoutGrid, Sparkles, StickyNote, Workflow } from "lucide-react";
 import { Button, cn } from "@latis/ui";
 import { ChatNode } from "../chat/ChatNode";
@@ -98,63 +99,22 @@ export function CanvasView() {
     return () => cancelAnimationFrame(id);
   }, [focusRequest, flow]);
 
+  // What the canvas commands (Settings → Commands) can do here.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest("input, textarea, [contenteditable]")) return;
-      const mod = e.metaKey || e.ctrlKey;
-      const ws = useWorkspace.getState();
-      // Canvas undo/redo (§7.2); text fields keep their own.
-      if (mod && e.key.toLowerCase() === "z") {
-        e.preventDefault();
-        void (e.shiftKey ? ws.redo() : ws.undo());
-        return;
-      }
-      // Enter on a focused chat jumps into its composer (keyboard-only use, §8.12).
-      if (!mod && e.key === "Enter") {
-        const node = (e.target as HTMLElement).closest(".react-flow__node");
-        const composer = node?.querySelector<HTMLTextAreaElement>("[data-testid=composer]");
-        if (composer) {
-          e.preventDefault();
-          composer.focus();
-          return;
-        }
-      }
-      if (mod && e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        useWorkspace.setState((st) => ({ nodes: st.nodes.map((n) => ({ ...n, selected: n.type !== "frame" })) }));
-        return;
-      }
-      if (!mod && (e.key === "Delete" || e.key === "Backspace")) {
-        const ids = ws.nodes.filter((n) => n.selected).map((n) => n.id);
-        if (ids.length) {
-          e.preventDefault();
-          void ws.deleteNodes(ids);
-        }
-        return;
-      }
-      if (!mod && !e.shiftKey && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        ws.focusSelection();
-        return;
-      }
-      if (!mod && !e.shiftKey && e.key.toLowerCase() === "n") {
-        e.preventDefault();
+    surfaces.canvas = {
+      fitAll: () => void flow.fitView({ duration: 320 }),
+      fitSelection: () => void flow.fitView({ nodes: flow.getNodes().filter((n) => n.selected), duration: 320 }),
+      zoomIn: () => void flow.zoomIn({ duration: 150 }),
+      zoomOut: () => void flow.zoomOut({ duration: 150 }),
+      zoomReset: () => void flow.zoomTo(1, { duration: 200 }),
+      center: () => {
         const box = container.current?.getBoundingClientRect();
-        const at = box
-          ? flow.screenToFlowPosition({ x: box.left + box.width / 2 - 170, y: box.top + box.height / 2 - 130 })
-          : { x: 0, y: 0 };
-        void ws.createNote(at);
-        return;
-      }
-      if (e.shiftKey && e.code === "Digit1") void flow.fitView({ duration: 320 });
-      if (e.shiftKey && e.code === "Digit2") void flow.fitView({ nodes: flow.getNodes().filter((n) => n.selected), duration: 320 });
-      if (!e.shiftKey && !e.metaKey && !e.ctrlKey && e.key === "0") void flow.zoomTo(1, { duration: 200 });
-      // Keyboard zoom (Ctrl/⌘ +/− stays the interface-size zoom).
-      if (!e.metaKey && !e.ctrlKey && e.key === "-") void flow.zoomOut({ duration: 150 });
-      if (!e.metaKey && !e.ctrlKey && (e.key === "=" || e.key === "+")) void flow.zoomIn({ duration: 150 });
+        return box ? flow.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
+      },
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      surfaces.canvas = null;
+    };
   }, [flow]);
 
   return (
