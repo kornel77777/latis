@@ -1,8 +1,10 @@
 name: Release
 
-# Pushing a tag like v0.2.0 builds the installers on all three OSes and attaches them to a *draft* GitHub release.
+# Pushing a tag like v0.2.0 builds the installers and attaches them to a *draft* GitHub release.
 # Check the draft, write its notes, then publish it: installed copies see it in their release notice.
 # Builds are unsigned until signing secrets exist (electron-builder.config.cjs reads them from the env).
+# Releases are macOS-only for now; Windows and Linux still build in CI (ci.yml), so adding them back here is
+# just the matrix below.
 
 on:
   push:
@@ -29,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-2022, ubuntu-latest]
+        os: [macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:

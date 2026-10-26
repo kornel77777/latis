@@ -27,11 +27,11 @@ Anthropic doesn't allow third-party apps to offer Claude subscription login in t
 
 ## Install
 
-Download the latest release for your system from [Releases](https://github.com/kornel77777/latis/releases). The builds aren't code-signed yet, so your system will warn the first time:
+Releases are for **macOS on Apple Silicon** (M1 and newer) for now. Windows, Linux and Intel Macs will follow. Until then, you can [build from source](#build-from-source) on those.
 
-- **macOS (Apple Silicon):** open the DMG and drag Latis to Applications. On first launch, if macOS says it can't check the app, open System Settings → Privacy & Security and click **Open Anyway**.
-- **Windows:** run the installer. If SmartScreen appears, click **More info → Run anyway**.
-- **Linux:** use the AppImage (`chmod +x`, then run it) or install the `.deb`.
+1. Download the `.dmg` from the latest [release](https://github.com/kornel77777/latis/releases).
+2. Open it and drag Latis to Applications.
+3. The app isn't code-signed yet. On first launch, if macOS says it can't check it, open System Settings → Privacy & Security and click **Open Anyway**.
 
 Latis shows a notice in its status bar when a newer release is out.
 

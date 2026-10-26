@@ -451,3 +451,7 @@ Settings → Data:
 - **Not done:** a "reset everything" button. The docs say to quit and delete the folder; moving an open SQLite database to the Trash isn't worth the risk.
 
 Everything that leaves the machine is listed in `docs/privacy.md`.
+
+### 2026-10-26: First releases are macOS (Apple Silicon) only
+
+At the user's request, `release.yml` builds only the macOS installers. Windows and Linux keep building in CI on every push (`ci.yml`, unpacked), so they don't rot. Adding them to the release matrix brings them back; the Linux `.deb` naming and homepage fixes are already in. Intel Macs need an x64 (or universal) build, also later.
