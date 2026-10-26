@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Run workflow (Actions tab) also uploads the packaged apps.
+  workflow_dispatch:
 
 # A newer push supersedes older runs on the same branch.
 concurrency:
@@ -37,7 +39,7 @@ jobs:
         with:
           name: e2e-results
           path: apps/desktop/test-results/
-          retention-days: 7
+          retention-days: 3
 
   build:
     needs: check
@@ -56,8 +58,11 @@ jobs:
       - run: corepack enable && corepack prepare pnpm@10.34.7 --activate
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @latis/desktop package
-      - uses: actions/upload-artifact@v4
+      # ~700 MB per run across the three OSes: every push checks that packaging works, but only a manual run keeps
+      # the result, so the storage quota stays free for e2e traces.
+      - if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
         with:
           name: latis-${{ matrix.os }}
           path: apps/desktop/release/
-          retention-days: 7
+          retention-days: 2

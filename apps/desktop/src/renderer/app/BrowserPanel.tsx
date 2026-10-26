@@ -16,10 +16,15 @@ const DEVICES: { id: Device; label: string }[] = [
   { id: "tablet-landscape", label: "Tablet, landscape" },
 ];
 
+/** Bumped by every navigation, so a slow dev-server scan doesn't replace a page the user already asked for. */
+let navigations = 0;
+
 async function go(target: string) {
+  const mine = ++navigations;
   try {
     const s = await latis.invoke("browser:navigate", { url: target });
-    useWorkspace.setState({ browser: s });
+    // A navigation that was cut short by a newer one replies late; its state is out of date.
+    if (mine === navigations) useWorkspace.setState({ browser: s });
   } catch (err) {
     useWorkspace.getState().toast(err instanceof Error ? err.message : String(err));
   }
@@ -79,9 +84,10 @@ export function BrowserPanel() {
 
   // First open: find running dev servers and show the first one (§9.7 AC1).
   useEffect(() => {
+    const before = navigations;
     void latis.invoke("browser:detect").then((found) => {
       setPorts(found);
-      if (!useWorkspace.getState().browser?.url && found[0]) void go(`localhost:${found[0]}`);
+      if (navigations === before && !useWorkspace.getState().browser?.url && found[0]) void go(`localhost:${found[0]}`);
     });
   }, []);
 
