@@ -1,0 +1,46 @@
+name: Release
+
+# Pushing a tag like v0.2.0 builds the installers on all three OSes and attaches them to a *draft* GitHub release.
+# Check the draft, write its notes, then publish it: installed copies see it in their release notice.
+# Builds are unsigned until signing secrets exist (electron-builder.config.cjs reads them from the env).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the app version
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          if [ "v$version" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} doesn't match apps/desktop/package.json version $version" >&2
+            exit 1
+          fi
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-2022, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && corepack prepare pnpm@10.34.7 --activate
+      - run: pnpm install --frozen-lockfile
+      - name: Build and upload to the draft release
+        working-directory: apps/desktop
+        run: pnpm exec electron-vite build && pnpm exec electron-builder --config electron-builder.config.cjs --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
