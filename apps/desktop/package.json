@@ -61,5 +61,6 @@
     "zustand": "^5.0.16"
   },
   "description": "Mission control for your coding agents.",
-  "author": "Kornel Omori"
+  "author": "Kornel Omori",
+  "homepage": "https://github.com/kornel77777/latis"
 }

@@ -63,4 +63,6 @@ module.exports = {
   nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
   // The package is "@latis/desktop"; Linux needs a file-safe program name.
   linux: { target: ["AppImage", "deb"], category: "Development", maintainer: "Kornel Omori", executableName: "latis" },
+  // Without these the .deb is named after the package ("@latis/desktop").
+  deb: { packageName: "latis", artifactName: "latis_${version}_${arch}.${ext}" },
 };
