@@ -96,3 +96,35 @@ Pushing `{ type: "user", message, parent_tool_use_id: null, priority: "next" }` 
 - Long tool calls: the CLI's own MCP timeout is set with the `MCP_TOOL_TIMEOUT` env var (ms). Latis sets 30 minutes because `wait_for_chats` blocks.
 - Instructions: `systemPrompt: { type: "preset", preset: "claude_code", append }` keeps Claude Code's own prompt and adds Latis's.
 - Live S4 (`e2e/live-m5.spec.ts`): as the Conductor, Claude Code called `spawn_chat` ×3 (and chose `permission_mode: "read-only"` itself), then `wait_for_chats` and `create_note`, in a 47 s turn.
+
+## Two ways to run Claude (2026-10-26)
+
+Anthropic's Agent SDK docs: "Unless previously approved, Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products, including agents built on the Claude Agent SDK." So Latis has two Claude agents:
+
+| Agent       | id                | UI                                        | Auth                                                                                                                                                                                 |
+| ----------- | ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claude      | `claude-code`     | Latis's chat card (this SDK adapter)      | An Anthropic API key (Settings → Agents, keychain) or `ANTHROPIC_API_KEY` from the shell. The user's sign-in only in dev runs and personal builds (`LATIS_PERSONAL=1 pnpm package`). |
+| Claude Code | `terminal:claude` | Claude Code's own terminal UI in the tile | The user's own Claude Code sign-in, untouched by Latis                                                                                                                               |
+
+Verified 2026-10-26 (CLI 2.1.310): with `ANTHROPIC_API_KEY` in the env, the SDK session uses only the key. `accountInfo()` reports `apiKeySource: "ANTHROPIC_API_KEY"`, and a bad key fails with "Invalid API key" rather than falling back to the subscription.
+
+## Terminal (`terminal:claude`, probed live 2026-10-26)
+
+Latis starts `claude --session-id <uuid> --settings <file>` in a PTY. After a restart it uses `--resume <uuid>`. With workspace tools it adds `--mcp-config <file>`, and with instructions `--append-system-prompt`. The files go in `<dataDir>/run`, mode 0600 (they hold tokens), and are removed when the session ends. The settings file adds HTTP hooks (`type: "http"`, `Authorization: Bearer <per-chat hook token>`) for `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Notification` and `Stop`. They POST to `/hooks` on Latis's loopback server, next to `/mcp`, with separate tokens. The user's own hooks keep running.
+
+| Hook                           | Latis                                                                                                                                                                                                                                                                       |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UserPromptSubmit`             | Records a turn and takes its checkpoint before answering, so Review and the timeline work. Text Latis typed itself (queue, flows) doesn't start a second turn.                                                                                                              |
+| `PreToolUse` (Bash/PowerShell) | Always-ask list. A match is held, and shown as a banner over the terminal and in the Inbox. The answer comes back as `permissionDecision`.                                                                                                                                  |
+| `PermissionRequest`            | Claude Code shows its own prompt **and** Latis raises an Inbox item. Whichever answers first wins. When the terminal answers, Claude abandons the HTTP request and the next hook settles Latis's item. "Always" maps to `updatedPermissions` with `destination: "session"`. |
+| `PostToolUse`                  | Working.                                                                                                                                                                                                                                                                    |
+| `Notification`                 | `idle_prompt` means idle when no turn is open. Other types (not `permission_prompt`) mean needs-you.                                                                                                                                                                        |
+| `Stop`                         | `last_assistant_message` becomes the finished summary, then `turn.completed`.                                                                                                                                                                                               |
+
+- **Not observed:** `SessionStart` didn't reach an HTTP hook in the probes. Latis passes `--session-id` instead, so it knows the id up front.
+- **Interrupts:** Esc or Ctrl+C mid-turn with no hook within 2.5 s counts as an interrupt, because Claude Code doesn't run `Stop` on an interrupt.
+- **Trust prompt:** a new folder still shows Claude Code's own "trust this folder" prompt, which the user answers in the terminal.
+- **Tests:**
+  - `fixtures/terminal/fake-claude/claude` speaks the same hook protocol for `e2e/claude-terminal.spec.ts`.
+  - `e2e/live-claude-terminal.spec.ts` (`LATIS_LIVE=1`) runs the real CLI.
+  - Windows is unverified: Claude Code runs hooks itself, but `--settings` paths there aren't tested.

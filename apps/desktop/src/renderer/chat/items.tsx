@@ -328,7 +328,13 @@ function RequestShell({
   );
 }
 
-function PermissionBlock({ item, respond }: { item: Extract<TranscriptItem, { kind: "permission" }>; respond: ItemActions["respond"] }) {
+export function PermissionBlock({
+  item,
+  respond,
+}: {
+  item: Extract<TranscriptItem, { kind: "permission" }>;
+  respond: ItemActions["respond"];
+}) {
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   return (

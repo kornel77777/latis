@@ -1,4 +1,13 @@
-import type { AgentAdapter, AgentSession, DetectResult, LoginHandle, ModelInfo, SessionOptions, UserTurn } from "@latis/shared";
+import type {
+  AgentAdapter,
+  AgentCapabilities,
+  AgentSession,
+  DetectResult,
+  LoginHandle,
+  ModelInfo,
+  SessionOptions,
+  UserTurn,
+} from "@latis/shared";
 import type { AgentManifest } from "../../manifests";
 import { SessionBase } from "../../session-base";
 import { shellEnv, versionOf, which } from "../../shell-env";
@@ -15,7 +24,7 @@ export class TerminalAdapter implements AgentAdapter {
   readonly displayName: string;
   readonly hue: string;
   readonly installHint: string | undefined;
-  readonly capabilities = {
+  readonly capabilities: AgentCapabilities = {
     streaming: false,
     steering: false,
     images: false,
@@ -28,13 +37,13 @@ export class TerminalAdapter implements AgentAdapter {
     reasoningLevels: false,
     usageReporting: false,
     nativeTerminal: true,
-  } as const;
+  };
 
   private binary: Promise<string | null> | null = null;
 
   constructor(
     readonly manifest: AgentManifest,
-    private readonly ptys: PtyManager,
+    protected readonly ptys: PtyManager,
     private readonly opts: { executable?: string | null } = {},
   ) {
     this.id = manifest.id;
@@ -43,7 +52,7 @@ export class TerminalAdapter implements AgentAdapter {
     this.installHint = manifest.installHint;
   }
 
-  private executable(): Promise<string | null> {
+  protected executablePath(): Promise<string | null> {
     if (this.opts.executable !== undefined) return Promise.resolve(this.opts.executable);
     this.binary ??= which(this.manifest.command);
     return this.binary;
@@ -54,7 +63,7 @@ export class TerminalAdapter implements AgentAdapter {
   }
 
   async detect(): Promise<DetectResult> {
-    const bin = await this.executable();
+    const bin = await this.executablePath();
     if (!bin) return { installed: false };
     const version = await versionOf(bin, this.manifest.detect.versionArgs);
     return { installed: true, binaryPath: bin, ...(version && { version }) };
@@ -70,7 +79,7 @@ export class TerminalAdapter implements AgentAdapter {
   }
 
   async login(): Promise<LoginHandle> {
-    const bin = (await this.executable()) ?? this.manifest.command;
+    const bin = (await this.executablePath()) ?? this.manifest.command;
     return { pty: { file: bin, args: this.manifest.login?.args ?? [], cwd: process.cwd() }, done: Promise.resolve({ signedIn: true }) };
   }
 
@@ -79,7 +88,7 @@ export class TerminalAdapter implements AgentAdapter {
   }
 
   async startSession(opts: SessionOptions): Promise<AgentSession> {
-    const bin = await this.executable();
+    const bin = await this.executablePath();
     if (!bin) throw new Error(`${this.displayName} isn't installed.${this.installHint ? ` Install it with: ${this.installHint}` : ""}`);
     const info = await this.ptys.create({
       file: bin,

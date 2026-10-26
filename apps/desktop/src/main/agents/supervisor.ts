@@ -160,6 +160,22 @@ export class SessionSupervisor {
     return turn;
   }
 
+  /** A prompt typed in an agent's own terminal UI: recorded as a turn, with its checkpoint, like a sent message. */
+  private async userTurn(chatId: string, text: string): Promise<void> {
+    const live = this.live.get(chatId);
+    if (!live) return;
+    this.resolve(chatId, { kinds: ["finished", "error", "rate_limited"] });
+    this.lastMessage.delete(chatId);
+    this.streamed.delete(chatId);
+    const turn = this.store.createTurn(chatId, text);
+    live.turnId = turn.id;
+    live.erroredThisTurn = false;
+    live.limitedThisTurn = false;
+    this.sinks.turn(turn);
+    this.setStatus(chatId, "working");
+    await this.hooks?.beforeTurn(chatId, turn.id).catch((err: unknown) => console.warn("[supervisor] checkpoint failed", err));
+  }
+
   /**
    * A message typed while a turn runs (§9.9): delivered at the agent's next step when it
    * supports steering, otherwise queued until the turn ends. With no turn running it's a normal send.
@@ -252,12 +268,12 @@ export class SessionSupervisor {
     return true;
   }
 
-  /** Ends the structured session so the conversation can continue elsewhere (open as terminal). */
   /** Settings → Permissions changed the always-ask list: running sessions use it from their next tool call. */
   setAlwaysAsk(patterns: string[]): void {
     for (const live of this.live.values()) live.session.setAlwaysAsk?.(patterns);
   }
 
+  /** Ends the structured session so the conversation can continue elsewhere (open as terminal). */
   async release(chatId: string) {
     await this.stop(chatId);
     this.setStatus(chatId, "idle");
@@ -353,6 +369,7 @@ export class SessionSupervisor {
       chatId,
       permissionMode: chat.permissionMode as PermissionMode,
       alwaysAsk: this.extras.alwaysAsk?.() ?? [],
+      onUserTurn: (text) => this.userTurn(chatId, text),
       ...(chat.model && { model: chat.model }),
       ...(chat.reasoning && { reasoning: chat.reasoning }),
       ...(await this.extras.sessionOptions?.(chat)),

@@ -1,0 +1,47 @@
+#!/usr/bin/env node
+// Stands in for Claude Code in e2e tests of the terminal Claude (docs/adapters/claude-code.md → Terminal).
+// It speaks the hook protocol the real CLI does: it reads the HTTP hooks from --settings and POSTs to them.
+// "run <command>" → UserPromptSubmit, PreToolUse for the command (waits for the answer), then Stop.
+import { readFileSync } from "node:fs";
+import { createInterface } from "node:readline";
+
+const args = process.argv.slice(2);
+if (args.includes("--version")) {
+  console.log("9.9.9 (Claude Code)");
+  process.exit(0);
+}
+const arg = (f) => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined);
+const resumed = arg("--resume");
+const sessionId = resumed ?? arg("--session-id");
+const settings = JSON.parse(readFileSync(arg("--settings"), "utf8"));
+const hookOf = (event) => settings.hooks[event]?.[0]?.hooks[0];
+const out = (s) => process.stdout.write(s);
+
+async function hook(event, body) {
+  const h = hookOf(event);
+  if (!h) return {};
+  const res = await fetch(h.url, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...h.headers },
+    body: JSON.stringify({ hook_event_name: event, session_id: sessionId, cwd: process.cwd(), ...body }),
+  });
+  return res.json();
+}
+
+out(`${resumed ? "Resumed" : "Started"} fake Claude Code (session ${sessionId})\n> `);
+let n = 0;
+for await (const line of createInterface({ input: process.stdin })) {
+  const prompt = line.trim();
+  if (!prompt) continue;
+  if (prompt === "exit") process.exit(0);
+  await hook("UserPromptSubmit", { prompt });
+  const command = /^run (.+)$/.exec(prompt)?.[1];
+  if (command) {
+    const answer = await hook("PreToolUse", { tool_name: "Bash", tool_input: { command }, tool_use_id: `toolu_${++n}` });
+    const decision = answer.hookSpecificOutput?.permissionDecision;
+    out(decision === "deny" ? `Blocked: ${answer.hookSpecificOutput.permissionDecisionReason}\n` : `Ran: ${command}\n`);
+    await hook("PostToolUse", { tool_name: "Bash", tool_input: { command } });
+  }
+  await hook("Stop", { last_assistant_message: command ? `Finished with ${command}` : `You said: ${prompt}` });
+  out("> ");
+}

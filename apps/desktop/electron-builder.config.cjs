@@ -24,7 +24,9 @@ module.exports = {
     "**/node_modules/node-pty/**",
   ],
   // The app reads this to know whether it may auto-update (main/updates.ts): unsigned builds don't.
-  extraMetadata: { latisSigned: macSigned || winSigned },
+  // latisPersonal (LATIS_PERSONAL=1 pnpm package): a build for your own machine, where the chat-view Claude may
+  // run on your Claude sign-in. Release builds never set it (DECISIONS 2026-10-26).
+  extraMetadata: { latisSigned: macSigned || winSigned, latisPersonal: process.env.LATIS_PERSONAL === "1" },
   // §13: refuse a modified app. RunAsNode stays on: the latis-mcp shim, the demo agent and card
   // refresh scripts run as Electron-as-Node child processes.
   electronFuses: {

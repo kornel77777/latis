@@ -44,7 +44,7 @@ test("Settings → Permissions: default mode and the always-ask list, enforced i
   await stubFolderPicker(app, repo);
   await page.getByTestId("empty-open-folder").click();
   await page.getByTestId("project-frame").getByTestId("frame-new-chat").click();
-  await page.getByRole("menuitem", { name: /Claude Code/ }).click();
+  await page.getByRole("menuitem", { name: /^Claude(?! Code)/ }).click();
   const card = page.getByTestId("chat-card");
   await expect(card.getByTestId("permission-picker")).toContainText("Full-auto");
   // Claude Code checks every command, so there's no "can't enforce" warning.

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { AgentEvent, buildTranscript, DEFAULT_ALWAYS_ASK, type SessionOptions, type StoredEvent, type Turn } from "@latis/shared";
-import { ClaudeCodeAdapter, type QueryFn } from "../../src/main/agents/adapters/claude-code";
+import { ClaudeCodeAdapter, NEEDS_API_KEY, type QueryFn } from "../../src/main/agents/adapters/claude-code";
 import { ClaudeMapper, toolKind } from "../../src/main/agents/adapters/claude-code/mapper";
 
 type Line =
@@ -183,7 +183,7 @@ async function drive(
   opts: Partial<SessionOptions> = {},
 ) {
   const seen: Seen = {};
-  const adapter = new ClaudeCodeAdapter({ queryFn: replayQuery(name, seen), executable: "/usr/bin/claude" });
+  const adapter = new ClaudeCodeAdapter({ queryFn: replayQuery(name, seen), executable: "/usr/bin/claude", subscription: true });
   const session = await adapter.startSession({ cwd: CWD, permissionMode: "ask", alwaysAsk: [], model: "haiku", reasoning: "low", ...opts });
   const events: StoredEvent[] = [];
   const done = new Promise<void>((resolve) => {
@@ -288,6 +288,27 @@ describe("ClaudeCodeAdapter session (replayed)", () => {
     expect(ro.hooks).toEqual([{}, {}]);
     const none = await drive("always-ask-bypass", () => expect.fail("nothing should ask"), ["go"], { permissionMode: "full-auto" });
     expect(none.hooks).toEqual([{}, {}]);
+  });
+
+  it("needs an API key unless the build may use the user's sign-in", async () => {
+    const seen: Seen = {};
+    const locked = new ClaudeCodeAdapter({
+      queryFn: replayQuery("allow-write-bash", seen),
+      executable: "/usr/bin/claude",
+      apiKey: () => null,
+    });
+    await expect(locked.startSession({ cwd: CWD, permissionMode: "ask", alwaysAsk: [] })).rejects.toThrow(NEEDS_API_KEY);
+    expect(await locked.authStatus()).toEqual({ signedIn: false, method: "none" });
+    expect(seen.options).toBeUndefined();
+
+    const keyed = new ClaudeCodeAdapter({
+      queryFn: replayQuery("allow-write-bash", seen),
+      executable: "/usr/bin/claude",
+      apiKey: () => "sk-ant-test-key-0123456789",
+    });
+    const session = await keyed.startSession({ cwd: CWD, permissionMode: "ask", alwaysAsk: [] });
+    expect(seen.options?.env?.ANTHROPIC_API_KEY).toBe("sk-ant-test-key-0123456789");
+    await session.dispose();
   });
 
   it("reports not-installed instead of starting", async () => {

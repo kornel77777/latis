@@ -30,7 +30,7 @@ export function ConductorSection() {
   const demo = useWorkspace((s) => s.demoInProjects);
   const prefs = useWorkspace((s) => s.prefs);
   const { setPrefs, toast, focusChat, setSettingsOpen } = useWorkspace.getState();
-  const choices = agents.filter((a) => a.kind === "structured" && a.installed && (a.id !== "fake" || demo));
+  const choices = agents.filter((a) => (a.kind === "structured" || a.id === "terminal:claude") && a.installed && (a.id !== "fake" || demo));
   return (
     <div className="flex flex-col gap-4 text-[13px]" data-testid="conductor-settings">
       <p className="leading-relaxed text-text-2">

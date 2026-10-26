@@ -412,3 +412,14 @@ Radii are 2–3px (`--radius-*`), pills became squares (status dots keep their s
 Per agent: Claude Code through a PreToolUse hook, Codex by switching Full-auto to `untrusted` approvals while the list isn't empty, ACP by running the agent's auto-edit mode in Full-auto and checking `execute` requests (only what the agent asks about, so ACP keeps its header warning), terminal agents not at all. A listed command never offers "Always for this chat". Read-only chats are left alone (they refuse commands anyway). Details in `docs/adapters/*.md`.
 
 Settings → Permissions holds the default mode for new chats (moved from its own setting into `Prefs.defaultPermissionMode`, read once for old data dirs), the list with a "Try a command" box, and which agents the list covers. Not done from §8.11/§9.8 AC4: per-project overrides, and listing/revoking "always allow" grants (they live in each agent's session today).
+
+### 2026-10-26: Claude in public builds: the terminal on the user's sign-in, the chat view on an API key
+
+Anthropic's Agent SDK overview says third-party products may not offer claude.ai login or rate limits unless approved, and points to API keys ([source](https://code.claude.com/docs/en/agent-sdk/overview)). Its support article still lets people use the SDK within their own plan's limits ([source](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)). Latis is going public as a free GitHub repo, so:
+
+- **Claude Code (`terminal:claude`)**, the default way to use a subscription, runs the user's own `claude` in its own terminal UI. Latis only adds a settings file of HTTP hooks (docs/adapters/claude-code.md → Terminal), which brings back status, Inbox approvals, the always-ask list, turns and checkpoints, resume and workspace tools.
+- **Claude (`claude-code`, the chat view)** needs an Anthropic API key in release builds. The key is kept in the OS keychain via `safeStorage`, or taken from `ANTHROPIC_API_KEY` in the shell. Renamed from "Claude Code" per the SDK branding rules.
+- **Personal use:** running from source and `LATIS_PERSONAL=1 pnpm package` builds keep the chat view on the user's own sign-in. Release CI never sets the flag.
+- **Approval:** asking Anthropic for approval of subscription login in the chat view is open for later.
+
+OpenAI: nothing found that addresses third-party Codex app-server clients on a ChatGPT sign-in ([Codex auth](https://developers.openai.com/codex/auth), [Codex with ChatGPT](https://help.openai.com/en/articles/11369540)). Codex keeps its own sign-in. Re-check before each release.

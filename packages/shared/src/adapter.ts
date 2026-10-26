@@ -64,6 +64,11 @@ export interface SessionOptions {
   systemPromptAppend?: string;
   mcpServers?: McpServerConfig[];
   env?: Record<string, string>;
+  /**
+   * Agents whose UI is a terminal report prompts the user typed there; Latis records the turn and takes its
+   * checkpoint before resolving.
+   */
+  onUserTurn?: (text: string) => Promise<void>;
 }
 
 export interface PtySpec {

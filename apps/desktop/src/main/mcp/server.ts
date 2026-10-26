@@ -59,7 +59,7 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
     {
       description:
         "Start a new chat with a coding agent in a folder and send it a first message. Returns its id right away; the agent works in the background (use wait_for_chats). " +
-        "agent: claude-code, codex, gemini (or another installed agent id). own_copy: work in a separate git worktree so parallel chats don't clash.",
+        "agent: claude-code (Latis chat view; needs the user's API key), terminal:claude (Claude Code in its own terminal, on the user's subscription), codex, gemini (or another installed agent id). own_copy: work in a separate git worktree so parallel chats don't clash.",
       inputSchema: {
         agent: z.string(),
         cwd: z.string().describe("Folder to work in; ~ is allowed. It becomes a project on the canvas if it isn't one."),
@@ -211,10 +211,24 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
   );
 }
 
-export class WorkspaceMcpServer {
+/** Answers one hook call from an agent (Claude Code's HTTP hooks); may wait for the user. */
+export type HookHandler = (input: Record<string, unknown>) => Promise<unknown>;
+
+/** Where agents running in a terminal report their hooks (docs/adapters/claude-code.md → Terminal). */
+export interface HookEndpoint {
+  readonly hookUrl: string;
+  hookTokenFor(chatId: string): string;
+  onHook(chatId: string, handler: HookHandler): () => void;
+}
+
+export class WorkspaceMcpServer implements HookEndpoint {
   private http: Server | null = null;
   private tokens = new Map<string, string>();
   private byChat = new Map<string, string>();
+  // Hook tokens are separate from MCP tokens: reporting hooks never grants the workspace tools.
+  private hookTokens = new Map<string, string>();
+  private hookByChat = new Map<string, string>();
+  private hookHandlers = new Map<string, HookHandler>();
   port = 0;
 
   constructor(private readonly ws: WorkspaceService) {}
@@ -234,11 +248,32 @@ export class WorkspaceMcpServer {
     return t;
   }
 
-  private callerOf(req: IncomingMessage): string | undefined {
+  get hookUrl(): string {
+    return `http://127.0.0.1:${this.port}/hooks`;
+  }
+
+  hookTokenFor(chatId: string): string {
+    let t = this.hookByChat.get(chatId);
+    if (!t) {
+      t = randomBytes(24).toString("hex");
+      this.hookByChat.set(chatId, t);
+      this.hookTokens.set(t, chatId);
+    }
+    return t;
+  }
+
+  onHook(chatId: string, handler: HookHandler): () => void {
+    this.hookHandlers.set(chatId, handler);
+    return () => {
+      if (this.hookHandlers.get(chatId) === handler) this.hookHandlers.delete(chatId);
+    };
+  }
+
+  private callerOf(req: IncomingMessage, tokens = this.tokens): string | undefined {
     const m = /^Bearer\s+([0-9a-f]+)$/i.exec(req.headers.authorization ?? "");
     if (!m) return undefined;
     const given = Buffer.from(m[1]!);
-    for (const [token, chatId] of this.tokens) {
+    for (const [token, chatId] of tokens) {
       const t = Buffer.from(token);
       if (t.length === given.length && timingSafeEqual(t, given)) return chatId;
     }
@@ -269,6 +304,7 @@ export class WorkspaceMcpServer {
     const host = req.headers.host ?? "";
     if (host !== `127.0.0.1:${this.port}` && host !== `localhost:${this.port}`) return deny(403, "forbidden host");
     if (req.headers.origin) return deny(403, "browsers can't call this server");
+    if (req.url === "/hooks") return this.handleHook(req, res, deny);
     if (!req.url?.startsWith("/mcp")) return deny(404, "not found");
     const caller = this.callerOf(req);
     if (!caller) return deny(401, "missing or unknown token");
@@ -293,6 +329,23 @@ export class WorkspaceMcpServer {
       console.warn("[mcp] request failed", err);
       if (!res.headersSent) deny(500, "internal error");
     }
+  }
+
+  /** A hook call: the answer may take as long as the user does, so the response waits. */
+  private async handleHook(req: IncomingMessage, res: ServerResponse, deny: (code: number, message: string) => void) {
+    const chatId = this.callerOf(req, this.hookTokens);
+    if (!chatId) return deny(401, "missing or unknown token");
+    if (req.method !== "POST") return deny(405, "POST only");
+    let input: Record<string, unknown>;
+    try {
+      input = JSON.parse(await readBody(req)) as Record<string, unknown>;
+    } catch {
+      return deny(400, "invalid JSON");
+    }
+    const handler = this.hookHandlers.get(chatId);
+    // No session listening (e.g. Latis restarted under a running agent): let the agent carry on.
+    const out = handler ? await handler(input).catch((err: unknown) => (console.warn("[hooks] handler failed", err), {})) : {};
+    if (!res.writableEnded) res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out ?? {}));
   }
 }
 

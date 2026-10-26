@@ -101,6 +101,8 @@ export const AgentInfo = z.object({
   steering: z.boolean(),
   canSignIn: z.boolean(),
   source: z.enum(["built-in", "manifest"]),
+  /** Agents that take an API key (the chat-view Claude): where it comes from, if anywhere. */
+  apiKey: z.enum(["saved", "shell", "none"]).optional(),
 });
 export type AgentInfo = z.infer<typeof AgentInfo>;
 
@@ -615,6 +617,11 @@ export const invokeContract = {
   "agents:login": { req: z.object({ agentId: z.string() }), res: PtyInfo },
   /** Opens <dataDir>/agents (manifests) in the file manager. */
   "agents:openFolder": { req: none, res: ok },
+  /** Saves (or with null, forgets) an agent's API key, encrypted with the OS keychain. */
+  "agents:setApiKey": {
+    req: z.object({ agentId: z.literal("claude-code"), key: z.string().trim().min(20).max(400).nullable() }),
+    res: z.array(AgentInfo),
+  },
   "agents:manifestErrors": { req: none, res: z.record(z.string(), z.string()) },
   /** Onboarding: a fresh folder under the data dir, opened as a project. */
   "project:createSandbox": {

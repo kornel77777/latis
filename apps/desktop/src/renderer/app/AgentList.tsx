@@ -8,7 +8,11 @@ import { useWorkspace } from "../stores/workspace";
 /** One line of agent status, shared by Settings → Agents and onboarding (§6.4, §8.10). */
 export function agentState(a: AgentInfo): { label: string; tone: "ok" | "warn" | "off" } {
   if (!a.installed) return { label: "Not installed", tone: "off" };
+  if (a.id === "terminal:claude") return { label: "Ready · your Claude subscription, in a terminal", tone: "ok" };
   if (a.kind === "terminal") return { label: "Detected · runs in a terminal", tone: "ok" };
+  if (a.apiKey === "saved") return { label: "Ready · API key", tone: "ok" };
+  if (a.apiKey === "shell") return { label: "Ready · API key from your shell (ANTHROPIC_API_KEY)", tone: "ok" };
+  if (a.apiKey === "none" && !a.signedIn) return { label: "Needs an API key", tone: "warn" };
   if (!a.signedIn) return { label: "Signed out", tone: "warn" };
   return { label: a.account ? `Signed in · ${a.account}` : "Ready", tone: "ok" };
 }
@@ -29,6 +33,64 @@ function CopyCommand({ text }: { text: string }) {
       <span className="truncate">{text}</span>
       {copied ? <Check size={11} className="shrink-0 text-state-done" /> : <Copy size={11} className="shrink-0" />}
     </button>
+  );
+}
+
+/** The chat-view Claude's API key (main: agents:setApiKey). Kept in the OS keychain; never shown again. */
+function ApiKeyRow({ agent }: { agent: AgentInfo }) {
+  const [key, setKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const toast = useWorkspace.getState().toast;
+  const save = (value: string | null) => {
+    setSaving(true);
+    latis
+      .invoke("agents:setApiKey", { agentId: "claude-code", key: value })
+      .then((agents) => {
+        useWorkspace.setState({ agents });
+        setKey("");
+        toast(value ? "API key saved in your keychain." : "API key removed.");
+      })
+      .catch((err: unknown) => toast(errorText(err)))
+      .finally(() => setSaving(false));
+  };
+  if (agent.apiKey === "saved")
+    return (
+      <div className="mt-2 flex items-center gap-2 text-[12px] text-text-2" data-testid="api-key">
+        <span>Anthropic API key saved</span>
+        <Button size="sm" variant="ghost" disabled={saving} onClick={() => save(null)}>
+          <Trash2 size={12} /> Remove
+        </Button>
+      </div>
+    );
+  return (
+    <form
+      className="mt-2 flex flex-col gap-1"
+      data-testid="api-key"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (key.trim()) save(key.trim());
+      }}
+    >
+      <div className="flex gap-1.5">
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder="sk-ant-…"
+          aria-label="Anthropic API key"
+          autoComplete="off"
+          spellCheck={false}
+          className="h-7 min-w-0 flex-1 rounded-control border border-line bg-bg-1 px-2 font-mono text-[12px] text-text-1 outline-none focus:border-line-strong"
+        />
+        <Button size="sm" variant="secondary" type="submit" disabled={saving || key.trim().length < 20}>
+          Save key
+        </Button>
+      </div>
+      <span className="text-[11.5px] leading-relaxed text-text-3">
+        For Latis&apos;s chat view, billed per use by Anthropic (console.anthropic.com). To use your Claude subscription instead, start a
+        Claude Code chat: it runs in its own terminal.
+      </span>
+    </form>
   );
 }
 
@@ -160,13 +222,15 @@ export function AgentList({ hideDemo = false, compact = false }: { hideDemo?: bo
               {!compact && a.installed && accounts && ACCOUNT_AGENTS.has(a.id) && (
                 <AccountsRow agent={a} state={accounts} onChange={setAccounts} />
               )}
+              {!compact && a.installed && a.apiKey && <ApiKeyRow agent={a} />}
               {!a.installed && a.installHint && (
                 <div className="mt-1.5">
                   <CopyCommand text={a.installHint} />
                 </div>
               )}
             </div>
-            {a.installed && a.canSignIn && (
+            {/* The chat-view Claude shares Claude Code's sign-in, which its card offers. */}
+            {a.installed && a.canSignIn && a.id !== "claude-code" && (
               <Button size="sm" variant={a.signedIn ? "ghost" : "primary"} onClick={() => void signIn(a.id)} data-testid="sign-in">
                 <LogIn size={12} /> {a.signedIn ? "Sign in again" : "Sign in"}
               </Button>

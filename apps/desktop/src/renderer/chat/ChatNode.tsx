@@ -153,6 +153,8 @@ export const FullChat = memo(function FullChat({
   const agentLabel = agent?.displayName ?? (s.agentId === "fake" ? "Demo agent" : s.agentId);
   const folder = s.cwd.split(/[\\/]/).filter(Boolean).at(-1) ?? s.cwd;
   const terminalAgent = agent?.kind === "terminal";
+  // Claude Code in a terminal reports turns and takes workspace tools through its hooks.
+  const hooked = s.agentId === "terminal:claude";
   const unenforced = !terminalAgent && s.permissionMode === "full-auto" && (agent?.unenforceable ?? []).includes("full-auto");
   const conductor = s.role === "conductor";
   const ownConnections = connections.filter((c) => !c.shared);
@@ -316,7 +318,7 @@ export const FullChat = memo(function FullChat({
               <MenuItem onSelect={() => void reveal(chatId)}>
                 <FolderOpen size={13} /> Open folder
               </MenuItem>
-              {!terminalAgent && (
+              {(!terminalAgent || hooked) && (
                 <MenuItem onSelect={() => useWorkspace.setState({ timelineFor: chatId })}>
                   <History size={13} /> Timeline
                 </MenuItem>
@@ -331,7 +333,7 @@ export const FullChat = memo(function FullChat({
                   <Settings2 size={13} /> Conductor settings…
                 </MenuItem>
               ) : (
-                !terminalAgent &&
+                (!terminalAgent || hooked) &&
                 s.agentId !== "fake" && (
                   <MenuItem onSelect={() => void useWorkspace.getState().setWorkspaceTools(chatId, !s.workspaceTools)}>
                     <Network size={13} /> {s.workspaceTools ? "Remove workspace tools" : "Give workspace tools"}
@@ -378,7 +380,10 @@ export const FullChat = memo(function FullChat({
           </button>
         )}
         {terminalAgent ? (
-          <TerminalChatBody chatId={chatId} />
+          <TerminalChatBody
+            chatId={chatId}
+            requests={items.filter((i): i is Extract<typeof i, { kind: "permission" }> => i.kind === "permission" && i.pending)}
+          />
         ) : (
           <>
             <div

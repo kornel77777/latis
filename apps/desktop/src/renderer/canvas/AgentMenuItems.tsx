@@ -2,6 +2,14 @@ import { Bot } from "lucide-react";
 import { MenuItem, MenuLabel } from "@latis/ui";
 import { useWorkspace } from "../stores/workspace";
 
+/** Which Claude is which, since both are there. */
+function hint(a: { id: string; apiKey?: string | undefined }): string | undefined {
+  if (a.id === "terminal:claude") return "Your Claude subscription, in its own terminal";
+  if (a.id === "claude-code")
+    return a.apiKey === "none" ? "Latis chat view, on your Claude sign-in (personal build)" : "Latis chat view, on your API key";
+  return undefined;
+}
+
 /** "New chat with…" entries: ready agents first, then ones that need installing or signing in. */
 export function AgentMenuItems({ onPick, includeDemo = true }: { onPick: (agentId: string) => void; includeDemo?: boolean }) {
   const agents = useWorkspace((s) => s.agents);
@@ -18,7 +26,12 @@ export function AgentMenuItems({ onPick, includeDemo = true }: { onPick: (agentI
             <span className="flex flex-1 flex-col">
               <span>{a.displayName}</span>
               {!a.installed && <span className="font-mono text-[10.5px] text-text-3">{a.installHint ?? "Not installed"}</span>}
-              {a.installed && !ready && <span className="text-[10.5px] text-text-3">Signed out · sign in from Settings → Agents</span>}
+              {a.installed && !ready && (
+                <span className="text-[10.5px] text-text-3">
+                  {a.apiKey === "none" ? "Needs an API key · add it in Settings → Agents" : "Signed out · sign in from Settings → Agents"}
+                </span>
+              )}
+              {a.installed && ready && hint(a) && <span className="text-[10.5px] text-text-3">{hint(a)}</span>}
             </span>
             {a.id === "fake" && <Bot size={12} className="text-text-3" />}
           </MenuItem>

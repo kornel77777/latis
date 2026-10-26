@@ -26,7 +26,7 @@ test("Claude Code in a project: permissions, diffs, questions, plans, restart", 
   await expect(page.getByTestId("sidebar-project")).toContainText("my-repo");
 
   await frame.getByTestId("frame-new-chat").click();
-  await page.getByRole("menuitem", { name: /Claude Code/ }).click();
+  await page.getByRole("menuitem", { name: /^Claude(?! Code)/ }).click();
   const card = page.getByTestId("chat-card");
   await expect(card).toHaveAttribute("data-agent", "claude-code");
   await expect(card).toContainText("my-repo");

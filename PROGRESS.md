@@ -7,6 +7,12 @@
 - Known: `m1.spec.ts` title check flaked once in a full run (passes alone); the canvas doesn't yet draw relationships (spawned-by, handoff, passed replies) as edges.
 - Chat transcripts follow a streaming reply in every view (canvas, lattice, lock-in) and stop following when the user scrolls up; e2e in `e2e/lattice.spec.ts`.
 - M7 has started (link policy, fuses, signing/notarization config, icon); auto-update, privacy doc, docs site, crash-report opt-in, perf and security passes and signed installers are still open.
+- 2026-10-26: **Claude, two ways** (DECISIONS 2026-10-26):
+  - **Claude Code** runs the user's own `claude` in a terminal tile on their subscription. HTTP hooks give it status, Inbox approvals (answer in the terminal or Latis), the always-ask banner, recorded turns with checkpoints, resume after restart, and workspace tools.
+  - **Claude** (the chat view) needs an API key in release builds; dev runs and `LATIS_PERSONAL=1` builds keep the user's sign-in.
+  - The Conductor, flows and handoff can use the terminal Claude.
+  - Live-tested against Claude Code 2.1.310 (`e2e/live-claude-terminal.spec.ts`).
+  - Tests: 158 unit, 45 native, 26 e2e.
 - 2026-10-26: **The always-ask list is enforced** (§9.8 AC3), including Full-auto: Claude Code through a PreToolUse hook and Codex through `untrusted` approvals (both verified live, recorded in `fixtures/claude-code/always-ask-bypass.jsonl` and `fixtures/codex/full-auto-always-ask.jsonl`); ACP agents when they ask before a command; terminal agents not at all (header warns). **Settings → Permissions**: default mode for new chats, the list (defaults `git push`, `rm -rf`, `npm publish`, `pnpm publish`, `git reset --hard`, `sudo`) with a "Try a command" box, and per-agent coverage. Tests: 148 unit, 45 native, 25 e2e (`e2e/permissions.spec.ts`). Still open from §9.8 AC4: listing and revoking "always allow" grants; per-project overrides; Gemini's execute permissions not recorded live.
 
 ## Current: M6 Power features: done 2026-10-23

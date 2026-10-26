@@ -34,7 +34,7 @@ import { EventLog } from "./store/event-log";
 import { CHAT_SIZE, WorkspaceStore } from "./store/workspace";
 import { PtyManager } from "./terminal/pty-manager";
 import { Connections } from "./mcp/connections";
-import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer } from "./mcp/server";
+import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer, type HookEndpoint } from "./mcp/server";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
 import { openLink } from "./security/links";
@@ -82,11 +82,44 @@ const ptys = new PtyManager(() => import("node-pty"), {
 // LATIS_CLAUDE_REPLAY=<fixtures/claude-code> is the M1 spelling and still works.
 const replayRoot =
   process.env.LATIS_REPLAY ?? (process.env.LATIS_CLAUDE_REPLAY ? resolve(process.env.LATIS_CLAUDE_REPLAY, "..") : undefined);
+/** The chat-view Claude's API key, encrypted with the OS keychain (decrypted once per launch). */
+let claudeKey: string | null | undefined;
+function claudeApiKey(): string | null {
+  if (claudeKey !== undefined) return claudeKey;
+  const saved = store.getSetting<string>("claudeApiKey");
+  claudeKey = null;
+  if (saved && safeStorage.isEncryptionAvailable()) {
+    try {
+      claudeKey = safeStorage.decryptString(Buffer.from(saved, "base64"));
+    } catch (err) {
+      console.warn("[agents] couldn't read the saved Anthropic API key", err);
+    }
+  }
+  return claudeKey;
+}
+
+/**
+ * Whether the chat-view Claude may run on the user's own Claude sign-in. Anthropic doesn't allow third-party
+ * products to offer that, so release builds don't (DECISIONS 2026-10-26). Running from source does, and so does
+ * a personal build made with LATIS_PERSONAL=1 (electron-builder writes `latisPersonal` into package.json).
+ */
+function claudeSubscriptionAllowed(): boolean {
+  if (!app.isPackaged) return true;
+  try {
+    return JSON.parse(readFileSync(join(app.getAppPath(), "package.json"), "utf8")).latisPersonal === true;
+  } catch {
+    return false;
+  }
+}
+
 const agents = new AgentRegistry({
   dataDir,
   ptys,
   fakeRunnerPath: join(here, "fake-runner.js"),
   ...(replayRoot && { replayRoot }),
+  hooks: (): Promise<HookEndpoint> => mcpReady.then(() => mcpServer),
+  claudeApiKey,
+  claudeSubscription: claudeSubscriptionAllowed(),
 });
 
 // LATIS_SKIP_ONBOARDING=1 (e2e) starts as if the first-run tour was done.
@@ -323,8 +356,9 @@ const flows = new FlowEngine({
 
 async function readyAgents(): Promise<string[]> {
   const list = await agents.list();
-  const ok = (id: string) => list.some((a) => a.id === id && a.installed && a.signedIn && a.kind === "structured");
-  const order = ["claude-code", "codex", "gemini", ...list.map((a) => a.id)];
+  const ok = (id: string) => list.some((a) => a.id === id && a.installed && a.signedIn && (a.kind === "structured" || agents.isHooked(id)));
+  // Claude Code in a terminal comes after the chat-view agents: it works, but its tile is a terminal.
+  const order = ["claude-code", "codex", "gemini", "terminal:claude", ...list.map((a) => a.id)];
   const ids = [...new Set(order)].filter((id) => ok(id) && (id !== "fake" || process.env.LATIS_DEMO_IN_PROJECTS === "1"));
   // The demo agent stands in for everything in tests.
   return process.env.LATIS_FLOW_AGENT ? [process.env.LATIS_FLOW_AGENT] : ids;
@@ -406,7 +440,7 @@ const shimPath = join(here, "latis-mcp.js");
 /** Latis's own server for a chat: HTTP where the agent takes it, otherwise the stdio shim. */
 function latisServer(chat: ChatSummary): McpServerConfig {
   const token = mcpServer.tokenFor(chat.id);
-  const http = chat.agentId === "claude-code" || chat.agentId === "codex";
+  const http = chat.agentId === "claude-code" || chat.agentId === "terminal:claude" || chat.agentId === "codex";
   return http
     ? {
         name: "latis",
@@ -494,7 +528,7 @@ async function probeUsage() {
   }
 }
 
-const CONDUCTOR_ORDER = ["claude-code", "codex", "gemini"];
+const CONDUCTOR_ORDER = ["claude-code", "codex", "gemini", "terminal:claude"];
 
 /** The pinned Conductor chat (§10.2), created once at the canvas's top left. */
 async function ensureConductor() {
@@ -624,8 +658,8 @@ registerHandlers({
       title: `Sign in · ${a.displayName}`,
       projectId: null,
       chatId: null,
-      // Signs in the active account (§9.12 AC3).
-      env: await agentEnv(agentId),
+      // Signs in the active account (§9.12 AC3). Both Claudes share one CLI home.
+      env: await agentEnv(agentId === "terminal:claude" ? "claude-code" : agentId),
     });
     // Re-check once the sign-in terminal closes, so the agent shows as signed in.
     const unsub = ptys.subscribe(info.id, (e) => {
@@ -634,6 +668,15 @@ registerHandlers({
       void agents.list(true).then((list) => emit(win?.webContents, "agents:changed", list));
     });
     return info;
+  },
+  "agents:setApiKey": async ({ key }) => {
+    if (key && !safeStorage.isEncryptionAvailable()) throw new Error("There's no keychain to keep the key in, so Latis won't save it.");
+    if (key) store.setSetting("claudeApiKey", safeStorage.encryptString(key).toString("base64"));
+    else store.setSetting("claudeApiKey", null);
+    claudeKey = key;
+    const list = await agents.list(true);
+    emit(win?.webContents, "agents:changed", list);
+    return list;
   },
   "agents:openFolder": async () => {
     mkdirSync(agents.agentsDir, { recursive: true });
@@ -959,7 +1002,7 @@ registerHandlers({
     const from = store.getChat(chatId);
     if (!from) throw new Error("That chat no longer exists.");
     const a = agents.get(agentId);
-    if (!a || agents.isTerminal(agentId)) throw new Error("Pick an agent Latis can chat with.");
+    if (!a || (agents.isTerminal(agentId) && !agents.isHooked(agentId))) throw new Error("Pick an agent Latis can chat with.");
     if (agentId === from.agentId) throw new Error("Pick a different agent to continue with.");
     const project = from.projectId ? store.getProject(from.projectId) : undefined;
     const r = store.absoluteRect(from.nodeId);
@@ -1169,7 +1212,8 @@ registerHandlers({
     const c = store.conductor();
     if (!c) throw new Error("There's no Conductor yet.");
     const a = agents.get(agentId);
-    if (!a || agents.isTerminal(agentId) || !a.capabilities.mcp) throw new Error("The Conductor needs an agent that can use MCP tools.");
+    if (!a || (agents.isTerminal(agentId) && !agents.isHooked(agentId)) || !a.capabilities.mcp)
+      throw new Error("The Conductor needs an agent that can use MCP tools.");
     if (supervisor.busy(c.id)) throw new Error("Wait for the Conductor to finish, then try again.");
     await supervisor.release(c.id);
     store.setChatFlags(c.id, { agentId, model: agentId === "fake" ? "demo-1" : null, reasoning: null });

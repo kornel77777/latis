@@ -60,12 +60,23 @@ export interface ClaudeAdapterOptions {
   queryFn?: QueryFn;
   /** Overrides binary discovery (tests). */
   executable?: string | null;
+  /** The user's Anthropic API key, when one is saved (Settings → Agents). */
+  apiKey?: () => string | null;
+  /**
+   * Whether the chat view may run on the user's own Claude sign-in. Anthropic doesn't allow third-party products
+   * to offer that (DECISIONS 2026-10-26), so release builds need an API key; personal and dev builds may.
+   */
+  subscription?: boolean;
 }
 
-/** Claude Code via the Claude Agent SDK (SPEC §6.3, docs/adapters/claude-code.md). */
+export const NEEDS_API_KEY =
+  "The Claude chat view needs an Anthropic API key (Settings → Agents → Claude). To use your Claude subscription, start a Claude Code chat instead: it runs in a terminal.";
+
+/** Claude Code via the Claude Agent SDK, drawn as Latis's chat card (SPEC §6.3, docs/adapters/claude-code.md). */
 export class ClaudeCodeAdapter implements AgentAdapter {
   readonly id = "claude-code";
-  readonly displayName = "Claude Code";
+  // Anthropic's branding rules for Agent SDK products: "Claude", not "Claude Code".
+  readonly displayName = "Claude";
   readonly hue = "amber-sand";
   readonly capabilities = {
     streaming: true,
@@ -113,6 +124,16 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     return { installed: true, binaryPath: bin, ...(version && { version }) };
   }
 
+  /**
+   * The API key as env (saved in Latis, else ANTHROPIC_API_KEY from the user's shell), or nothing to run on the
+   * user's sign-in where that's allowed. Null when neither is available.
+   */
+  private async credentials(): Promise<Record<string, string> | null> {
+    const key = this.opts.apiKey?.() ?? (await agentEnv(this.id)).ANTHROPIC_API_KEY;
+    if (key) return { ANTHROPIC_API_KEY: key };
+    return this.opts.subscription ? {} : null;
+  }
+
   /** Starts the CLI without sending a message (no tokens spent) and runs `fn` against it. */
   private async probe<T>(fn: (q: Query) => Promise<T>): Promise<T> {
     const bin = await this.executable();
@@ -120,7 +141,11 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     const input = new InputQueue();
     const q = (await this.queryFn())({
       prompt: input,
-      options: { pathToClaudeCodeExecutable: bin, env: await agentEnv(this.id), persistSession: false },
+      options: {
+        pathToClaudeCodeExecutable: bin,
+        env: { ...(await agentEnv(this.id)), ...(await this.credentials()) },
+        persistSession: false,
+      },
     });
     try {
       return await fn(q);
@@ -132,6 +157,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
 
   async authStatus(): Promise<AuthStatus> {
     if (this.auth) return this.auth;
+    if (!(await this.credentials())) return { signedIn: false, method: "none" };
     try {
       const info = await this.probe((q) => q.accountInfo());
       const apiKey = info.apiKeySource && info.apiKeySource !== "none";
@@ -180,7 +206,15 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   private async open(opts: SessionOptions, resume: string | undefined): Promise<AgentSession> {
     const bin = await this.executable();
     if (!bin) throw new Error(`Claude Code isn't installed. Install it with: ${this.installHint}`);
-    return new ClaudeSession(await this.queryFn(), bin, { ...process.env, ...(await agentEnv(this.id)), ...opts.env }, opts, resume);
+    const credentials = await this.credentials();
+    if (!credentials) throw new Error(NEEDS_API_KEY);
+    return new ClaudeSession(
+      await this.queryFn(),
+      bin,
+      { ...process.env, ...(await agentEnv(this.id)), ...opts.env, ...credentials },
+      opts,
+      resume,
+    );
   }
 }
 
