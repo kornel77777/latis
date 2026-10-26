@@ -17,6 +17,7 @@ import type {
   SessionOptions,
   Theme,
 } from "@latis/shared";
+import { DEFAULT_ALWAYS_ASK } from "@latis/shared";
 import conductorSystem from "../../resources/conductor/SYSTEM.md?raw";
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
@@ -113,6 +114,8 @@ const DEFAULT_PREFS: Prefs = {
   keybindings: {},
   // The lattice is where work happens; the canvas is the map. LATIS_LAYOUT=canvas starts on the canvas (most e2e specs).
   layoutMode: process.env.LATIS_LAYOUT === "canvas" ? "canvas" : "lattice",
+  defaultPermissionMode: "auto-edit",
+  alwaysAsk: DEFAULT_ALWAYS_ASK,
 };
 /** Once per data dir: move existing installs to the lattice and the cold accent (DECISIONS 2026-10-25). */
 let designMigrated = false;
@@ -131,7 +134,14 @@ function migrateDesign() {
 function prefs(): Prefs {
   migrateDesign();
   const saved = store.getSetting<Partial<Prefs>>("prefs") ?? {};
-  return { ...DEFAULT_PREFS, ...saved, appearance: { ...DEFAULT_APPEARANCE, ...saved.appearance } };
+  // Before Settings → Permissions the default mode was its own setting.
+  const legacyMode = store.getSetting<PermissionMode>("defaultPermissionMode");
+  return {
+    ...DEFAULT_PREFS,
+    ...(legacyMode && { defaultPermissionMode: legacyMode }),
+    ...saved,
+    appearance: { ...DEFAULT_APPEARANCE, ...saved.appearance },
+  };
 }
 /** Interface size is the window's zoom factor, so everything (canvas maths included) scales together. */
 function applyUiScale() {
@@ -209,6 +219,7 @@ const supervisor = new SessionSupervisor(
   },
   {
     sessionOptions: (chat) => sessionOptions(chat),
+    alwaysAsk: () => prefs().alwaysAsk,
     turnEnded: (chatId, status, final) => {
       try {
         flows.turnEnded(chatId, status, final);
@@ -326,7 +337,7 @@ function createFlowFrom(spec: import("@latis/shared").FlowSpec, x: number, y: nu
       dataDir,
       canvasId,
       readyAgents,
-      defaultMode: () => store.getSetting<PermissionMode>("defaultPermissionMode") ?? "auto-edit",
+      defaultMode: () => prefs().defaultPermissionMode,
       createCard: ({ title, gate, fields, x: cx, y: cy, parentId }) => {
         const g = gateCard(gate);
         if (!g) throw new Error(`There's no "${gate}" gate card.`);
@@ -506,7 +517,7 @@ async function ensureConductor() {
     agentId,
     model: agentId === "fake" ? "demo-1" : null,
     reasoning: null,
-    permissionMode: store.getSetting<PermissionMode>("defaultPermissionMode") ?? "auto-edit",
+    permissionMode: prefs().defaultPermissionMode,
     cwd: conductorDir,
     title: "Conductor",
     role: "conductor",
@@ -667,7 +678,7 @@ registerHandlers({
       agentId,
       model: model ?? (agentId === "fake" ? "demo-1" : null),
       reasoning: reasoning ?? null,
-      permissionMode: permissionMode ?? store.getSetting<PermissionMode>("defaultPermissionMode") ?? "auto-edit",
+      permissionMode: permissionMode ?? prefs().defaultPermissionMode,
       cwd: own?.cwd ?? project?.folderPath ?? sandboxDir(),
       worktreeId: own?.worktreeId ?? null,
       title: agentId === "fake" ? "Demo chat" : agents.isTerminal(agentId) ? agents.get(agentId)!.displayName : "New chat",
@@ -1091,6 +1102,7 @@ registerHandlers({
     const next = { ...prefs(), ...patch };
     store.setSetting("prefs", next);
     if (patch.appearance) applyUiScale();
+    if (patch.alwaysAsk) supervisor.setAlwaysAsk(next.alwaysAsk);
     return next;
   },
   "appearance:pickWallpaper": async () => {

@@ -30,7 +30,7 @@ Verified 2026-10-23 against `@openai/codex@0.163.0` (`codex-cli 0.163.0`, macOS 
 | Read-only           | `read-only`          | `never`          | Writes fail in the sandbox, nothing asks                                                              |
 | Ask                 | `workspace-write`    | `untrusted`      | Pure reads (see below) auto-accepted; every other command and every patch goes to the user            |
 | Auto-edit (default) | `workspace-write`    | `untrusted`      | Patches whose paths are all inside the chat cwd and pure reads are auto-accepted; commands go to user |
-| Full-auto           | `danger-full-access` | `never`          | Nothing asks; the always-ask list can't be enforced (chat header warns)                               |
+| Full-auto           | `danger-full-access` | `never`          | Nothing asks. With an always-ask list: `untrusted` instead, see below                                 |
 
 - Recorded: with `untrusted`, Codex asks before **every** `apply_patch`, even inside the workspace, and before plain reads like `cat README.md`. Without the Latis-side auto-accept, Auto-edit would behave like Ask.
 - A "pure read" is a command approval whose `commandActions` are all `read`, `listFiles` or `search` (Codex's own parse of the command).
@@ -47,6 +47,12 @@ Verified 2026-10-23 against `@openai/codex@0.163.0` (`codex-cli 0.163.0`, macOS 
 
 - "Always for this chat" maps to `acceptForSession`. `decline` lets the model continue and explain. `cancel` ends the turn.
 - `serverRequest/resolved { requestId }` follows every answer.
+
+## Always-ask list (recorded 2026-10-26, codex-cli with ChatGPT Plus)
+
+With `approvalPolicy: "untrusted"` and `sandbox: "danger-full-access"` Codex asks before every command it doesn't consider safe, still unsandboxed. Latis uses that pair for Full-auto whenever the list isn't empty and accepts every request itself except commands matching the list (`unwrapCommand` strips the `/bin/zsh -lc '…'` wrapper first). Listed commands go to the user in every mode except Read-only; "always" answers become `accept`, never `acceptForSession`. Emptying or filling the list in Full-auto changes the policy on the next `turn/start`.
+
+Recorded in `full-auto-always-ask.jsonl` (`record-codex-stream.mjs --mode full-auto-guarded --deny-matching "rm -rf"`): two command approvals (`mkdir build && …` accepted, `rm -rf build` declined); the agent reported the decline. Codex doesn't ask about commands it parses as safe reads, so a pattern like `cat .env` isn't caught in Full-auto.
 
 ## Notification → AgentEvent mapping
 

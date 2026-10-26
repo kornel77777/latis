@@ -1,6 +1,6 @@
 // Records a real `codex app-server` JSON-RPC exchange into fixtures/codex/<name>.jsonl (SPEC §0.2, §16).
 // Usage: node scripts/record-codex-stream.mjs <name> "<prompt>" [--deny] [--model gpt-6-luna] [--mode auto-edit]
-//          [--then "<second prompt>"] [--steer "<text>"] [--interrupt] [--resume] [--codex /path/to/codex]
+//          [--deny-matching "<regex>"] [--then "<second prompt>"] [--steer "<text>"] [--interrupt] [--resume] [--codex /path/to/codex]
 // Uses whatever account Codex is signed in with. Paths, ids and identities are scrubbed.
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -22,6 +22,8 @@ const MODES = {
   ask: { approvalPolicy: "untrusted", sandbox: "workspace-write" },
   "auto-edit": { approvalPolicy: "untrusted", sandbox: "workspace-write" },
   "full-auto": { approvalPolicy: "never", sandbox: "danger-full-access" },
+  // Full-auto with an always-ask list: Codex asks about every command and Latis answers.
+  "full-auto-guarded": { approvalPolicy: "untrusted", sandbox: "danger-full-access" },
 };
 const mode = MODES[arg("--mode") ?? "auto-edit"];
 
@@ -72,7 +74,9 @@ async function turn(threadId, text, { steer, interrupt } = {}) {
       if (m.method === "turn/started") turnId = m.params.turn.id;
       if (m.id !== undefined && m.method) {
         // A server request (approval or question): answer like a user would.
-        const decision = flag("--deny") ? "decline" : "accept";
+        const denyMatching = arg("--deny-matching");
+        const command = String(m.params?.command ?? "");
+        const decision = flag("--deny") || (denyMatching && new RegExp(denyMatching).test(command)) ? "decline" : "accept";
         if (m.method === "item/tool/requestUserInput") {
           const answers = Object.fromEntries(m.params.questions.map((q) => [q.id, { answers: [q.options?.[0]?.label ?? "yes"] }]));
           send({ id: m.id, result: { answers } });

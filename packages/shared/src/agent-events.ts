@@ -70,6 +70,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     command: z.string().optional(),
     paths: z.array(z.string()).optional(),
     reason: z.string().optional(),
+    // Latis extension: the always-ask pattern this matched (§9.8 AC3). Only "allow once" is offered.
+    alwaysAsk: z.string().optional(),
   }),
   z.object({
     type: z.literal("question.asked"),

@@ -48,7 +48,8 @@ export interface Toast {
   action?: { label: string; run: () => void };
 }
 
-export type SettingsSection = "Agents" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
+export type SettingsSection =
+  "Agents" | "Permissions" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
 
 export type ChatOptions = Partial<Pick<ChatSummary, "model" | "reasoning" | "permissionMode" | "title">>;
 

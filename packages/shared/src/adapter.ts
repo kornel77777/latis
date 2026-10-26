@@ -103,6 +103,8 @@ export interface AgentSession {
   respond(requestId: string, response: RequestResponse): Promise<void>;
   setModel?(model: string, reasoning?: string): Promise<void>;
   setPermissionMode?(mode: PermissionMode): Promise<void>;
+  /** The always-ask list changed in Settings (§9.8 AC3); applies from the next tool call. */
+  setAlwaysAsk?(patterns: string[]): void;
   onEvent(listener: (e: AgentEvent) => void): Unsubscribe;
   /** Fires once if the underlying process dies unexpectedly. */
   onExit(listener: (info: { code: number | null; signal: string | null }) => void): Unsubscribe;

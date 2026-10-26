@@ -1,16 +1,17 @@
-import type {
-  AgentAdapter,
-  AgentSession,
-  AuthStatus,
-  DetectResult,
-  LoginHandle,
-  McpServerConfig,
-  ModelInfo,
-  PermissionMode,
-  RequestResponse,
-  SessionOptions,
-  UsageSnapshot,
-  UserTurn,
+import {
+  matchAlwaysAsk,
+  type AgentAdapter,
+  type AgentSession,
+  type AuthStatus,
+  type DetectResult,
+  type LoginHandle,
+  type McpServerConfig,
+  type ModelInfo,
+  type PermissionMode,
+  type RequestResponse,
+  type SessionOptions,
+  type UsageSnapshot,
+  type UserTurn,
 } from "@latis/shared";
 import { JsonRpcPeer, RpcError, type Params } from "../../rpc/peer";
 import { spawnTransport, type LineTransport } from "../../rpc/transport";
@@ -28,6 +29,13 @@ const MODES: Record<PermissionMode, { approvalPolicy: Approval; sandbox: Sandbox
   "auto-edit": { approvalPolicy: "untrusted", sandbox: "workspace-write" },
   "full-auto": { approvalPolicy: "never", sandbox: "danger-full-access" },
 };
+/**
+ * Full-auto with an always-ask list: Codex asks about every command and Latis accepts all but the listed ones
+ * (docs/adapters/codex.md → Always-ask list).
+ */
+const GUARDED_FULL_AUTO = { approvalPolicy: "untrusted", sandbox: "danger-full-access" } as const;
+const policyFor = (mode: PermissionMode, alwaysAsk: string[]) =>
+  mode === "full-auto" && alwaysAsk.length ? GUARDED_FULL_AUTO : MODES[mode];
 /** `turn/start` takes the sandbox as a policy object with every field set. */
 function sandboxPolicy(sandbox: Sandbox) {
   if (sandbox === "read-only") return { type: "readOnly", networkAccess: false };
@@ -203,6 +211,8 @@ const cancelled = (req: CodexRequest) => (req.elicitation ? { action: "cancel", 
 
 interface PendingRequest {
   req: CodexRequest;
+  /** On the always-ask list: "always" answers count once. */
+  alwaysAsk?: string;
   resolve: (result: unknown) => void;
 }
 
@@ -214,6 +224,7 @@ class CodexSession extends SessionBase implements AgentSession {
   private interrupting = false;
   private pending = new Map<string, PendingRequest>();
   private mode: PermissionMode;
+  private alwaysAsk: string[];
   private model: string | undefined;
   private effort: string | undefined;
   /** Options changed since the last turn/start; sent with the next one. */
@@ -227,6 +238,7 @@ class CodexSession extends SessionBase implements AgentSession {
     super();
     this.mapper = new CodexMapper(opts.cwd);
     this.mode = opts.permissionMode;
+    this.alwaysAsk = opts.alwaysAsk;
     this.model = opts.model && opts.model !== "default" ? opts.model : undefined;
     this.effort = opts.reasoning;
   }
@@ -248,7 +260,7 @@ class CodexSession extends SessionBase implements AgentSession {
       });
       const base = {
         cwd: opts.cwd,
-        ...MODES[opts.permissionMode],
+        ...policyFor(opts.permissionMode, opts.alwaysAsk),
         ...(s.model && { model: s.model }),
         ...(opts.systemPromptAppend && { developerInstructions: opts.systemPromptAppend }),
         ...(opts.mcpServers?.length && { config: { mcp_servers: Object.fromEntries(opts.mcpServers.map((m) => [m.name, codexMcp(m)])) } }),
@@ -293,6 +305,14 @@ class CodexSession extends SessionBase implements AgentSession {
     }
     // Latis-side auto-answers that make the modes behave as documented (codex.md → Permission modes).
     else if (req.event.type === "permission.requested") {
+      const event = req.event;
+      const pattern = event.command !== undefined && this.mode !== "read-only" ? matchAlwaysAsk(event.command, this.alwaysAsk) : null;
+      if (pattern) {
+        return new Promise((resolve) => {
+          this.pending.set(req.requestId, { req, resolve, alwaysAsk: pattern });
+          this.emit({ ...event, alwaysAsk: pattern });
+        });
+      }
       if (req.pureRead && this.mode !== "read-only") return Promise.resolve({ decision: "accept" });
       if (req.editInsideCwd && this.mode === "auto-edit") return Promise.resolve({ decision: "accept" });
       if (this.mode === "full-auto") return Promise.resolve({ decision: "accept" });
@@ -307,8 +327,9 @@ class CodexSession extends SessionBase implements AgentSession {
   private turnOverrides() {
     const o: Record<string, unknown> = {};
     if (this.dirty.mode) {
-      o.approvalPolicy = MODES[this.mode].approvalPolicy;
-      o.sandboxPolicy = sandboxPolicy(MODES[this.mode].sandbox);
+      const policy = policyFor(this.mode, this.alwaysAsk);
+      o.approvalPolicy = policy.approvalPolicy;
+      o.sandboxPolicy = sandboxPolicy(policy.sandbox);
     }
     if (this.model) o.model = this.model;
     if (this.effort) o.effort = this.effort;
@@ -356,7 +377,8 @@ class CodexSession extends SessionBase implements AgentSession {
       return;
     }
     if (response.kind === "permission") {
-      const decision = response.decision === "deny" ? "decline" : response.decision === "allow-once" ? "accept" : "acceptForSession";
+      const once = response.decision === "allow-once" || p.alwaysAsk !== undefined;
+      const decision = response.decision === "deny" ? "decline" : once ? "accept" : "acceptForSession";
       p.resolve({ decision });
     } else if (response.kind === "answer") {
       const ids = p.req.questionIds ?? {};
@@ -378,6 +400,12 @@ class CodexSession extends SessionBase implements AgentSession {
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     this.mode = mode;
     this.dirty.mode = true;
+  }
+
+  /** Full-auto switches between asking about every command and asking about none on the next turn. */
+  setAlwaysAsk(patterns: string[]): void {
+    if (Boolean(patterns.length) !== Boolean(this.alwaysAsk.length)) this.dirty.mode = true;
+    this.alwaysAsk = patterns;
   }
 
   async dispose(): Promise<void> {

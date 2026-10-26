@@ -30,7 +30,16 @@ export type TranscriptItem =
       parentId?: string;
     }
   | ({ kind: "file"; key: string } & FileChange)
-  | { kind: "permission"; key: string; id: string; summary: string; command?: string; reason?: string; pending: boolean }
+  | {
+      kind: "permission";
+      key: string;
+      id: string;
+      summary: string;
+      command?: string;
+      reason?: string;
+      alwaysAsk?: string;
+      pending: boolean;
+    }
   | { kind: "question"; key: string; id: string; questions: QuestionSpec[]; pending: boolean }
   | { kind: "plan"; key: string; id: string; markdown: string; pending: boolean }
   | { kind: "error"; key: string; message: string }
@@ -160,6 +169,7 @@ function projectTurn(events: StoredEvent[], turnId: string | null): TranscriptIt
           summary: e.summary,
           ...(e.command !== undefined && { command: e.command }),
           ...(e.reason !== undefined && { reason: e.reason }),
+          ...(e.alwaysAsk !== undefined && { alwaysAsk: e.alwaysAsk }),
           pending: true,
         });
         break;

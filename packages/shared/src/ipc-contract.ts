@@ -409,6 +409,10 @@ export const Prefs = z.object({
   keybindings: z.record(z.string(), z.array(z.string().max(40)).max(4)),
   /** Canvas or the tiled lattice. */
   layoutMode: z.enum(["canvas", "lattice"]),
+  /** Mode new chats start in (Settings → Permissions, §8.11). */
+  defaultPermissionMode: PermissionModeSchema,
+  /** Command patterns that always need approval, even in Full-auto (§9.8 AC3). */
+  alwaysAsk: z.array(z.string().trim().min(1).max(200)).max(100),
 });
 export type Prefs = z.infer<typeof Prefs>;
 

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { AgentEvent, type AgentSession, type PermissionMode } from "@latis/shared";
+import { AgentEvent, DEFAULT_ALWAYS_ASK, type AgentSession, type PermissionMode } from "@latis/shared";
 import { CodexAdapter } from "../../src/main/agents/adapters/codex";
 import { CodexMapper, unwrapCommand } from "../../src/main/agents/adapters/codex/mapper";
 import { ReplayLibrary, replayTransport } from "../../src/main/agents/rpc/replay";
@@ -114,9 +114,15 @@ describe("CodexMapper", () => {
   });
 });
 
-function adapter() {
+function adapter(sent: Record<string, unknown>[] = []) {
   const lib = new ReplayLibrary(DIR, { fallback: "write-and-run", turnMethod: "turn/start", paceMs: 0 });
-  return new CodexAdapter({ transport: (cwd) => replayTransport(lib, cwd), executable: "/replay/codex" });
+  return new CodexAdapter({
+    transport: (cwd) => {
+      const t = replayTransport(lib, cwd);
+      return { ...t, send: (line: string) => (sent.push(JSON.parse(line) as Record<string, unknown>), t.send(line)) };
+    },
+    executable: "/replay/codex",
+  });
 }
 
 function collect(session: AgentSession) {
@@ -184,6 +190,42 @@ describe("CodexAdapter (replayed app-server)", () => {
     const req = await waitFor((e) => e.type === "permission.requested");
     await s.respond(req.type === "permission.requested" ? req.id : "", { kind: "permission", decision: "deny" });
     expect(await waitFor((e) => e.type === "tool.completed")).toMatchObject({ status: "denied" });
+    await s.dispose();
+  });
+
+  it("asks about always-ask commands in Full-auto and accepts the rest", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const s = await adapter(sent).startSession({ cwd: CWD, permissionMode: "full-auto", alwaysAsk: DEFAULT_ALWAYS_ASK });
+    const { events, waitFor } = collect(s);
+    // Codex has to ask about every command for Latis to see them.
+    expect(sent.find((m) => m.method === "thread/start")).toMatchObject({
+      params: { approvalPolicy: "untrusted", sandbox: "danger-full-access" },
+    });
+    await s.send({ text: "/full-auto-always-ask" });
+    const req = await waitFor((e) => e.type === "permission.requested");
+    expect(req).toMatchObject({ kind: "exec", command: "rm -rf build", alwaysAsk: "rm -rf" });
+    expect(events.filter((e) => e.type === "permission.requested")).toHaveLength(1);
+    // "Always" doesn't stick for a listed command.
+    await s.respond(req.type === "permission.requested" ? req.id : "", { kind: "permission", decision: "allow-chat" });
+    await waitFor((e) => e.type === "turn.completed");
+    const answers = sent.filter((m) => m.result && typeof m.result === "object" && "decision" in m.result).map((m) => m.result);
+    expect(answers).toEqual([{ decision: "accept" }, { decision: "accept" }]);
+    await s.dispose();
+  });
+
+  it("runs Full-auto without asking when the list is empty, and switches on the next turn", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const s = await adapter(sent).startSession({ cwd: CWD, permissionMode: "full-auto", alwaysAsk: [] });
+    expect(sent.find((m) => m.method === "thread/start")).toMatchObject({ params: { approvalPolicy: "never" } });
+    s.setAlwaysAsk!(["rm -rf"]);
+    const { waitFor } = collect(s);
+    await s.send({ text: "/full-auto-always-ask" });
+    expect(sent.find((m) => m.method === "turn/start")).toMatchObject({
+      params: { approvalPolicy: "untrusted", sandboxPolicy: { type: "dangerFullAccess" } },
+    });
+    const req = await waitFor((e) => e.type === "permission.requested");
+    await s.respond(req.type === "permission.requested" ? req.id : "", { kind: "permission", decision: "deny" });
+    await waitFor((e) => e.type === "turn.completed");
     await s.dispose();
   });
 

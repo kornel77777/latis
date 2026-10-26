@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import type { CanUseTool, ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { CanUseTool, HookInput, ModelInfo, Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { QueryFn } from "./index";
 
 // Test double for the SDK's query(): replays recordings from fixtures/claude-code/*.jsonl.
@@ -85,6 +85,14 @@ export function createReplayQuery(dir: string, fallback = "allow-write-bash"): Q
               displayName: d.displayName,
             };
             await options.canUseTool!(d.toolName, d.input, ctx as unknown as Parameters<CanUseTool>[2]);
+          } else if (l.kind === "pre_tool_use") {
+            // Recorded PreToolUse hook calls (the always-ask list); the recording already holds the outcome.
+            const d = l.data as { toolName: string; input: Record<string, unknown>; toolUseID: string };
+            const input = { hook_event_name: "PreToolUse", tool_name: d.toolName, tool_input: d.input, tool_use_id: d.toolUseID };
+            for (const m of options.hooks?.PreToolUse ?? []) {
+              if (m.matcher && !new RegExp(`^(${m.matcher})$`).test(d.toolName)) continue;
+              for (const h of m.hooks) await h(input as HookInput, d.toolUseID, { signal: new AbortController().signal });
+            }
           } else if (l.kind === "message") {
             // Pace like a live stream so the UI's streaming paths are exercised.
             await new Promise((r) => setTimeout(r, (l.data as SDKMessage).type === "stream_event" ? 8 : 25));

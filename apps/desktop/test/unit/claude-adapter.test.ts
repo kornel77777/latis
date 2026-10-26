@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AgentEvent, buildTranscript, type StoredEvent, type Turn } from "@latis/shared";
+import { AgentEvent, buildTranscript, DEFAULT_ALWAYS_ASK, type SessionOptions, type StoredEvent, type Turn } from "@latis/shared";
 import { ClaudeCodeAdapter, type QueryFn } from "../../src/main/agents/adapters/claude-code";
 import { ClaudeMapper, toolKind } from "../../src/main/agents/adapters/claude-code/mapper";
 
@@ -27,12 +27,15 @@ function mapAll(name: string): AgentEvent[] {
 }
 
 describe("ClaudeMapper", () => {
-  it.each(["allow-write-bash", "deny-write", "two-turns-edit", "ask-question", "plan-mode"])("maps %s to schema-valid events", (name) => {
-    const events = mapAll(name);
-    for (const e of events) expect(AgentEvent.safeParse(e).success).toBe(true);
-    expect(events[0]).toMatchObject({ type: "session.started", model: expect.stringContaining("claude-") });
-    expect(events.at(-1)).toMatchObject({ type: "turn.completed", status: "ok" });
-  });
+  it.each(["allow-write-bash", "deny-write", "two-turns-edit", "ask-question", "plan-mode", "always-ask-bypass"])(
+    "maps %s to schema-valid events",
+    (name) => {
+      const events = mapAll(name);
+      for (const e of events) expect(AgentEvent.safeParse(e).success).toBe(true);
+      expect(events[0]).toMatchObject({ type: "session.started", model: expect.stringContaining("claude-") });
+      expect(events.at(-1)).toMatchObject({ type: "turn.completed", status: "ok" });
+    },
+  );
 
   it("streams text and completes it with the full message", () => {
     const events = mapAll("allow-write-bash");
@@ -130,7 +133,9 @@ describe("ClaudeMapper", () => {
 });
 
 /** A stand-in for the SDK's query(): replays a recording, pausing at each turn and permission prompt. */
-function replayQuery(name: string, seen: { options?: Options }): QueryFn {
+type Seen = { options?: Options; hooks?: unknown[] };
+
+function replayQuery(name: string, seen: Seen): QueryFn {
   return (({ prompt, options }: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => {
     seen.options = options;
     const lines = fixture(name);
@@ -146,6 +151,14 @@ function replayQuery(name: string, seen: { options?: Options }): QueryFn {
           const d = l.data as { toolName: string; input: Record<string, unknown>; toolUseID: string };
           const ctx = { signal: new AbortController().signal, toolUseID: d.toolUseID, suggestions: [] };
           await options.canUseTool!(d.toolName, d.input, ctx as unknown as Parameters<NonNullable<Options["canUseTool"]>>[2]);
+        } else if (l.kind === "pre_tool_use") {
+          const d = l.data as { toolName: string; input: Record<string, unknown>; toolUseID: string };
+          const input = { hook_event_name: "PreToolUse", tool_name: d.toolName, tool_input: d.input, tool_use_id: d.toolUseID };
+          for (const m of options.hooks?.PreToolUse ?? []) {
+            if (m.matcher && !new RegExp(`^(${m.matcher})$`).test(d.toolName)) continue;
+            for (const h of m.hooks)
+              (seen.hooks ??= []).push(await h(input as never, d.toolUseID, { signal: new AbortController().signal }));
+          }
         } else if (l.kind === "message") {
           yield l.data as SDKMessage;
           if ((l.data as SDKMessage).type === "result") awaitingTurn = true;
@@ -167,10 +180,11 @@ async function drive(
   name: string,
   onRequest: (e: AgentEvent, respond: (r: Parameters<import("@latis/shared").AgentSession["respond"]>[1]) => void) => void,
   turns = ["go"],
+  opts: Partial<SessionOptions> = {},
 ) {
-  const seen: { options?: Options } = {};
+  const seen: Seen = {};
   const adapter = new ClaudeCodeAdapter({ queryFn: replayQuery(name, seen), executable: "/usr/bin/claude" });
-  const session = await adapter.startSession({ cwd: CWD, permissionMode: "ask", alwaysAsk: [], model: "haiku", reasoning: "low" });
+  const session = await adapter.startSession({ cwd: CWD, permissionMode: "ask", alwaysAsk: [], model: "haiku", reasoning: "low", ...opts });
   const events: StoredEvent[] = [];
   const done = new Promise<void>((resolve) => {
     let completed = 0;
@@ -186,7 +200,7 @@ async function drive(
   await session.send({ text: turns[0]! });
   await done;
   await session.dispose();
-  return { events, options: seen.options!, session };
+  return { events, options: seen.options!, session, hooks: seen.hooks ?? [] };
 }
 
 describe("ClaudeCodeAdapter session (replayed)", () => {
@@ -234,6 +248,46 @@ describe("ClaudeCodeAdapter session (replayed)", () => {
     const steps = buildTranscript(turns, events).filter((i) => i.kind === "step");
     const edit = steps.find((s) => s.kind === "step" && s.name === "Edit");
     expect(edit).toMatchObject({ files: [{ path: "a.txt", additions: 1, deletions: 1 }] });
+  });
+
+  it("asks about always-ask commands in Full-auto through the PreToolUse hook", async () => {
+    const asked: AgentEvent[] = [];
+    const { hooks, options } = await drive(
+      "always-ask-bypass",
+      (e, r) => {
+        asked.push(e);
+        r({ kind: "permission", decision: "deny" });
+      },
+      ["go"],
+      { permissionMode: "full-auto", alwaysAsk: DEFAULT_ALWAYS_ASK },
+    );
+    expect(options.permissionMode).toBe("bypassPermissions");
+    expect(asked).toEqual([
+      expect.objectContaining({ type: "permission.requested", kind: "exec", command: "rm -rf build", alwaysAsk: "rm -rf" }),
+    ]);
+    // The first command isn't listed: the hook stays out of the way. The listed one is denied.
+    expect(hooks).toEqual([
+      {},
+      { hookSpecificOutput: expect.objectContaining({ hookEventName: "PreToolUse", permissionDecision: "deny" }) },
+    ]);
+  });
+
+  it("allows an always-ask command the user approves, once", async () => {
+    const { hooks } = await drive("always-ask-bypass", (_e, r) => r({ kind: "permission", decision: "allow-chat" }), ["go"], {
+      permissionMode: "full-auto",
+      alwaysAsk: ["rm -rf"],
+    });
+    expect(hooks[1]).toEqual({ hookSpecificOutput: expect.objectContaining({ permissionDecision: "allow" }) });
+  });
+
+  it("leaves read-only chats and an empty list to the normal permission flow", async () => {
+    const ro = await drive("always-ask-bypass", () => expect.fail("nothing should ask"), ["go"], {
+      permissionMode: "read-only",
+      alwaysAsk: ["rm -rf"],
+    });
+    expect(ro.hooks).toEqual([{}, {}]);
+    const none = await drive("always-ask-bypass", () => expect.fail("nothing should ask"), ["go"], { permissionMode: "full-auto" });
+    expect(none.hooks).toEqual([{}, {}]);
   });
 
   it("reports not-installed instead of starting", async () => {

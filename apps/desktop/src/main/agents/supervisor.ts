@@ -55,6 +55,8 @@ export interface TurnHooks {
 export interface SessionExtras {
   /** Per-session options: MCP servers, instructions (§10). */
   sessionOptions?(chat: ChatSummary): Promise<Partial<SessionOptions>>;
+  /** The always-ask list from Settings → Permissions (§9.8 AC3). */
+  alwaysAsk?(): string[];
   /** What the agent receives for what the user typed (skills, §9.14). The transcript keeps the typed text. */
   expand?(chatId: string, text: string): string;
   /** A turn ended, with the agent's final message (flows, §11). */
@@ -251,6 +253,11 @@ export class SessionSupervisor {
   }
 
   /** Ends the structured session so the conversation can continue elsewhere (open as terminal). */
+  /** Settings → Permissions changed the always-ask list: running sessions use it from their next tool call. */
+  setAlwaysAsk(patterns: string[]): void {
+    for (const live of this.live.values()) live.session.setAlwaysAsk?.(patterns);
+  }
+
   async release(chatId: string) {
     await this.stop(chatId);
     this.setStatus(chatId, "idle");
@@ -345,7 +352,7 @@ export class SessionSupervisor {
       cwd: chat.cwd,
       chatId,
       permissionMode: chat.permissionMode as PermissionMode,
-      alwaysAsk: [],
+      alwaysAsk: this.extras.alwaysAsk?.() ?? [],
       ...(chat.model && { model: chat.model }),
       ...(chat.reasoning && { reasoning: chat.reasoning }),
       ...(await this.extras.sessionOptions?.(chat)),

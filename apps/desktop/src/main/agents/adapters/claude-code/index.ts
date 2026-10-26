@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   CanUseTool,
   EffortLevel,
+  HookCallback,
   McpHttpServerConfig,
   McpStdioServerConfig,
   Options,
@@ -12,19 +13,20 @@ import type {
   SDKUserMessage,
   query as sdkQuery,
 } from "@anthropic-ai/claude-agent-sdk";
-import type {
-  AgentAdapter,
-  AgentEvent,
-  AgentSession,
-  AuthStatus,
-  DetectResult,
-  LoginHandle,
-  McpServerConfig,
-  ModelInfo,
-  PermissionMode,
-  RequestResponse,
-  SessionOptions,
-  UserTurn,
+import {
+  matchAlwaysAsk,
+  type AgentAdapter,
+  type AgentEvent,
+  type AgentSession,
+  type AuthStatus,
+  type DetectResult,
+  type LoginHandle,
+  type McpServerConfig,
+  type ModelInfo,
+  type PermissionMode,
+  type RequestResponse,
+  type SessionOptions,
+  type UserTurn,
 } from "@latis/shared";
 import { agentEnv, versionOf, which } from "../../shell-env";
 import { ClaudeMapper, toolKind } from "./mapper";
@@ -39,6 +41,8 @@ const SDK_MODE: Record<PermissionMode, SdkPermissionMode> = {
 };
 const EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 const READ_ONLY_KINDS = new Set(["read", "search", "web"]);
+/** Tools whose `command` input runs in a shell, checked against the always-ask list. */
+const SHELL_TOOLS = "Bash|PowerShell";
 /** Tools that are conversations with the user, not actions, so read-only mode still lets them through. */
 const DIALOG_TOOLS = new Set(["AskUserQuestion", "ExitPlanMode"]);
 
@@ -226,9 +230,11 @@ class ClaudeSession implements AgentSession {
   private q: Query;
   private disposed = false;
   private mode: PermissionMode;
+  private alwaysAsk: string[];
 
   constructor(queryFn: QueryFn, executable: string, env: NodeJS.ProcessEnv, opts: SessionOptions, resume: string | undefined) {
     this.mode = opts.permissionMode;
+    this.alwaysAsk = opts.alwaysAsk;
     this.mapper = new ClaudeMapper(opts.cwd);
     if (resume) this.nativeSessionId = resume;
     const options: Options = {
@@ -239,6 +245,8 @@ class ClaudeSession implements AgentSession {
       permissionMode: SDK_MODE[opts.permissionMode],
       thinking: { type: "adaptive", display: "summarized" },
       canUseTool: this.canUseTool,
+      // canUseTool isn't consulted in bypassPermissions, so the always-ask list runs as a PreToolUse hook (§9.8 AC3).
+      hooks: { PreToolUse: [{ matcher: SHELL_TOOLS, timeout: 7 * 24 * 3600, hooks: [this.preToolUse] }] },
       ...(opts.model && opts.model !== "default" && { model: opts.model }),
       ...(opts.reasoning && EFFORTS.has(opts.reasoning) && { effort: opts.reasoning as EffortLevel }),
       // Lets the chat switch into Full-auto later; the starting mode is still the one above.
@@ -293,6 +301,33 @@ class ClaudeSession implements AgentSession {
       });
       this.emit(event);
     });
+  };
+
+  /**
+   * Commands on the always-ask list wait for the user in every mode. The hook's allow/deny skips the agent's own
+   * permission check, so a matching command is asked about once (docs/adapters/claude-code.md → Always-ask list).
+   */
+  private preToolUse: HookCallback = (input, _toolUseID, { signal }) => {
+    if (input.hook_event_name !== "PreToolUse" || this.mode === "read-only") return Promise.resolve({});
+    const toolInput = (input.tool_input ?? {}) as Record<string, unknown>;
+    const pattern = typeof toolInput.command === "string" ? matchAlwaysAsk(toolInput.command, this.alwaysAsk) : null;
+    if (!pattern) return Promise.resolve({});
+    const id = input.tool_use_id;
+    const event = { ...this.mapper.requestEvent(input.tool_name, toolInput, { toolUseID: id }), alwaysAsk: pattern };
+    return new Promise<PermissionResult>((resolve) => {
+      this.pending.set(id, { toolName: input.tool_name, input: toolInput, suggestions: [], resolve });
+      signal.addEventListener("abort", () => {
+        this.pending.delete(id);
+        resolve({ behavior: "deny", message: "Cancelled." });
+      });
+      this.emit(event);
+    }).then((r) => ({
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse" as const,
+        permissionDecision: r.behavior,
+        permissionDecisionReason: r.behavior === "deny" ? r.message : `The user approved this (always-ask: ${pattern}).`,
+      },
+    }));
   };
 
   async send(turn: UserTurn): Promise<void> {
@@ -358,6 +393,10 @@ class ClaudeSession implements AgentSession {
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     this.mode = mode;
     await this.q.setPermissionMode(SDK_MODE[mode]);
+  }
+
+  setAlwaysAsk(patterns: string[]): void {
+    this.alwaysAsk = patterns;
   }
 
   onEvent(listener: (e: AgentEvent) => void) {

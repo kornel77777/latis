@@ -7,11 +7,22 @@ import { latis } from "../api";
 import { useWorkspace, type SettingsSection } from "../stores/workspace";
 import { AgentList } from "./AgentList";
 import { CommandsSection } from "./CommandsSettings";
+import { PermissionsSection } from "./PermissionsSettings";
 import { ConductorSection, ConnectionsSection, SkillsSection } from "./SettingsOrchestration";
 
-const sections: SettingsSection[] = ["Agents", "Conductor", "Connections", "Skills", "Commands", "Appearance", "Notifications"];
+const sections: SettingsSection[] = [
+  "Agents",
+  "Permissions",
+  "Conductor",
+  "Connections",
+  "Skills",
+  "Commands",
+  "Appearance",
+  "Notifications",
+];
 const BODY: Record<SettingsSection, () => React.ReactNode> = {
   Agents: AgentsSection,
+  Permissions: PermissionsSection,
   Conductor: ConductorSection,
   Connections: ConnectionsSection,
   Skills: SkillsSection,
@@ -20,7 +31,7 @@ const BODY: Record<SettingsSection, () => React.ReactNode> = {
   Notifications: NotificationsSection,
 };
 
-/** Settings (§8.11). Permissions, accounts and the rest come with their milestones. */
+/** Settings (§8.11). */
 export function SettingsDialog() {
   const open = useWorkspace((s) => s.settingsOpen);
   const setOpen = useWorkspace((s) => s.setSettingsOpen);

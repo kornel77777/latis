@@ -24,17 +24,26 @@ Verified 2026-10-22 against `@anthropic-ai/claude-agent-sdk@0.3.309` and Claude 
 
 ## Permission modes (SPEC §9.8)
 
-| Latis               | SDK `permissionMode` | Notes                                                                                                      |
-| ------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Read-only           | `default`            | `canUseTool` auto-denies every non-read tool                                                               |
-| Ask                 | `default`            | Reads run without asking; edits and commands go through `canUseTool`                                       |
-| Auto-edit (default) | `acceptEdits`        | Commands still go through `canUseTool`                                                                     |
-| Full-auto           | `bypassPermissions`  | `canUseTool` is never called; the always-ask list needs a PreToolUse hook (not yet: chat header must warn) |
+| Latis               | SDK `permissionMode` | Notes                                                                               |
+| ------------------- | -------------------- | ----------------------------------------------------------------------------------- |
+| Read-only           | `default`            | `canUseTool` auto-denies every non-read tool                                        |
+| Ask                 | `default`            | Reads run without asking; edits and commands go through `canUseTool`                |
+| Auto-edit (default) | `acceptEdits`        | Commands still go through `canUseTool`                                              |
+| Full-auto           | `bypassPermissions`  | `canUseTool` is never called; the always-ask list runs as a PreToolUse hook (below) |
 
 `canUseTool(toolName, input, { toolUseID, title, displayName, decisionReason, suggestions, signal })` resolves to `{ behavior: "allow", updatedInput, updatedPermissions? }` or `{ behavior: "deny", message, interrupt? }`.
 
 - `suggestions` arrive with `destination: "localSettings"`, which would write into the repo's `.claude/settings.local.json`. For "Always for this chat" Latis rewrites them to `destination: "session"`.
 - Reads (`Read`, `Glob`, `Grep`) are not asked in `default` mode.
+
+## Always-ask list (probed live 2026-10-26, SDK 0.3.309, Haiku)
+
+Every session registers `hooks.PreToolUse: [{ matcher: "Bash|PowerShell", timeout: 604800, hooks: [cb] }]`. The callback matches `tool_input.command` against the list (`matchAlwaysAsk`, `packages/shared/src/always-ask.ts`):
+
+- No match, or a read-only chat: returns `{}` and the normal flow (mode, `canUseTool`) decides.
+- Match: emits `permission.requested` with `alwaysAsk`, waits for the user, then returns `hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "allow" | "deny", permissionDecisionReason }`.
+
+Probed: in `bypassPermissions` a hook `deny` blocks the command and `allow` runs it, and the SDK waits for the callback (1.5 s in the probe). In `default` mode a hook `allow` skips `canUseTool`, so a listed command is asked about once, not twice. The SDK warns `CLAUDE_SDK_CAN_USE_TOOL_SHADOWED` in bypass mode; that is expected. "Always" answers are treated as once. Recording: `always-ask-bypass.jsonl` (`record-claude-stream.mjs --mode bypassPermissions --deny-matching "rm -rf"`, `pre_tool_use` lines replayed by `replay.ts`).
 
 ## Questions and plans
 

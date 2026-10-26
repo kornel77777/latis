@@ -1,17 +1,18 @@
 import { mkdirSync } from "node:fs";
 import { isAbsolute, relative } from "node:path";
-import type {
-  AgentAdapter,
-  AgentSession,
-  AuthStatus,
-  DetectResult,
-  LoginHandle,
-  McpServerConfig,
-  ModelInfo,
-  PermissionMode,
-  RequestResponse,
-  SessionOptions,
-  UserTurn,
+import {
+  matchAlwaysAsk,
+  type AgentAdapter,
+  type AgentSession,
+  type AuthStatus,
+  type DetectResult,
+  type LoginHandle,
+  type McpServerConfig,
+  type ModelInfo,
+  type PermissionMode,
+  type RequestResponse,
+  type SessionOptions,
+  type UserTurn,
 } from "@latis/shared";
 import type { AgentManifest } from "../../manifests";
 import { JsonRpcPeer, RpcError, type Params } from "../../rpc/peer";
@@ -64,6 +65,12 @@ const MODE_ALIASES: Record<PermissionMode, string[]> = {
   "auto-edit": ["autoEdit", "auto_edit", "auto-edit", "acceptEdits", "accept_edits"],
   "full-auto": ["yolo", "bypassPermissions", "full-auto", "full_auto", "full-access"],
 };
+/** The command an `execute` tool call runs: its raw input when the agent sends one, else its title (Gemini). */
+function commandOf(call: ToolCall): string {
+  const raw = (call.rawInput ?? {}) as { command?: unknown };
+  return typeof raw.command === "string" ? raw.command : (call.title ?? "");
+}
+
 const READ_KINDS = new Set(["read", "search", "fetch", "think", "switch_mode"]);
 const EDIT_KINDS = new Set(["edit", "delete", "move"]);
 const CLIENT_INFO = { name: "latis", title: "Latis", version: "0.1.0" };
@@ -229,8 +236,9 @@ class AcpSession extends SessionBase implements AgentSession {
   private loading = false;
   private turnStart = 0;
   private interrupting = false;
-  private pending = new Map<string, { call: ToolCall; options: PermissionOption[]; resolve: (r: unknown) => void }>();
+  private pending = new Map<string, { call: ToolCall; options: PermissionOption[]; resolve: (r: unknown) => void; alwaysAsk?: string }>();
   private mode: PermissionMode;
+  private alwaysAsk: string[];
   private state: NewSessionResult = {};
   private images = false;
   private disposed = false;
@@ -244,15 +252,17 @@ class AcpSession extends SessionBase implements AgentSession {
     private readonly transport: LineTransport,
     private readonly cwd: string,
     mode: PermissionMode,
+    alwaysAsk: string[],
   ) {
     super();
     this.mapper = new AcpMapper(cwd);
     this.mode = mode;
+    this.alwaysAsk = alwaysAsk;
   }
 
   static async open(adapter: AcpAdapter, opts: SessionOptions, resume: string | undefined): Promise<AcpSession> {
     const transport = await adapter.transport(opts.cwd);
-    const s = new AcpSession(adapter, transport, opts.cwd, opts.permissionMode);
+    const s = new AcpSession(adapter, transport, opts.cwd, opts.permissionMode, opts.alwaysAsk);
     transport.onExit((info) => {
       if (s.disposed) return;
       for (const p of s.pending.values()) p.resolve({ outcome: { outcome: "cancelled" } });
@@ -310,7 +320,9 @@ class AcpSession extends SessionBase implements AgentSession {
   }
 
   private async applyMode(mode: PermissionMode) {
-    const id = this.modeId(mode);
+    // The agent's yolo mode never asks, so with an always-ask list Full-auto runs the agent in its auto-edit mode
+    // and Latis allows everything that isn't listed (docs/adapters/acp.md → Always-ask list).
+    const id = this.modeId(mode === "full-auto" && this.alwaysAsk.length ? "auto-edit" : mode);
     if (!id || id === this.state.modes?.currentModeId) return;
     try {
       await this.peer.request("session/set_mode", { sessionId: this.sessionId, modeId: id });
@@ -372,6 +384,14 @@ class AcpSession extends SessionBase implements AgentSession {
     const options = params.options as PermissionOption[];
     // Emulated modes on top of whatever the agent's own mode decides (docs/adapters/acp.md).
     const kind = call.kind ?? "other";
+    const pattern = this.mode !== "read-only" && kind === "execute" ? matchAlwaysAsk(commandOf(call), this.alwaysAsk) : null;
+    if (pattern) {
+      return new Promise((resolve) => {
+        this.pending.set(call.toolCallId, { call, options, resolve, alwaysAsk: pattern });
+        for (const e of this.mapper.permission(call.toolCallId, call))
+          this.emit(e.type === "permission.requested" ? { ...e, alwaysAsk: pattern } : e);
+      });
+    }
     if (this.mode === "full-auto" || (this.mode !== "read-only" && isWorkspaceTool(call)))
       return Promise.resolve(this.pick(options, ["allow_once", "allow_always"]));
     if (this.mode === "read-only" && !READ_KINDS.has(kind)) {
@@ -435,7 +455,7 @@ class AcpSession extends SessionBase implements AgentSession {
     } else {
       // "Always" is remembered by Latis and answered with allow-once: agents' own allow_always can fail
       // (Gemini refuses it in untrusted folders) and would outlive the chat.
-      if (response.decision !== "allow-once") this.always.add(alwaysKey(p.call));
+      if (response.decision !== "allow-once" && !p.alwaysAsk) this.always.add(alwaysKey(p.call));
       p.resolve(this.pick(p.options, ["allow_once", "allow_always"]));
     }
   }
@@ -448,6 +468,11 @@ class AcpSession extends SessionBase implements AgentSession {
   async setPermissionMode(mode: PermissionMode): Promise<void> {
     this.mode = mode;
     await this.applyMode(mode);
+  }
+
+  setAlwaysAsk(patterns: string[]): void {
+    this.alwaysAsk = patterns;
+    if (this.mode === "full-auto") void this.applyMode(this.mode);
   }
 
   async dispose(): Promise<void> {

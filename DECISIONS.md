@@ -404,3 +404,11 @@ Working with several agents happens in the lattice:
 ### 2026-10-25: Cold, sharp visual language
 
 Radii are 2–3px (`--radius-*`), pills became squares (status dots keep their shapes for accessibility, §8.12), shadows became hairlines, the palette moved to blue-steel greys with an ice-blue accent (Glacier). Agent colour is a 2px rule on the chat header and on your messages instead of a wash. Toolbar labels use `.latis-caps` (mono, uppercase). Lattice panes sit 4px apart on `bg-0`; the focused one gets a 1px accent outline.
+
+### 2026-10-26: The always-ask list is enforced per agent; Settings → Permissions
+
+§9.8 AC3 names examples but not a matching rule or defaults. Defaults: `git push`, `rm -rf`, `npm publish`, `pnpm publish`, `git reset --hard`, `sudo`. Matching (`packages/shared/src/always-ask.ts`) errs towards asking: the command line is split into simple commands (quotes honoured; `;`, `&&`, `|`, `$(…)`, backticks and the script of `sh -c`/`bash -lc`/`eval` all count); a pattern matches when its first word is a program in a command (by basename, so `sudo rm` and `/usr/bin/git` count) and its other words follow in any order. Short flags compare as letter sets (`rm -rf` = `-fr` = `-r -f` = `-Rf`, with `--recursive`/`--force`), long flags also match `--flag=value` and longer spellings. The pattern as whole words anywhere in the line also matches (`echo git push` asks; `pseudo` doesn't match `sudo`).
+
+Per agent: Claude Code through a PreToolUse hook, Codex by switching Full-auto to `untrusted` approvals while the list isn't empty, ACP by running the agent's auto-edit mode in Full-auto and checking `execute` requests (only what the agent asks about, so ACP keeps its header warning), terminal agents not at all. A listed command never offers "Always for this chat". Read-only chats are left alone (they refuse commands anyway). Details in `docs/adapters/*.md`.
+
+Settings → Permissions holds the default mode for new chats (moved from its own setting into `Prefs.defaultPermissionMode`, read once for old data dirs), the list with a "Try a command" box, and which agents the list covers. Not done from §8.11/§9.8 AC4: per-project overrides, and listing/revoking "always allow" grants (they live in each agent's session today).

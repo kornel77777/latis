@@ -219,6 +219,24 @@ describe("AcpAdapter (replayed agent)", () => {
     await s.dispose();
   });
 
+  it("asks about always-ask commands in Full-auto and allows the rest", async () => {
+    const listed = await adapter().startSession({ cwd: CWD, permissionMode: "full-auto", alwaysAsk: ["git push", "printf"] });
+    const a = collect(listed);
+    await listed.send({ text: "/deny" });
+    const req = await a.waitFor((e) => e.type === "permission.requested");
+    expect(req).toMatchObject({ kind: "exec", command: expect.stringContaining("printf 'secret'"), alwaysAsk: "printf" });
+    await listed.respond(req.type === "permission.requested" ? req.id : "", { kind: "permission", decision: "allow-once" });
+    await a.waitFor((e) => e.type === "turn.completed");
+    await listed.dispose();
+
+    const unlisted = await adapter().startSession({ cwd: CWD, permissionMode: "full-auto", alwaysAsk: ["git push"] });
+    const b = collect(unlisted);
+    await unlisted.send({ text: "/deny" });
+    await b.waitFor((e) => e.type === "turn.completed");
+    expect(b.events.filter((e) => e.type === "permission.requested")).toHaveLength(0);
+    await unlisted.dispose();
+  });
+
   it("emulates Auto-edit by allowing in-folder edits itself", async () => {
     const s = await adapter().startSession(opts("auto-edit"));
     const { events, waitFor } = collect(s);

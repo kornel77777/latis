@@ -19,11 +19,14 @@ export interface RegistryOptions {
   replayRoot?: string;
 }
 
-/** Permission modes each kind of adapter can't fully enforce (§9.8 AC3). */
+/**
+ * Permission modes in which an adapter can't fully enforce the always-ask list (§9.8 AC3). Claude Code and Codex
+ * check every command; ACP agents only when the agent asks before running one; terminal agents never.
+ */
 function unenforceable(a: AgentAdapter): PermissionMode[] {
   if (a instanceof TerminalAdapter) return ["read-only", "ask", "auto-edit", "full-auto"];
-  if (a instanceof FakeAdapter) return [];
-  return ["full-auto"];
+  if (a instanceof AcpAdapter) return ["full-auto"];
+  return [];
 }
 
 /** All agents Latis knows: built-in adapters plus manifest agents from <dataDir>/agents (§6.4). */

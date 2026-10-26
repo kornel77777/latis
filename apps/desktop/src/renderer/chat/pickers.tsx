@@ -10,7 +10,7 @@ export const MODES: { id: Mode; label: string; hint: string; icon: typeof Shield
   { id: "read-only", label: "Read-only", hint: "Reads only. No edits or commands.", icon: ShieldCheck },
   { id: "ask", label: "Ask", hint: "Asks before edits and commands.", icon: ShieldHalf },
   { id: "auto-edit", label: "Auto-edit", hint: "Edits freely, asks before commands.", icon: ShieldAlert },
-  { id: "full-auto", label: "Full-auto", hint: "Runs everything without asking.", icon: ShieldOff },
+  { id: "full-auto", label: "Full-auto", hint: "Runs everything except the always-ask list.", icon: ShieldOff },
 ];
 
 const chipClass =
@@ -123,7 +123,7 @@ export function PermissionPicker({ chat, unenforceable }: { chat: ChatSummary; u
             <span>{m.label}</span>
             <span className="text-[11px] text-text-3">
               {m.hint}
-              {unenforceable.includes(m.id) && " The always-ask list can't be enforced here yet."}
+              {unenforceable.includes(m.id) && " The always-ask list is only checked when the agent asks first."}
             </span>
           </span>
           {chat.permissionMode === m.id && <span className="text-accent">●</span>}

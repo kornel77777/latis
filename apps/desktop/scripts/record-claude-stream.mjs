@@ -1,5 +1,6 @@
 // Records a real Claude Agent SDK stream into fixtures/claude-code/<name>.jsonl (SPEC §0.2, §16).
 // Usage: node scripts/record-claude-stream.mjs <name> "<prompt>" [--deny] [--model haiku] [--mode plan] [--then "<second prompt>"]
+//          [--deny-matching "<regex>"]   PreToolUse hook on Bash, as Latis uses for the always-ask list; denies matching commands
 // Spends real tokens on whatever account Claude Code is signed in with. Paths and identities are scrubbed.
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -35,7 +36,29 @@ const q = query({
     model: arg("--model") ?? "haiku",
     includePartialMessages: true,
     permissionMode: arg("--mode") ?? "default",
+    ...(arg("--mode") === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
     settingSources: [],
+    ...(arg("--deny-matching") && {
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "Bash",
+            hooks: [
+              async (hookInput) => {
+                const deny = new RegExp(arg("--deny-matching")).test(hookInput.tool_input.command);
+                record("pre_tool_use", { toolName: hookInput.tool_name, input: hookInput.tool_input, toolUseID: hookInput.tool_use_id });
+                return {
+                  hookSpecificOutput: {
+                    hookEventName: "PreToolUse",
+                    ...(deny && { permissionDecision: "deny", permissionDecisionReason: "The user denied this." }),
+                  },
+                };
+              },
+            ],
+          },
+        ],
+      },
+    }),
     canUseTool: async (toolName, toolInput, opts) => {
       record("can_use_tool", {
         toolName,

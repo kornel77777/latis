@@ -237,7 +237,7 @@ export const FullChat = memo(function FullChat({
             )}
             {unenforced && (
               <span
-                title={`Full-auto: ${agentLabel} runs every tool without asking, and Latis can't enforce the always-ask list yet.`}
+                title={`Full-auto: ${agentLabel} runs most tools without asking. Latis checks the always-ask list only when ${agentLabel} asks before running a command.`}
                 className="text-state-working"
               >
                 <AlertTriangle size={13} />

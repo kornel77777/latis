@@ -53,7 +53,9 @@ ACP has no standard permission vocabulary. A manifest can map Latis modes onto t
 "modes": { "read-only": "plan", "ask": "default", "auto-edit": "autoEdit", "full-auto": "yolo" }
 ```
 
-(Gemini's mode ids match its `--approval-mode` choices `default`, `auto_edit`, `yolo`, `plan`. Read them from `session/new` once signed in; the built-in manifest maps by name match against `availableModes`.) Without a mapping, Latis **emulates** modes on `session/request_permission`: read-only rejects everything not `kind: read/search`, auto-edit auto-allows `kind: edit`, full-auto allows everything. The always-ask list can't be enforced (the agent decides what to ask about).
+(Gemini's mode ids match its `--approval-mode` choices `default`, `auto_edit`, `yolo`, `plan`. Read them from `session/new` once signed in; the built-in manifest maps by name match against `availableModes`.) Without a mapping, Latis **emulates** modes on `session/request_permission`: read-only rejects everything not `kind: read/search`, auto-edit auto-allows `kind: edit`, full-auto allows everything.
+
+**Always-ask list:** a `kind: "execute"` request whose command (`rawInput.command`, else the title, which is Gemini's command line) matches the list goes to the user in every mode except Read-only, and "always" answers aren't remembered. In Full-auto with a non-empty list the agent runs in its auto-edit mode instead of yolo, so it asks before commands and Latis allows the unlisted ones. This only covers commands the agent asks about: Gemini runs commands it considers safe (e.g. `wc -l`) without asking. So ACP agents keep the Full-auto warning in the chat header. Tested by replay with `deny.jsonl` (Claude bridge); Gemini not yet recorded live (free quota).
 
 ## Steering
 

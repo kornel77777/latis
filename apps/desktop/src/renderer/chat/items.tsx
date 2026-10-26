@@ -10,6 +10,7 @@ import {
   Globe,
   Plug,
   Search,
+  ShieldAlert,
   Terminal,
   Wrench,
   type LucideIcon,
@@ -331,7 +332,12 @@ function PermissionBlock({ item, respond }: { item: Extract<TranscriptItem, { ki
   const [denying, setDenying] = useState(false);
   const [reason, setReason] = useState("");
   return (
-    <RequestShell title="Permission" pending={item.pending} testId="permission" summary={item.summary.replaceAll("`", "")}>
+    <RequestShell
+      title={item.alwaysAsk ? "Permission · always ask" : "Permission"}
+      pending={item.pending}
+      testId="permission"
+      summary={item.summary.replaceAll("`", "")}
+    >
       <div className="mt-1 text-text-1">
         <Markdown text={item.summary} />
         {item.command && !item.summary.includes(item.command) && (
@@ -343,6 +349,14 @@ function PermissionBlock({ item, respond }: { item: Extract<TranscriptItem, { ki
           </pre>
         )}
         {item.reason && <div className="mt-0.5 text-[12px] text-text-3">Reason: {item.reason}</div>}
+        {item.alwaysAsk && (
+          <div className="mt-1 flex items-center gap-1.5 text-[12px] text-text-2" data-testid="always-ask-match">
+            <ShieldAlert size={12} className="shrink-0 text-state-needs-you" />
+            <span>
+              Matches <code className="font-mono text-text-1">{item.alwaysAsk}</code> on your always-ask list, so Latis asks every time.
+            </span>
+          </div>
+        )}
       </div>
       {item.pending ? (
         denying ? (
@@ -374,9 +388,11 @@ function PermissionBlock({ item, respond }: { item: Extract<TranscriptItem, { ki
             >
               Allow once
             </Button>
-            <Button size="sm" onClick={() => respond(item.id, { kind: "permission", decision: "allow-chat" })} data-testid="allow-chat">
-              Always for this chat
-            </Button>
+            {!item.alwaysAsk && (
+              <Button size="sm" onClick={() => respond(item.id, { kind: "permission", decision: "allow-chat" })} data-testid="allow-chat">
+                Always for this chat
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={() => respond(item.id, { kind: "permission", decision: "deny" })} data-testid="deny">
               Deny
             </Button>
