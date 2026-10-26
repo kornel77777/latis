@@ -61,5 +61,6 @@ module.exports = {
   },
   win: { target: ["nsis"] },
   nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
-  linux: { target: ["AppImage", "deb"], category: "Development", maintainer: "Kornel Omori" },
+  // The package is "@latis/desktop"; Linux needs a file-safe program name.
+  linux: { target: ["AppImage", "deb"], category: "Development", maintainer: "Kornel Omori", executableName: "latis" },
 };
