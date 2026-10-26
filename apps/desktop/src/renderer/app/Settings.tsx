@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, ImageIcon, X } from "lucide-react";
+import { FolderOpen, ImageIcon, RefreshCw, X } from "lucide-react";
 import type { Appearance, Theme } from "@latis/shared";
 import { ACCENTS } from "./useAppearance";
 import { Button, Dialog, cn } from "@latis/ui";
@@ -11,6 +11,7 @@ import { PermissionsSection } from "./PermissionsSettings";
 import { ConductorSection, ConnectionsSection, SkillsSection } from "./SettingsOrchestration";
 
 const sections: SettingsSection[] = [
+  "General",
   "Agents",
   "Permissions",
   "Conductor",
@@ -21,6 +22,7 @@ const sections: SettingsSection[] = [
   "Notifications",
 ];
 const BODY: Record<SettingsSection, () => React.ReactNode> = {
+  General: GeneralSection,
   Agents: AgentsSection,
   Permissions: PermissionsSection,
   Conductor: ConductorSection,
@@ -60,6 +62,55 @@ export function SettingsDialog() {
         </div>
       </div>
     </Dialog>
+  );
+}
+
+function GeneralSection() {
+  const prefs = useWorkspace((s) => s.prefs);
+  const update = useWorkspace((s) => s.update);
+  const setPrefs = useWorkspace((s) => s.setPrefs);
+  const [checking, setChecking] = useState(false);
+  if (!prefs) return null;
+  const check = () => {
+    setChecking(true);
+    void latis
+      .invoke("update:check")
+      .then((u) => useWorkspace.setState({ update: u }))
+      .finally(() => setChecking(false));
+  };
+  const status = !update?.checkedAt
+    ? "Not checked yet."
+    : update.error
+      ? `Couldn't check: ${update.error}`
+      : update.available
+        ? `Latis ${update.available.version} is out.`
+        : "You have the latest version.";
+  return (
+    <div className="flex flex-col gap-2" data-testid="general-settings">
+      <Row label="Version" hint={status}>
+        <span className="font-mono text-[12px] text-text-2">{update ? update.current : ""}</span>
+        {update?.available && (
+          <a
+            href={update.available.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-[12px] text-accent hover:underline"
+            data-testid="update-link"
+          >
+            Download {update.available.version}
+          </a>
+        )}
+        <Button size="sm" variant="secondary" disabled={checking} onClick={check} data-testid="update-check">
+          <RefreshCw size={12} className={checking ? "animate-spin" : undefined} /> {checking ? "Checking…" : "Check now"}
+        </Button>
+      </Row>
+      <Toggle
+        label="Check for new versions"
+        hint="About every 6 hours Latis asks GitHub for its latest release. Nothing about you or your work is sent, and nothing is installed."
+        checked={prefs.checkUpdates}
+        onChange={(v) => void setPrefs({ checkUpdates: v })}
+      />
+    </div>
   );
 }
 

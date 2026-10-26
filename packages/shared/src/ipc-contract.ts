@@ -398,6 +398,16 @@ export const Appearance = z.object({
 });
 export type Appearance = z.infer<typeof Appearance>;
 
+/** "A new version is out" (GitHub Releases); nothing is downloaded. */
+export const UpdateState = z.object({
+  current: z.string(),
+  available: z.object({ version: z.string(), url: z.string().url(), name: z.string(), publishedAt: z.string().nullable() }).nullable(),
+  checkedAt: z.number().nullable(),
+  /** Why the last check failed, if it did. */
+  error: z.string().nullable(),
+});
+export type UpdateState = z.infer<typeof UpdateState>;
+
 export const Prefs = z.object({
   onboarded: z.boolean(),
   notifyNeedsYou: z.boolean(),
@@ -415,6 +425,10 @@ export const Prefs = z.object({
   defaultPermissionMode: PermissionModeSchema,
   /** Command patterns that always need approval, even in Full-auto (§9.8 AC3). */
   alwaysAsk: z.array(z.string().trim().min(1).max(200)).max(100),
+  /** Ask GitHub for a newer release now and then (Settings → General). */
+  checkUpdates: z.boolean(),
+  /** The release whose notice the user dismissed. */
+  dismissedUpdate: z.string().nullable(),
 });
 export type Prefs = z.infer<typeof Prefs>;
 
@@ -828,6 +842,8 @@ export const invokeContract = {
   "flow:setJob": { req: z.object({ nodeId: z.string(), job: z.string().max(4000) }), res: ok },
   "flow:setStart": { req: z.object({ nodeId: z.string(), input: z.string().max(20_000), oneTaskPerLine: z.boolean() }), res: ok },
   "prefs:get": { req: none, res: Prefs },
+  "update:get": { req: none, res: UpdateState },
+  "update:check": { req: none, res: UpdateState },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */
   "appearance:pickWallpaper": { req: none, res: z.string().nullable() },
@@ -852,6 +868,7 @@ export const eventContract = {
   "agents:changed": z.array(AgentInfo),
   "reviews:changed": z.array(ReviewItem),
   "browser:state": BrowserState,
+  "update:changed": UpdateState,
   "chat:timeline": z.object({ chatId: z.string(), entries: z.array(TimelineEntry) }),
   /** Main added or changed canvas items itself (the workspace tools, the Conductor). */
   "canvas:upsert": z.object({

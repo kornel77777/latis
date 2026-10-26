@@ -35,6 +35,7 @@ import { CHAT_SIZE, WorkspaceStore } from "./store/workspace";
 import { PtyManager } from "./terminal/pty-manager";
 import { Connections } from "./mcp/connections";
 import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer, type HookEndpoint } from "./mcp/server";
+import { RELEASES_FEED, UpdateChecker } from "./updates";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
 import { openLink } from "./security/links";
@@ -82,6 +83,14 @@ const ptys = new PtyManager(() => import("node-pty"), {
 // LATIS_CLAUDE_REPLAY=<fixtures/claude-code> is the M1 spelling and still works.
 const replayRoot =
   process.env.LATIS_REPLAY ?? (process.env.LATIS_CLAUDE_REPLAY ? resolve(process.env.LATIS_CLAUDE_REPLAY, "..") : undefined);
+// LATIS_UPDATE_FEED (tests) points the release check at a local server.
+const updates = new UpdateChecker({
+  current: app.getVersion(),
+  feed: process.env.LATIS_UPDATE_FEED ?? RELEASES_FEED,
+  ...(process.env.LATIS_UPDATE_FEED && { pagePrefix: new URL(process.env.LATIS_UPDATE_FEED).origin + "/" }),
+  onChange: (s) => emit(win?.webContents, "update:changed", s),
+});
+
 /** The chat-view Claude's API key, encrypted with the OS keychain (decrypted once per launch). */
 let claudeKey: string | null | undefined;
 function claudeApiKey(): string | null {
@@ -149,6 +158,8 @@ const DEFAULT_PREFS: Prefs = {
   layoutMode: process.env.LATIS_LAYOUT === "canvas" ? "canvas" : "lattice",
   defaultPermissionMode: "auto-edit",
   alwaysAsk: DEFAULT_ALWAYS_ASK,
+  checkUpdates: true,
+  dismissedUpdate: null,
 };
 /** Once per data dir: move existing installs to the lattice and the cold accent (DECISIONS 2026-10-25). */
 let designMigrated = false;
@@ -1141,6 +1152,8 @@ registerHandlers({
     return { ok: true };
   },
   "prefs:get": () => prefs(),
+  "update:get": () => updates.state(),
+  "update:check": () => updates.check(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };
     store.setSetting("prefs", next);
@@ -1279,6 +1292,9 @@ function createWindow() {
 void app.whenReady().then(() => {
   protocol.handle("card", (req) => cards.serve(req.url));
   createWindow();
+  // Only installed copies check on their own; a dev run is newer than any release anyway.
+  if (app.isPackaged || process.env.LATIS_UPDATE_FEED)
+    updates.start(() => prefs().checkUpdates, process.env.LATIS_UPDATE_FEED ? 500 : 10_000);
   void ensureConductor().catch((err: unknown) => console.error("[conductor] couldn't create the Conductor", err));
   scheduler.start();
   flows.resumeAll();

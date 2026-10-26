@@ -7,6 +7,7 @@ import {
   type AttentionItem,
   type FocusView,
   type BrowserState,
+  type UpdateState,
   type ImageAttachment,
   type McpConnection,
   type FlowEdge,
@@ -49,7 +50,7 @@ export interface Toast {
 }
 
 export type SettingsSection =
-  "Agents" | "Permissions" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
+  "General" | "Agents" | "Permissions" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
 
 export type ChatOptions = Partial<Pick<ChatSummary, "model" | "reasoning" | "permissionMode" | "title">>;
 
@@ -109,6 +110,8 @@ interface WorkspaceState {
   zen: boolean;
   dockTab: "Terminal" | "Browser" | "Files" | "Diff";
   browser: BrowserState | null;
+  /** The release check (Settings → General, status bar). */
+  update: UpdateState | null;
   /** Images waiting in a chat's composer (pasted, or from the element picker). */
   attachments: Record<string, ImageAttachment[]>;
   settingsSection: SettingsSection;
@@ -362,6 +365,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   zen: false,
   dockTab: "Terminal",
   browser: null,
+  update: null,
   attachments: {},
   settingsSection: "Agents",
   connections: [],
@@ -401,6 +405,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         latis.invoke("usage:get"),
         latis.invoke("lattice:get"),
       ]);
+      void latis.invoke("update:get").then((update) => set({ update }));
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
       set({
@@ -1115,6 +1120,15 @@ export function subscribeToMain(): void {
     if (!parsed.success) return console.warn("dropped invalid chat:queue payload");
     const { chatId, queue } = parsed.data;
     useWorkspace.setState((s) => ({ queues: { ...s.queues, [chatId]: queue } }));
+  });
+  latis.on("update:changed", (raw) => {
+    const parsed = eventContract["update:changed"].safeParse(raw);
+    if (!parsed.success) return;
+    const before = useWorkspace.getState().update?.available?.version;
+    const next = parsed.data.available;
+    useWorkspace.setState({ update: parsed.data });
+    if (next && next.version !== before && useWorkspace.getState().prefs?.dismissedUpdate !== next.version)
+      useWorkspace.getState().toast(`Latis ${next.version} is out. Get it from the status bar.`);
   });
   latis.on("browser:state", (raw) => {
     const parsed = eventContract["browser:state"].safeParse(raw);

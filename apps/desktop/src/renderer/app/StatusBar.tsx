@@ -1,8 +1,38 @@
+import { ArrowUpCircle, X } from "lucide-react";
 import { StatusDot, statusLabel, type StatusKind } from "@latis/ui";
 import { useWorkspace } from "../stores/workspace";
 import { useShallow } from "zustand/react/shallow";
 
 const shown: StatusKind[] = ["working", "needs-you", "done", "error"];
+
+/** The running version, or a link to a newer release (main/updates.ts). */
+function UpdateNotice() {
+  const update = useWorkspace((s) => s.update);
+  const dismissed = useWorkspace((s) => s.prefs?.dismissedUpdate ?? null);
+  const setPrefs = useWorkspace((s) => s.setPrefs);
+  const next = update?.available;
+  if (!next || next.version === dismissed) return <span className="text-text-3">{update ? `v${update.current}` : ""}</span>;
+  return (
+    <span className="flex items-center gap-0.5" data-testid="update-available">
+      <a
+        href={next.url}
+        target="_blank"
+        rel="noreferrer"
+        className="flex items-center gap-1 rounded-[2px] px-1 text-accent hover:bg-surface-2"
+        title={`${next.name}: download it from GitHub`}
+      >
+        <ArrowUpCircle size={11} /> Latis {next.version} is out
+      </a>
+      <button
+        className="rounded-[2px] px-1 text-text-3 hover:bg-surface-2 hover:text-text-1"
+        aria-label="Dismiss the update notice"
+        onClick={() => void setPrefs({ dismissedUpdate: next.version })}
+      >
+        <X size={11} />
+      </button>
+    </span>
+  );
+}
 
 export function StatusBar() {
   const statuses = useWorkspace(useShallow((s) => Object.values(s.chats).map((c) => c.summary.status)));
@@ -80,7 +110,7 @@ function UsageMeters() {
           </span>
         );
       })}
-      <span className="text-text-3">v0.1</span>
+      <UpdateNotice />
     </div>
   );
 }

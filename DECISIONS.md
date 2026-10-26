@@ -423,3 +423,13 @@ Anthropic's Agent SDK overview says third-party products may not offer claude.ai
 - **Approval:** asking Anthropic for approval of subscription login in the chat view is open for later.
 
 OpenAI: nothing found that addresses third-party Codex app-server clients on a ChatGPT sign-in ([Codex auth](https://developers.openai.com/codex/auth), [Codex with ChatGPT](https://help.openai.com/en/articles/11369540)). Codex keeps its own sign-in. Re-check before each release.
+
+### 2026-10-26: A release notice instead of auto-update, for now
+
+Auto-update needs signed builds (macOS won't swap in an unsigned app, Windows shows SmartScreen), and signing waits until there's demand. So installed copies ask GitHub's releases API (`/repos/kornel77777/latis/releases/latest`):
+
+- **When:** 10 s after launch, then every 6 hours.
+- **What it shows:** a link in the status bar and in Settings → General, plus a toast the first time a version appears. Nothing is downloaded.
+- **What it offers:** only a newer tag whose page is on `github.com/kornel77777/latis/releases/`. Drafts and pre-releases never count, since `latest` excludes them. A 404 (no releases yet, or a private repo) means nothing to offer.
+- **Turning it off:** Settings → General → "Check for new versions". The request carries no user data, only the app version in the User-Agent.
+- **Where it doesn't run:** dev runs never check. `LATIS_UPDATE_FEED` points tests at a local server.
