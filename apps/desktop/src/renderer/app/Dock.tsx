@@ -88,7 +88,7 @@ function Terminals() {
               </button>
               <button
                 aria-label={`Close ${p.title}`}
-                className="rounded p-0.5 opacity-60 hover:bg-surface hover:opacity-100"
+                className="rounded-[2px] p-0.5 opacity-60 hover:bg-surface hover:opacity-100"
                 onClick={() => void closePty(p.id)}
               >
                 <X size={11} />

@@ -60,7 +60,7 @@ export function Sidebar() {
             <t.icon size={13} /> {t.label}
             {t.id === "inbox" && inboxCount > 0 && (
               <span
-                className="rounded-full bg-state-needs-you px-1.5 text-[10px] font-semibold leading-4 text-bg-0"
+                className="rounded-control bg-state-needs-you px-1.5 text-[10px] font-semibold leading-4 text-bg-0"
                 data-testid="inbox-count"
               >
                 {inboxCount}
@@ -93,7 +93,7 @@ function ReviewEntry() {
       <GitCompare size={13} /> Review changes
       {open > 0 && (
         <span
-          className="ml-auto rounded-full bg-accent px-1.5 text-[10px] font-semibold leading-4 text-accent-fg"
+          className="ml-auto rounded-control bg-accent px-1.5 text-[10px] font-semibold leading-4 text-accent-fg"
           data-testid="review-count"
         >
           {open}
@@ -196,7 +196,7 @@ function InboxRow({ item, chatTitle }: { item: AttentionItem; chatTitle: string 
         {!needsYou && (
           <button
             aria-label="Dismiss"
-            className="ml-auto rounded p-1 text-text-3 opacity-0 hover:text-text-1 group-hover:opacity-100"
+            className="ml-auto rounded-[2px] p-1 text-text-3 opacity-0 hover:text-text-1 group-hover:opacity-100"
             onClick={() => void dismissAttention(item.id)}
           >
             <X size={11} />
@@ -232,7 +232,7 @@ function ChatRow({ chat, indent }: { chat: ChatSummary; indent: boolean }) {
       )}
       data-testid="sidebar-chat"
     >
-      <span className="h-3 w-[3px] shrink-0 rounded-full" style={{ background: `var(--hue-${hue})` }} />
+      <span className="h-3 w-[3px] shrink-0" style={{ background: `var(--hue-${hue})` }} />
       <span className="min-w-0 flex-1 truncate">{chat.title}</span>
       <StatusDot status={chat.status} />
     </button>
@@ -244,7 +244,7 @@ function ProjectsTab() {
   const chats = useWorkspace(useShallow((s) => Object.values(s.chats).map((c) => c.summary)));
   const views = useWorkspace((s) => s.views);
   const activeView = useWorkspace((s) => s.activeView);
-  const mode = useWorkspace((s) => s.prefs?.layoutMode ?? "canvas");
+  const mode = useWorkspace((s) => s.prefs?.layoutMode ?? "lattice");
   const nodeCount = useWorkspace((s) => s.nodes.length);
   const focusNode = useWorkspace((s) => s.focusNode);
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -268,8 +268,8 @@ function ProjectsTab() {
   return (
     <div className="p-1.5">
       <Section title="Workspace">
-        {place("canvas", "Canvas", LayoutGrid, !activeView && mode === "canvas", () => runCommand("view.canvas"), nodeCount)}
         {place("lattice", "Lattice", Grid2x2, !activeView && mode === "lattice", () => runCommand("view.lattice"), chats.length)}
+        {place("canvas", "Canvas", LayoutGrid, !activeView && mode === "canvas", () => runCommand("view.canvas"), nodeCount)}
         {views.map((v) =>
           place(`view-${v.id}`, v.name, ScanSearch, activeView === v.id, () => useWorkspace.getState().openView(v.id), v.chatIds.length),
         )}
@@ -287,7 +287,7 @@ function ProjectsTab() {
           <button
             aria-label="Open folder as project"
             title="Open folder as project"
-            className="rounded p-0.5 hover:bg-surface-2 hover:text-text-1"
+            className="rounded-[2px] p-0.5 hover:bg-surface-2 hover:text-text-1"
             onClick={() => void openFolder()}
           >
             <Plus size={13} />
@@ -409,7 +409,7 @@ function FilesTab() {
               key={f}
               title={f}
               onClick={() => projectId && void latis.invoke("project:openFile", { projectId, path: f })}
-              className="flex h-6 w-full items-center gap-1.5 rounded-[5px] px-1.5 text-left text-[12px] hover:bg-surface-2"
+              className="flex h-6 w-full items-center gap-1.5 rounded-control px-1.5 text-left text-[12px] hover:bg-surface-2"
             >
               <FileText size={11} className="shrink-0 text-text-3" />
               <span className="truncate text-text-1">{f.slice(slash + 1)}</span>

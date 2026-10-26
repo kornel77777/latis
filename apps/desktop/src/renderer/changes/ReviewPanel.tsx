@@ -207,7 +207,7 @@ export function ReviewPanel() {
                   data-testid="review-item"
                 >
                   <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-text-1">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: `var(--hue-${a?.hue ?? "violet"})` }} />
+                    <span className="h-2 w-2 shrink-0" style={{ background: `var(--hue-${a?.hue ?? "violet"})` }} />
                     <span className="truncate">{c.title}</span>
                     {r.reviewedAt !== null && <CheckCheck size={12} className="ml-auto shrink-0 text-state-done" aria-label="Reviewed" />}
                   </div>

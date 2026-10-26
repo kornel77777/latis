@@ -1,5 +1,13 @@
 # Progress
 
+## Since M6 (2026-10-24)
+
+- The lattice is the default workspace (⌘1); the canvas is the map (⌘2). Agent strip, split-with-agent, broadcast bar and pass/review between panes; e2e in `e2e/lattice.spec.ts`.
+- New cold, sharp look (2px radii, hairlines, Glacier accent).
+- Known: `m1.spec.ts` title check flaked once in a full run (passes alone); the canvas doesn't yet draw relationships (spawned-by, handoff, passed replies) as edges.
+- Chat transcripts follow a streaming reply in every view (canvas, lattice, lock-in) and stop following when the user scrolls up; e2e in `e2e/lattice.spec.ts`.
+- M7 has started (link policy, fuses, signing/notarization config, icon); auto-update, privacy doc, docs site, crash-report opt-in, perf and security passes and signed installers are still open.
+
 ## Current: M6 Power features: done 2026-10-23
 
 Exit criteria: **S5** and **S6** pass. The e2e runs use the demo and replayed agents; the live runs used Claude Code and Codex (`e2e/live-m6.spec.ts`). Details are in `docs/qa/M6.md`.

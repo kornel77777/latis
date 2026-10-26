@@ -18,7 +18,7 @@ function Tool({ cmd, label, children, testId }: { cmd: string; label: string; ch
       aria-label={label}
       title={key ? `${label} (${display(key)})` : label}
       onClick={() => runCommand(cmd)}
-      className="flex h-7 min-w-7 items-center justify-center rounded-[7px] px-1.5 text-text-2 transition-colors duration-fast hover:bg-surface-2 hover:text-text-1"
+      className="flex h-7 min-w-7 items-center justify-center rounded-control px-1.5 text-text-2 transition-colors duration-fast hover:bg-surface-2 hover:text-text-1"
       {...(testId && { "data-testid": testId })}
     >
       {children}
@@ -36,7 +36,7 @@ export function CanvasToolbar() {
       role="toolbar"
       aria-label="Canvas tools"
       className={cn(
-        "absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-[11px] border border-line bg-surface/90 p-1 shadow-lift backdrop-blur",
+        "absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-0.5 rounded-control border border-line bg-surface/90 p-1 shadow-lift backdrop-blur",
       )}
       data-testid="canvas-toolbar"
     >
@@ -48,7 +48,7 @@ export function CanvasToolbar() {
       </Tool>
       <button
         onClick={() => void flow.zoomTo(1, { duration: 200 })}
-        className="h-7 w-12 rounded-[7px] font-mono text-[11.5px] text-text-2 hover:bg-surface-2 hover:text-text-1"
+        className="h-7 w-12 rounded-control font-mono text-[11.5px] text-text-2 hover:bg-surface-2 hover:text-text-1"
         aria-label="Reset zoom to 100%"
         title="Zoom to 100% (0)"
         data-testid="zoom-badge"

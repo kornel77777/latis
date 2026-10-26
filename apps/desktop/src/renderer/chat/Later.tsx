@@ -193,7 +193,7 @@ export function ScheduledList({ chatId }: { chatId: string }) {
           </span>
           <button
             aria-label="Cancel scheduled message"
-            className="rounded p-0.5 text-text-3 hover:bg-surface-2 hover:text-text-1"
+            className="rounded-[2px] p-0.5 text-text-3 hover:bg-surface-2 hover:text-text-1"
             onClick={() => void latis.invoke("schedule:cancel", { id: m.id })}
           >
             <X size={12} />

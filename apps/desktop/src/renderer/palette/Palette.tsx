@@ -84,7 +84,7 @@ function Snippet({ text }: { text: string }) {
     <>
       {parts.map((p, i) =>
         p.startsWith("[") && p.endsWith("]") ? (
-          <mark key={i} className="rounded-[3px] bg-accent/20 px-0.5 text-text-1">
+          <mark key={i} className="rounded-control bg-accent/20 px-0.5 text-text-1">
             {p.slice(1, -1)}
           </mark>
         ) : (

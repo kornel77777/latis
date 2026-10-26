@@ -1,5 +1,19 @@
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Columns3, EyeOff, GripVertical, Grid2x2, LayoutPanelLeft, Maximize2, Minimize2, Plus, Rows3, Scaling, X } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Columns2,
+  Columns3,
+  EyeOff,
+  Forward,
+  GripVertical,
+  Grid2x2,
+  LayoutPanelLeft,
+  Maximize2,
+  Minimize2,
+  Rows2,
+  Rows3,
+  Scaling,
+  X,
+} from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { LatticeNode } from "@latis/shared";
 import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@latis/ui";
@@ -7,13 +21,15 @@ import { FullChat } from "../chat/ChatNode";
 import { display } from "../commands/keys";
 import { allCommands, bindingsOf, surfaces } from "../commands/registry";
 import { useWorkspace } from "../stores/workspace";
+import { applyPending, askOthersToReview, canMessage, canStart, passReply, stackAgent } from "./collab";
+import { AgentStrip, BroadcastBar } from "./LatticeBars";
 import { rects, arrange, equalize, neighbour, paneIds, place, remove, resize, shift, sync, zoneAt, type Dir, type Zone } from "./tree";
 
 // The lattice: every chat tiled side by side, for working on many things at once. Drag a pane by
 // its header onto another pane's edge to split it there, or onto its middle to swap; drag the
 // gutters to resize. Everything also has a command (Settings → Commands).
 
-const GUTTER = 6;
+const GUTTER = 4;
 
 /** The chats the lattice shows, Conductor first, then oldest first. */
 function useLatticeChats(): string[] {
@@ -64,7 +80,8 @@ export function LatticeView() {
   useEffect(() => {
     const have = paneIds(root);
     if (have.length === ids.length && ids.every((id) => have.includes(id))) return;
-    setLattice({ root: sync(root, ids, size.w, size.h) });
+    const next = sync(root, ids, size.w, size.h);
+    setLattice({ root: next && applyPending(next) });
   }, [ids, root, size.w, size.h, setLattice]);
 
   const focusPane = useCallback((chatId: string) => {
@@ -166,14 +183,15 @@ export function LatticeView() {
         key={chatId}
         data-pane={chatId}
         data-testid="lattice-pane"
+        data-focused={focused === chatId || undefined}
         onPointerDownCapture={() => focusPane(chatId)}
         onDoubleClick={(e) => {
           if ((e.target as HTMLElement).closest("header") && !(e.target as HTMLElement).closest("button, input"))
             useWorkspace.setState((s) => ({ latticeMax: s.latticeMax === chatId ? null : chatId }));
         }}
         className={cn(
-          "relative h-full w-full min-w-0 overflow-hidden rounded-card transition-shadow duration-fast",
-          focused === chatId ? "ring-2 ring-accent/70" : "ring-0",
+          "relative h-full w-full min-w-0 overflow-hidden",
+          focused === chatId ? "outline outline-1 -outline-offset-1 outline-accent" : "",
           drag?.on && drag.id === chatId && "opacity-40",
         )}
       >
@@ -193,6 +211,8 @@ export function LatticeView() {
           }
           paneControls={
             <>
+              <SplitMenu chatId={chatId} />
+              <PassMenu chatId={chatId} others={ids.filter((id) => id !== chatId)} />
               <Button
                 size="icon"
                 variant="ghost"
@@ -221,19 +241,26 @@ export function LatticeView() {
 
   const shown = maximized && paneIds(root).includes(maximized) ? null : root;
   const projectList = Object.values(projects);
+  const working = ids.filter((id) => chats[id]?.summary.status === "working").length;
+  const waiting = ids.filter((id) => chats[id]?.summary.status === "needs-you").length;
 
   return (
-    <div className="flex min-w-0 flex-1 flex-col bg-bg-1" data-testid="lattice">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-3">
-        <Grid2x2 size={14} className="text-accent" />
-        <span className="text-[13px] font-semibold text-text-1">Lattice</span>
-        <span className="text-[12px] text-text-3">{ids.length} chats</span>
+    <div className="flex min-w-0 flex-1 flex-col bg-bg-0" data-testid="lattice">
+      <div className="flex h-10 shrink-0 items-center gap-3 border-b border-line bg-bg-0 px-3">
+        <span className="latis-caps flex shrink-0 items-center gap-2 text-text-1">
+          <Grid2x2 size={13} className="text-accent" /> Lattice
+        </span>
+        <span className="latis-caps shrink-0 text-text-3" data-testid="lattice-count">
+          {ids.length} {ids.length === 1 ? "chat" : "chats"}
+          {working > 0 && <span className="text-state-working"> · {working} working</span>}
+          {waiting > 0 && <span className="text-state-needs-you"> · {waiting} need you</span>}
+        </span>
         {projectList.length > 0 && (
           <select
             value={projectId ?? ""}
             onChange={(e) => setLattice({ projectId: e.target.value || null })}
             aria-label="Which chats"
-            className="ml-2 h-7 rounded-control border border-line bg-surface px-1.5 text-[12px] text-text-1"
+            className="h-7 shrink-0 rounded-control border border-line bg-surface px-1.5 text-[12px] text-text-1"
           >
             <option value="">All projects</option>
             {projectList.map((p) => (
@@ -243,7 +270,10 @@ export function LatticeView() {
             ))}
           </select>
         )}
-        <div className="ml-auto flex items-center gap-0.5" role="toolbar" aria-label="Arrange">
+        <div className="mx-auto min-w-0 overflow-x-auto">
+          <AgentStrip />
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label="Arrange">
           {(
             [
               ["grid", Grid2x2, "Grid", "lattice.grid"],
@@ -291,18 +321,17 @@ export function LatticeView() {
               <MenuItem onSelect={() => setLattice({ hidden: [] })}>Put all back</MenuItem>
             </Menu>
           )}
-          <NewChatMenu projectId={projectId} />
         </div>
       </div>
-      <div ref={box} className={cn("relative min-h-0 flex-1 p-1.5", drag?.on && "cursor-grabbing select-none")}>
+      <div ref={box} className={cn("relative min-h-0 flex-1 p-1", drag?.on && "cursor-grabbing select-none")}>
         {!ids.length ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-            <Grid2x2 size={28} className="text-text-3" />
-            <p className="max-w-sm text-[13px] leading-relaxed text-text-2">
-              The lattice tiles your chats side by side. Start a chat and it slots in; drag a pane by its header to an edge to split, or to
-              the middle to swap.
+          <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
+            <span className="latis-caps text-text-3">Lattice · empty</span>
+            <p className="max-w-md text-[13px] leading-relaxed text-text-2">
+              Stack agents side by side and run them together. Each one tiles in next to the others; drag a header to an edge to split, or
+              to the middle to swap. Type in the bar at the bottom to message them all at once.
             </p>
-            <NewChatMenu projectId={projectId} primary />
+            <AgentStrip big />
           </div>
         ) : shown ? (
           <Tile node={shown} path={[]} renderPane={renderPane} />
@@ -310,6 +339,7 @@ export function LatticeView() {
           renderPane(maximized!)
         )}
       </div>
+      <BroadcastBar ids={ids} />
     </div>
   );
 }
@@ -346,7 +376,7 @@ function DropHint({ zone }: { zone: Zone }) {
       data-zone={zone}
     >
       {zone === "center" && (
-        <span className="absolute inset-0 m-auto h-6 w-fit rounded-full bg-accent px-2.5 py-1 text-[11px] font-medium text-accent-fg">
+        <span className="absolute inset-0 m-auto h-6 w-fit rounded-control bg-accent px-2.5 py-1 text-[11px] font-medium text-accent-fg">
           Swap
         </span>
       )}
@@ -414,41 +444,92 @@ function Gutter({ row, path, index, sizes }: { row: boolean; path: number[]; ind
     >
       <div
         className={cn(
-          "absolute rounded-full bg-line opacity-0 transition-opacity group-hover:bg-accent group-hover:opacity-100",
-          row ? "inset-y-2 left-[2px] w-[2px]" : "inset-x-2 top-[2px] h-[2px]",
+          "absolute bg-accent opacity-0 transition-opacity group-hover:opacity-100",
+          row ? "inset-y-0 left-[1.5px] w-px" : "inset-x-0 top-[1.5px] h-px",
         )}
       />
     </div>
   );
 }
 
-/** New chat from the lattice: it tiles in next to the largest pane. */
-function NewChatMenu({ projectId, primary = false }: { projectId: string | null; primary?: boolean }) {
+/** Start another agent right beside this pane, in the same project. */
+function SplitMenu({ chatId }: { chatId: string }) {
   const agents = useWorkspace(useShallow((s) => s.agents.filter((a) => a.installed)));
-  const projects = useWorkspace((s) => s.projects);
-  const target = projectId ?? (Object.keys(projects).length === 1 ? Object.keys(projects)[0]! : null);
+  const projectId = useWorkspace((s) => s.chats[chatId]?.summary.projectId ?? null);
+  const item = (zone: "right" | "down") =>
+    agents.map((a) => (
+      <MenuItem
+        key={`${zone}-${a.id}`}
+        disabled={!canStart(a.id, projectId)}
+        onSelect={() => void stackAgent(a.id, projectId, { target: chatId, zone })}
+      >
+        <span className="h-2 w-2 shrink-0" style={{ background: `var(--hue-${a.hue})` }} />
+        {a.displayName}
+      </MenuItem>
+    ));
   return (
     <Menu
       trigger={
-        <Button size="sm" variant={primary ? "primary" : "secondary"} data-testid="lattice-new-chat">
-          <Plus size={12} /> New chat
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label="Split with another agent"
+          title={"Split with another agent" + shortcut("lattice.splitRight")}
+        >
+          <Columns2 size={13} />
         </Button>
       }
     >
-      <MenuLabel>{target ? `In ${projects[target]?.name}` : "Pick a project in the filter first, or start a demo"}</MenuLabel>
-      {agents.map((a) => (
-        <MenuItem
-          key={a.id}
-          disabled={a.id !== "fake" && !target}
-          onSelect={() =>
-            void useWorkspace
-              .getState()
-              .createChat({ agentId: a.id, projectId: a.id === "fake" && !useWorkspace.getState().demoInProjects ? null : target })
-          }
-        >
-          {a.displayName}
+      <MenuLabel>
+        <span className="flex items-center gap-1.5">
+          <Columns2 size={11} /> Split right with
+        </span>
+      </MenuLabel>
+      {item("right")}
+      <MenuSeparator />
+      <MenuLabel>
+        <span className="flex items-center gap-1.5">
+          <Rows2 size={11} /> Split below with
+        </span>
+      </MenuLabel>
+      {item("down")}
+    </Menu>
+  );
+}
+
+/** Hand this pane's latest reply to another agent, or ask every other pane to review it. */
+function PassMenu({ chatId, others }: { chatId: string; others: string[] }) {
+  const chats = useWorkspace((s) => s.chats);
+  const agents = useWorkspace((s) => s.agents);
+  const targets = useMemo(
+    () =>
+      others
+        .filter((id) => chats[id] && agents.find((a) => a.id === chats[id]!.summary.agentId)?.kind !== "terminal")
+        .map((id) => {
+          const c = chats[id]!.summary;
+          return { id, title: c.title, agent: agents.find((a) => a.id === c.agentId)?.displayName ?? c.agentId };
+        }),
+    [others, chats, agents],
+  );
+  if (!targets.length || !canMessage(chatId)) return null;
+  return (
+    <Menu
+      trigger={
+        <Button size="icon" variant="ghost" aria-label="Pass the last reply" title="Pass the last reply to another agent">
+          <Forward size={13} />
+        </Button>
+      }
+    >
+      <MenuLabel>Put the last reply in…</MenuLabel>
+      {targets.map((t) => (
+        <MenuItem key={t.id} onSelect={() => void passReply(chatId, t.id)}>
+          {t.title} <span className="ml-auto pl-3 text-text-3">{t.agent}</span>
         </MenuItem>
       ))}
+      <MenuSeparator />
+      <MenuItem onSelect={() => void askOthersToReview(chatId, others)}>
+        Ask the {targets.length === 1 ? "other chat" : `other ${targets.length}`} to review it
+      </MenuItem>
     </Menu>
   );
 }

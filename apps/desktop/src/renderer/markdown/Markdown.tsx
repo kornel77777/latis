@@ -46,7 +46,7 @@ const components: Components = {
     const text = String(children as ReactNode).replace(/\n$/, "");
     const lang = /language-([\w-]+)/.exec(className ?? "")?.[1];
     if (lang || text.includes("\n")) return <CodeBlock code={text} lang={lang ?? ""} />;
-    return <code className="rounded-[4px] bg-surface-2 px-1 py-px font-mono text-[0.88em] text-text-1">{children}</code>;
+    return <code className="rounded-control bg-surface-2 px-1 py-px font-mono text-[0.88em] text-text-1">{children}</code>;
   },
   a: ({ href, children }) => (
     <a

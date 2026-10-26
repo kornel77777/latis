@@ -38,6 +38,7 @@ import { ChatJob, FlowHandles } from "../canvas/flows";
 import { LimitBanner, ScheduledList, SendLaterDialog } from "./Later";
 import { SkillSuggestions, useSkillSuggestions } from "./SkillSuggestions";
 import { TerminalChatBody } from "./TerminalChatBody";
+import { useFollowOutput } from "./followOutput";
 
 /** Things to ask the Conductor, shown while it has no messages (§10.2). */
 const CONDUCTOR_STARTERS = [
@@ -102,6 +103,7 @@ export const FullChat = memo(function FullChat({
   };
   const [editingTitle, setEditingTitle] = useState(false);
   const list = useRef<VirtuosoHandle>(null);
+  const follow = useFollowOutput(list);
   const connections = useWorkspace((st) => st.connections);
   const tinted = useWorkspace((st) => st.prefs?.appearance.tintChats ?? true);
   const suggest = useSkillSuggestions(draft, chat?.summary.projectId ?? null);
@@ -164,7 +166,8 @@ export const FullChat = memo(function FullChat({
     setImages([]);
     // Mid-turn messages steer the agent or wait in the queue (§9.9).
     const sent = working ? steer(chatId, text, attached) : send(chatId, text, attached);
-    void sent.then(() => list.current?.scrollToIndex({ index: "LAST", behavior: "auto" }));
+    follow.stick();
+    void sent.then(follow.stick);
   };
 
   return (
@@ -206,7 +209,7 @@ export const FullChat = memo(function FullChat({
               autoFocus
               defaultValue={s.title}
               aria-label="Chat title"
-              className="nodrag min-w-0 flex-1 rounded-[6px] border border-line-strong bg-bg-1 px-1.5 text-[13px] font-semibold text-text-1 outline-none"
+              className="nodrag min-w-0 flex-1 rounded-control border border-line-strong bg-bg-1 px-1.5 text-[13px] font-semibold text-text-1 outline-none"
               onBlur={(e) => {
                 setEditingTitle(false);
                 const t = e.currentTarget.value.trim();
@@ -244,7 +247,7 @@ export const FullChat = memo(function FullChat({
               <Menu
                 trigger={
                   <button
-                    className="flex h-6 max-w-36 items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] text-accent hover:bg-surface-2"
+                    className="flex h-6 max-w-36 items-center gap-1 rounded-control px-1.5 text-[11.5px] text-accent hover:bg-surface-2"
                     title={`Own copy: ${s.worktree.path}`}
                     aria-label={`Branch ${s.worktree.branch}`}
                     data-testid="branch-chip"
@@ -273,7 +276,7 @@ export const FullChat = memo(function FullChat({
               <Menu
                 trigger={
                   <button
-                    className="flex h-6 max-w-28 items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] text-text-3 hover:bg-surface-2 hover:text-text-1"
+                    className="flex h-6 max-w-28 items-center gap-1 rounded-control px-1.5 text-[11.5px] text-text-3 hover:bg-surface-2 hover:text-text-1"
                     title={s.cwd}
                     aria-label={`Folder ${folder}`}
                     data-testid="folder-chip"
@@ -421,8 +424,10 @@ export const FullChat = memo(function FullChat({
                   ref={list}
                   className="scroll-thin"
                   data={items}
-                  followOutput={(atBottom) => (atBottom ? "auto" : false)}
-                  initialTopMostItemIndex={Math.max(0, items.length - 1)}
+                  followOutput={follow.followOutput}
+                  totalListHeightChanged={follow.onHeightChange}
+                  scrollerRef={follow.scrollerRef}
+                  initialTopMostItemIndex={{ index: Math.max(0, items.length - 1), align: "end" }}
                   increaseViewportBy={{ top: 400, bottom: 400 }}
                   computeItemKey={(_i, it) => it.key}
                   itemContent={(_i, it) => (
@@ -457,7 +462,7 @@ export const FullChat = memo(function FullChat({
                 {images && images.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 px-2 pt-2" aria-label="Attached images" data-testid="attachments">
                     {images.map((img, i) => (
-                      <div key={i} className="group relative h-12 w-16 overflow-hidden rounded-[6px] border border-line">
+                      <div key={i} className="group relative h-12 w-16 overflow-hidden rounded-control border border-line">
                         <img
                           src={`data:${img.mime};base64,${img.dataBase64}`}
                           alt={`Attachment ${i + 1}`}
@@ -465,7 +470,7 @@ export const FullChat = memo(function FullChat({
                         />
                         <button
                           aria-label={`Remove attachment ${i + 1}`}
-                          className="absolute right-0.5 top-0.5 rounded bg-bg-0/80 p-0.5 text-text-1 opacity-0 group-hover:opacity-100"
+                          className="absolute right-0.5 top-0.5 rounded-[2px] bg-bg-0/80 p-0.5 text-text-1 opacity-0 group-hover:opacity-100"
                           onClick={() => setImages(images.filter((_, j) => j !== i))}
                         >
                           <X size={10} />
@@ -622,7 +627,7 @@ function QueueList({ chatId, queue }: { chatId: string; queue: QueuedMessage[] }
             </button>
           )}
           <button
-            className="shrink-0 rounded px-1 text-[11px] text-accent hover:underline"
+            className="shrink-0 rounded-[2px] px-1 text-[11px] text-accent hover:underline"
             onClick={() => void sendNow(chatId, q.id)}
             data-testid="send-now"
           >
@@ -630,7 +635,7 @@ function QueueList({ chatId, queue }: { chatId: string; queue: QueuedMessage[] }
           </button>
           <button
             aria-label="Remove queued message"
-            className="shrink-0 rounded p-0.5 text-text-3 hover:text-text-1"
+            className="shrink-0 rounded-[2px] p-0.5 text-text-3 hover:text-text-1"
             onClick={() => void removeQueued(chatId, q.id)}
           >
             <X size={11} />

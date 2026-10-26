@@ -25,6 +25,8 @@ export async function launch(dataDir: string, extraEnv: Record<string, string> =
       LATIS_SKIP_ONBOARDING: "1",
       // Most specs predate the Conductor (M5); m5.spec.ts turns it on.
       LATIS_SKIP_CONDUCTOR: "1",
+      // The app opens on the lattice; most specs drive the canvas. Pass LATIS_LAYOUT: "" for the real default.
+      LATIS_LAYOUT: "canvas",
       ...extraEnv,
     },
   });

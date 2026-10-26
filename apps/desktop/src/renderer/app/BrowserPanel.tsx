@@ -189,7 +189,7 @@ export function BrowserPanel() {
         <div className="flex gap-1 border-b border-line px-2 py-1 text-[11px] text-text-3">
           Running:
           {ports.map((p) => (
-            <button key={p} className="rounded px-1 font-mono text-accent hover:underline" onClick={() => void go(`localhost:${p}`)}>
+            <button key={p} className="rounded-[2px] px-1 font-mono text-accent hover:underline" onClick={() => void go(`localhost:${p}`)}>
               :{p}
             </button>
           ))}

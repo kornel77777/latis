@@ -385,3 +385,22 @@ At the user's request, the focus views of §8.7 are called **Lock In** everywher
 ### 2026-10-23: Two-finger scroll pans the canvas
 
 The wheel zoomed the canvas for one version. Trackpads send two-finger scroll as wheel events, which made moving around hard, so panning is the default again. Pinch and ⌘/Ctrl + wheel zoom. Appearance → Scroll wheel → Zoom keeps the other behaviour for mouse users who want it.
+
+### 2026-10-24: Transcripts follow streaming output until the user scrolls up
+
+Virtuoso's `followOutput` only reacts to new items, so a reply growing in place (streamed text, tool output) left the view behind. `chat/followOutput.ts` keeps a "stuck" flag: on by default and after sending; off on wheel-up, Up/PageUp/Home, or an upward scrollbar/touch drag; on again when the user reaches the bottom (24 px). While stuck, any growth of the list or resize of the viewport pins it to the bottom. One component, so this covers the canvas, the lattice and lock-in.
+
+### 2026-10-25: The lattice is the workspace; the canvas is the map
+
+At the user's request the app opens on the lattice (`layoutMode` default `"lattice"`, ⌘1; the canvas moved to ⌘2 and second place in the title bar and sidebar). Existing data dirs are moved over once (`designV2` setting), which also swaps the old default accent Aurora for Glacier. `LATIS_LAYOUT=canvas` starts on the canvas; the e2e helper sets it because most specs drive the canvas. The canvas stays for seeing how chats, notes, cards and flows relate.
+
+Working with several agents happens in the lattice:
+
+- **Agent strip** in the toolbar: one button per installed agent starts a chat in the target project (the filter, else the focused pane's, else the only project) and tiles it in.
+- **Split** on each pane: a new chat with any agent, in the same project, placed right of or below that pane (⌘\ and ⌘⇧\ use the same agent).
+- **Broadcast bar** (⌘⇧A): one message to every selected pane; chats mid-turn are steered. Terminal agents are left out.
+- **Pass** on each pane: put its latest reply into another pane's composer (to add an instruction), or send it to every other pane with a request to review it.
+
+### 2026-10-25: Cold, sharp visual language
+
+Radii are 2–3px (`--radius-*`), pills became squares (status dots keep their shapes for accessibility, §8.12), shadows became hairlines, the palette moved to blue-steel greys with an ice-blue accent (Glacier). Agent colour is a 2px rule on the chat header and on your messages instead of a wash. Toolbar labels use `.latis-caps` (mono, uppercase). Lattice panes sit 4px apart on `bg-0`; the focused one gets a 1px accent outline.

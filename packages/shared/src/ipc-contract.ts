@@ -372,7 +372,7 @@ export const ImageAttachment = z.object({
 });
 export type ImageAttachment = z.infer<typeof ImageAttachment>;
 
-export const Accent = z.enum(["aurora", "nova", "ember", "bloom", "moss", "mono"]);
+export const Accent = z.enum(["glacier", "aurora", "nova", "ember", "bloom", "moss", "mono"]);
 export type Accent = z.infer<typeof Accent>;
 
 /** Appearance settings (§8.1, §8.11). */

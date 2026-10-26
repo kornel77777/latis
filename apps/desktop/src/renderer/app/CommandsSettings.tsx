@@ -14,7 +14,7 @@ function Recorder({ onChord, onCancel }: { onChord: (chord: string) => void; onC
   return (
     <button
       autoFocus
-      className="h-6 rounded-[6px] border border-accent bg-accent/10 px-2 text-[11.5px] text-accent outline-none"
+      className="h-6 rounded-control border border-accent bg-accent/10 px-2 text-[11.5px] text-accent outline-none"
       onKeyDown={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -100,7 +100,7 @@ export function CommandsSection() {
                               <span
                                 key={k}
                                 className={cn(
-                                  "inline-flex h-6 items-center gap-1 rounded-[6px] border bg-bg-1 pl-1.5 pr-0.5 font-mono text-[11.5px] text-text-1",
+                                  "inline-flex h-6 items-center gap-1 rounded-control border bg-bg-1 pl-1.5 pr-0.5 font-mono text-[11.5px] text-text-1",
                                   bad?.includes(k) ? "border-state-needs-you/60" : "border-line",
                                 )}
                                 data-testid="shortcut"
@@ -108,7 +108,7 @@ export function CommandsSection() {
                                 {display(k)}
                                 <button
                                   aria-label={`Remove ${display(k)} from ${c.title}`}
-                                  className="rounded p-0.5 text-text-3 opacity-0 hover:text-text-1 group-hover:opacity-100 focus:opacity-100"
+                                  className="rounded-[2px] p-0.5 text-text-3 opacity-0 hover:text-text-1 group-hover:opacity-100 focus:opacity-100"
                                   onClick={() =>
                                     save(
                                       c.id,
@@ -131,7 +131,7 @@ export function CommandsSection() {
                             ) : (
                               <button
                                 aria-label={`Add a shortcut to ${c.title}`}
-                                className="flex h-6 w-6 items-center justify-center rounded-[6px] text-text-3 opacity-60 hover:bg-surface-2 hover:text-text-1 group-hover:opacity-100"
+                                className="flex h-6 w-6 items-center justify-center rounded-control text-text-3 opacity-60 hover:bg-surface-2 hover:text-text-1 group-hover:opacity-100"
                                 onClick={() => setRecording(c.id)}
                                 data-testid="add-shortcut"
                               >
@@ -142,7 +142,7 @@ export function CommandsSection() {
                               aria-label={`Reset ${c.title} to its default shortcut`}
                               title="Back to the default"
                               className={cn(
-                                "flex h-6 w-6 items-center justify-center rounded-[6px] text-text-3 hover:bg-surface-2 hover:text-text-1",
+                                "flex h-6 w-6 items-center justify-center rounded-control text-text-3 hover:bg-surface-2 hover:text-text-1",
                                 isDefault(c) && "invisible",
                               )}
                               onClick={() => save(c.id, null)}

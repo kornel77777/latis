@@ -29,7 +29,7 @@ export function Checklist() {
         </span>
         <button
           aria-label="Dismiss getting started"
-          className="ml-auto rounded p-1 text-text-3 hover:bg-surface-2 hover:text-text-1"
+          className="ml-auto rounded-[2px] p-1 text-text-3 hover:bg-surface-2 hover:text-text-1"
           onClick={() => void useWorkspace.getState().setPrefs({ checklist: null })}
         >
           <X size={12} />
@@ -46,7 +46,7 @@ export function Checklist() {
             >
               <span
                 className={cn(
-                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-control border",
                   ok ? "border-state-done bg-state-done text-bg-0" : "border-line-strong",
                 )}
               >

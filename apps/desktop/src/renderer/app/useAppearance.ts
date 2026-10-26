@@ -5,6 +5,7 @@ import type { Accent, Appearance } from "@latis/shared";
 
 /** Accent choices per theme. Light-theme values are darkened to reach WCAG AA as text on light surfaces (§8.12). */
 export const ACCENTS: Record<Accent, { label: string; dark: string; light: string; fgDark: string; fgLight: string }> = {
+  glacier: { label: "Glacier", dark: "#7cc7ff", light: "#0b5cad", fgDark: "#031526", fgLight: "#ffffff" },
   aurora: { label: "Aurora", dark: "#5eead4", light: "#0b7a6e", fgDark: "#062621", fgLight: "#ffffff" },
   nova: { label: "Nova", dark: "#818cf8", light: "#4f46e5", fgDark: "#0b0d2a", fgLight: "#ffffff" },
   ember: { label: "Ember", dark: "#fb923c", light: "#c2410c", fgDark: "#2a1103", fgLight: "#ffffff" },

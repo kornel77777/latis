@@ -31,7 +31,7 @@ export function TitleBar() {
   const zen = useWorkspace((s) => s.zen);
   const views = useWorkspace((s) => s.views);
   const activeView = useWorkspace((s) => s.activeView);
-  const mode = useWorkspace((s) => s.prefs?.layoutMode ?? "canvas");
+  const mode = useWorkspace((s) => s.prefs?.layoutMode ?? "lattice");
   const bindings = useWorkspace((s) => s.prefs?.keybindings);
   const shortcutOf = (id: string) => {
     const c = allCommands().find((x) => x.id === id);
@@ -61,8 +61,8 @@ export function TitleBar() {
           <div className="flex shrink-0 rounded-control border border-line bg-bg-1 p-0.5" role="radiogroup" aria-label="Layout">
             {(
               [
-                ["canvas", LayoutDashboard, "Canvas", "view.canvas"],
                 ["lattice", Grid2x2, "Lattice", "view.lattice"],
+                ["canvas", LayoutDashboard, "Canvas", "view.canvas"],
               ] as const
             ).map(([m, Icon, label, cmd]) => {
               const on = !activeView && mode === m;
@@ -76,7 +76,7 @@ export function TitleBar() {
                   onClick={() => runCommand(cmd)}
                   data-testid={`mode-${m}`}
                   className={cn(
-                    "flex h-6 items-center gap-1.5 rounded-[6px] px-2.5 text-[12px] font-medium transition-colors duration-fast",
+                    "flex h-6 items-center gap-1.5 rounded-control px-2.5 text-[12px] font-medium transition-colors duration-fast",
                     on ? "bg-surface text-text-1 shadow-sm" : "text-text-3 hover:text-text-1",
                   )}
                 >
@@ -101,7 +101,7 @@ export function TitleBar() {
               </button>
               <button
                 aria-label={`Close ${v.name}`}
-                className="rounded p-0.5 opacity-60 hover:bg-surface-2 hover:opacity-100"
+                className="rounded-[2px] p-0.5 opacity-60 hover:bg-surface-2 hover:opacity-100"
                 onClick={() => closeView(v.id)}
               >
                 <X size={11} />

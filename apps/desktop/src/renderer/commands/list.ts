@@ -1,6 +1,8 @@
 import { latis } from "../api";
 import { useWorkspace } from "../stores/workspace";
 import { surfaces, type Command } from "./registry";
+import { stackAgent } from "../lattice/collab";
+import { broadcastInput } from "../lattice/LatticeBars";
 
 // The built-in commands. Titles read as actions; the defaults keep every shortcut Latis had.
 
@@ -12,6 +14,13 @@ const selectedChat = () => {
   return n?.data.chatId ? s.chats[n.data.chatId]?.summary : undefined;
 };
 const openPalette = (query = "") => useWorkspace.setState({ paletteOpen: true, paletteQuery: query });
+const inLattice = () => !ws().activeView && (ws().prefs?.layoutMode ?? "lattice") === "lattice";
+/** A new chat with the focused pane's agent and project, tiled beside it. */
+const splitFocused = (zone: "right" | "down") => {
+  const s = ws();
+  const c = s.latticeFocus ? s.chats[s.latticeFocus]?.summary : undefined;
+  if (c) void stackAgent(c.agentId, c.projectId, { target: c.id, zone });
+};
 const setMode = (layoutMode: "canvas" | "lattice") => {
   useWorkspace.setState({ activeView: null });
   void ws().setPrefs({ layoutMode });
@@ -70,14 +79,14 @@ export function builtInCommands(): Command[] {
     },
 
     // ── Navigate ─────────────────────────────────────────────────────────────
-    { id: "view.canvas", title: "Show the canvas", category: "Navigate", keys: ["Mod+1"], run: () => setMode("canvas") },
-    { id: "view.lattice", title: "Show the lattice", category: "Navigate", keys: ["Mod+2"], run: () => setMode("lattice") },
+    { id: "view.lattice", title: "Show the lattice", category: "Navigate", keys: ["Mod+1"], run: () => setMode("lattice") },
+    { id: "view.canvas", title: "Show the canvas", category: "Navigate", keys: ["Mod+2"], run: () => setMode("canvas") },
     {
       id: "view.toggle",
       title: "Switch canvas / lattice",
       category: "Navigate",
       keys: ["Mod+Shift+L"],
-      run: () => setMode((ws().prefs?.layoutMode ?? "canvas") === "canvas" ? "lattice" : "canvas"),
+      run: () => setMode((ws().prefs?.layoutMode ?? "lattice") === "canvas" ? "lattice" : "canvas"),
     },
     { id: "inbox.next", title: "Next item that needs you", category: "Navigate", keys: ["Ctrl+J"], run: () => ws().jumpAttention(1) },
     {
@@ -322,6 +331,30 @@ export function builtInCommands(): Command[] {
       keys: ["Mod+Alt+M"],
       scope: "lattice",
       run: () => surfaces.lattice?.arrange("main"),
+    },
+    {
+      id: "lattice.splitRight",
+      title: "Split right with the same agent",
+      category: "Lattice",
+      keys: ["Mod+\\"],
+      when: inLattice,
+      run: () => splitFocused("right"),
+    },
+    {
+      id: "lattice.splitDown",
+      title: "Split down with the same agent",
+      category: "Lattice",
+      keys: ["Mod+Shift+\\"],
+      when: inLattice,
+      run: () => splitFocused("down"),
+    },
+    {
+      id: "lattice.broadcast",
+      title: "Message every chat in the lattice",
+      category: "Lattice",
+      keys: ["Mod+Shift+A"],
+      when: inLattice,
+      run: () => broadcastInput.current?.focus(),
     },
     {
       id: "lattice.equalize",

@@ -279,7 +279,7 @@ export function FlowEdgeView(props: EdgeProps) {
             trigger={
               <button
                 className={cn(
-                  "rounded-full border bg-surface px-1.5 py-0.5 text-[10.5px] leading-none hover:border-line-strong",
+                  "rounded-control border bg-surface px-1.5 py-0.5 text-[10.5px] leading-none hover:border-line-strong",
                   waiting ? "border-state-needs-you text-state-needs-you" : "border-line text-text-3",
                 )}
                 aria-label={`Edge: ${mode}`}

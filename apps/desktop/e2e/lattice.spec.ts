@@ -29,7 +29,7 @@ test("lattice: chats tile in, rearrange by drag, keyboard and presets, and the l
   const dataDir = tempDataDir();
   const { app, page } = await launch(dataDir);
   await demoChats(page, 4);
-  await page.keyboard.press(`${mod}+2`);
+  await page.keyboard.press(`${mod}+1`);
   await expect(page.getByTestId("lattice")).toBeVisible();
   await expect(page.getByTestId("lattice-pane")).toHaveCount(4);
   if (shots) await page.screenshot({ path: `${shots}/lattice-tiled.png` });
@@ -56,7 +56,9 @@ test("lattice: chats tile in, rearrange by drag, keyboard and presets, and the l
   await page.keyboard.press(`${mod}+Alt+Shift+ArrowRight`);
   await expect.poll(() => order(page)).toEqual(["Chat 1", "Chat 4", "Chat 2", "Chat 3"]);
   await page.keyboard.press(`${mod}+Alt+ArrowLeft`);
-  expect(await page.evaluate(() => document.querySelector("[data-pane].ring-2 [data-testid=chat-title]")?.textContent)).toBe("Chat 1");
+  expect(await page.evaluate(() => document.querySelector("[data-pane][data-focused] [data-testid=chat-title]")?.textContent)).toBe(
+    "Chat 1",
+  );
 
   // Maximise and restore; take a chat out and put it back.
   await page.keyboard.press(`${mod}+Shift+Enter`);
@@ -148,5 +150,101 @@ test("canvas: two-finger scroll / the wheel pans by default, and zooms when set 
   const before = await badge.textContent();
   await page.mouse.wheel(0, -400);
   await expect(badge).not.toHaveText(before!);
+  await app.close();
+});
+
+test("lattice: a streaming reply keeps the transcript at the bottom until the user scrolls up", async () => {
+  const dataDir = tempDataDir();
+  const { app, page } = await launch(dataDir);
+  await demoChats(page, 2);
+  await page.keyboard.press(`${mod}+1`);
+  await expect(page.getByTestId("lattice-pane")).toHaveCount(2);
+
+  const pane = page.getByTestId("lattice-pane").filter({ hasText: "Chat 1" });
+  const scroller = pane.getByTestId("transcript").getByTestId("virtuoso-scroller");
+  const gap = () => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+  const height = () => scroller.evaluate((el) => el.scrollHeight);
+
+  const composer = pane.getByTestId("composer");
+  await composer.fill("go /long");
+  await composer.press("Enter");
+
+  // While it streams, the list grows and the view follows it.
+  await expect.poll(height, { timeout: 5_000 }).toBeGreaterThan(1_500);
+  for (let i = 0; i < 5; i++) {
+    await page.waitForTimeout(250);
+    expect(await gap()).toBeLessThan(40);
+  }
+
+  // Scrolling up stops the following; the view stays where the user put it.
+  const box = (await scroller.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -600);
+  await page.waitForTimeout(200);
+  const top = await scroller.evaluate((el) => el.scrollTop);
+  await page.waitForTimeout(800);
+  expect(Math.abs((await scroller.evaluate((el) => el.scrollTop)) - top)).toBeLessThan(2);
+
+  // Scrolling back to the bottom follows again.
+  await scroller.evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await page.waitForTimeout(500);
+  expect(await gap()).toBeLessThan(40);
+  await app.close();
+});
+
+test("lattice is the default: stack agents, split a pane, message them all, pass a reply and ask for a review", async () => {
+  const dataDir = tempDataDir();
+  // The real default layout, not the canvas the other specs start on.
+  const { app, page } = await launch(dataDir, { LATIS_LAYOUT: "" });
+  await expect(page.getByTestId("lattice")).toBeVisible();
+
+  // Empty lattice: one click starts an agent.
+  await page.getByTestId("stack-fake").last().click();
+  await expect(page.getByTestId("lattice-pane")).toHaveCount(1);
+  const first = page.getByTestId("lattice-pane").first();
+  const firstId = await first.getAttribute("data-pane");
+
+  // Split it: the new chat tiles to its right.
+  await first.getByRole("button", { name: "Split with another agent" }).click();
+  await page.getByRole("menuitem").filter({ hasText: /demo/i }).first().click();
+  await expect(page.getByTestId("lattice-pane")).toHaveCount(2);
+  const secondId = await page.locator(`[data-testid=lattice-pane]:not([data-pane="${firstId}"])`).getAttribute("data-pane");
+  const second = page.locator(`[data-pane="${secondId}"]`);
+  const [a, b] = [(await first.boundingBox())!, (await second.boundingBox())!];
+  expect(b.x).toBeGreaterThan(a.x + a.width / 2);
+  expect(Math.abs(b.y - a.y)).toBeLessThan(4);
+
+  // The toolbar strip stacks a third.
+  await page.getByTestId("stack-fake").click();
+  await expect(page.getByTestId("lattice-pane")).toHaveCount(3);
+
+  // One message to all three.
+  await expect(page.getByTestId("broadcast-target")).toHaveCount(3);
+  const thirdId = (await page.getByTestId("lattice-pane").evaluateAll((els) => els.map((e) => e.getAttribute("data-pane")))).find(
+    (id) => id !== firstId && id !== secondId,
+  );
+  const third = page.locator(`[data-pane="${thirdId}"]`);
+  await page.getByTestId("broadcast-target").nth(2).click(); // leave the newest out
+  await page.getByTestId("broadcast-input").fill("hello everyone");
+  await page.getByTestId("broadcast-input").press("Enter");
+  await expect(first.getByTestId("transcript")).toContainText("hello everyone");
+  await expect(second.getByTestId("transcript")).toContainText("hello everyone");
+  await expect(third.getByTestId("transcript")).not.toContainText("hello everyone");
+  // The demo agent asks before running a command; allow both.
+  for (const pane of [first, second]) await pane.getByRole("button", { name: "Allow once" }).click({ timeout: 10_000 });
+  await expect(first.getByTestId("chat-card")).toHaveAttribute("data-completed-turns", "1", { timeout: 15_000 });
+  await expect(second.getByTestId("chat-card")).toHaveAttribute("data-completed-turns", "1", { timeout: 15_000 });
+  if (shots) await page.screenshot({ path: `${shots}/lattice-collab.png` });
+
+  // Pass the first chat's reply into the second's composer.
+  await first.getByRole("button", { name: "Pass the last reply" }).click();
+  await page.getByRole("menuitem").first().click();
+  await expect(second.getByTestId("composer")).toHaveValue(/^From .*<reply>/s);
+
+  // Ask everyone else to review it: both others get it.
+  await first.getByRole("button", { name: "Pass the last reply" }).click();
+  await page.getByRole("menuitem", { name: /to review it/ }).click();
+  await expect(second.getByTestId("transcript")).toContainText("Review this", { timeout: 10_000 });
+  await expect(third.getByTestId("transcript")).toContainText("Review this", { timeout: 10_000 });
   await app.close();
 });

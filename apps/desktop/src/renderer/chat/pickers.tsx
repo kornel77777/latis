@@ -14,7 +14,7 @@ export const MODES: { id: Mode; label: string; hint: string; icon: typeof Shield
 ];
 
 const chipClass =
-  "flex h-6 items-center gap-1 rounded-[6px] px-1.5 text-[11.5px] font-medium text-text-2 hover:bg-surface-2 hover:text-text-1 data-[state=open]:bg-surface-2";
+  "flex h-6 items-center gap-1 rounded-control px-1.5 text-[11.5px] font-medium text-text-2 hover:bg-surface-2 hover:text-text-1 data-[state=open]:bg-surface-2";
 
 function useModels(agentId: string): { models: AgentModel[] | undefined; load: () => void; error: string | null } {
   const models = useWorkspace((s) => s.models[agentId]);

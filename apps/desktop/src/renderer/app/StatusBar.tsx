@@ -17,7 +17,7 @@ export function StatusBar() {
         return (
           <button
             key={k}
-            className="flex items-center gap-1.5 rounded px-1 hover:bg-surface-2 hover:text-text-1"
+            className="flex items-center gap-1.5 rounded-[2px] px-1 hover:bg-surface-2 hover:text-text-1"
             data-testid={`count-${k}`}
             title={k === "needs-you" ? "Jump to the next item (Ctrl+J)" : undefined}
             onClick={() => (k === "needs-you" ? jumpAttention(1) : undefined)}
@@ -26,7 +26,10 @@ export function StatusBar() {
           </button>
         );
       })}
-      <button className="flex items-center gap-1 rounded px-1 hover:bg-surface-2 hover:text-text-1" onClick={() => setSidebarTab("inbox")}>
+      <button
+        className="flex items-center gap-1 rounded-[2px] px-1 hover:bg-surface-2 hover:text-text-1"
+        onClick={() => setSidebarTab("inbox")}
+      >
         Inbox {inbox}
       </button>
       <UsageMeters />

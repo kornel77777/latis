@@ -43,7 +43,7 @@ export function Item({ item, actions }: { item: TranscriptItem; actions: ItemAct
     case "user":
       return (
         <div
-          className="latis-bubble ml-auto w-fit max-w-[85%] whitespace-pre-wrap rounded-[14px] rounded-br-[5px] bg-surface-2 px-3 py-2 text-text-1"
+          className="latis-bubble whitespace-pre-wrap border-l-2 border-accent bg-surface-2 px-3 py-2 text-text-1"
           data-testid="user-message"
         >
           {item.text}
@@ -108,7 +108,7 @@ function UndoTurn({ turnId, actions }: { turnId: string; actions: ItemActions })
   if (!st?.restorable || st.files === 0) return null;
   return st.undone ? (
     <button
-      className="ml-auto rounded px-1 text-text-2 hover:bg-surface-2 hover:text-text-1"
+      className="ml-auto rounded-[2px] px-1 text-text-2 hover:bg-surface-2 hover:text-text-1"
       onClick={() => actions.redo?.(turnId)}
       data-testid="redo-turn"
     >
@@ -116,7 +116,7 @@ function UndoTurn({ turnId, actions }: { turnId: string; actions: ItemActions })
     </button>
   ) : (
     <button
-      className="ml-auto rounded px-1 text-text-2 hover:bg-surface-2 hover:text-text-1"
+      className="ml-auto rounded-[2px] px-1 text-text-2 hover:bg-surface-2 hover:text-text-1"
       onClick={() => actions.undo?.(turnId)}
       title={`Restores the ${st.files} file${st.files === 1 ? "" : "s"} this turn changed`}
       data-testid="undo-turn"
@@ -135,7 +135,7 @@ function AssistantMessage({ text, streaming }: { text: string; streaming: boolea
       {!streaming && text && (
         <button
           aria-label="Copy message"
-          className="absolute -right-1 -top-1 rounded-[6px] bg-surface p-1 text-text-3 opacity-0 transition-opacity hover:text-text-1 group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute -right-1 -top-1 rounded-control bg-surface p-1 text-text-3 opacity-0 transition-opacity hover:text-text-1 group-hover:opacity-100 focus-visible:opacity-100"
           onClick={() => {
             void navigator.clipboard.writeText(text);
             setCopied(true);

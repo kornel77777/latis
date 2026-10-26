@@ -58,7 +58,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
           }}
         >
           <header className="latis-frame-drag flex cursor-grab items-center gap-5 px-8 py-6 active:cursor-grabbing">
-            <span className="h-8 w-8 rounded-[8px]" style={{ background: color }} />
+            <span className="h-8 w-8 rounded-control" style={{ background: color }} />
             <span className="text-[56px] font-semibold text-text-1">{project.name}</span>
             {counts[0]! > 0 && (
               <span className="flex items-center gap-3 text-[36px] text-text-2">
@@ -88,13 +88,13 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
         }}
       >
         <header className="latis-frame-drag flex h-11 cursor-grab items-center gap-2 px-4 active:cursor-grabbing">
-          <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: color }} />
+          <span className="h-2.5 w-2.5 rounded-control" style={{ background: color }} />
           {renaming ? (
             <input
               autoFocus
               defaultValue={project.name}
               aria-label="Project name"
-              className="nodrag w-48 rounded-[6px] border border-line-strong bg-bg-1 px-1.5 text-[14px] font-semibold text-text-1 outline-none"
+              className="nodrag w-48 rounded-control border border-line-strong bg-bg-1 px-1.5 text-[14px] font-semibold text-text-1 outline-none"
               onBlur={(e) => {
                 setRenaming(false);
                 const name = e.currentTarget.value.trim();
@@ -180,7 +180,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
                     aria-label={name}
                     aria-pressed={project.color === name}
                     onClick={() => void updateProject(project.id, { color: name })}
-                    className="h-5 w-5 rounded-full border-2"
+                    className="h-5 w-5 rounded-control border-2"
                     style={{ background: hex, borderColor: project.color === name ? "var(--text-1)" : "transparent" }}
                   />
                 ))}

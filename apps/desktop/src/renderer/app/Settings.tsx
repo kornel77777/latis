@@ -184,7 +184,7 @@ function AppearanceSection() {
               aria-label={c.label}
               title={c.label}
               onClick={() => set({ accent: id as Appearance["accent"] })}
-              className="h-6 w-6 rounded-full border-2"
+              className="h-6 w-6 rounded-control border-2"
               style={{ background: c.dark, borderColor: a.accent === id ? "var(--text-1)" : "transparent" }}
             />
           ))}

@@ -1,26 +1,26 @@
-/* Latis design tokens (SPEC §8.1) — "Observatory at night". Dark-first. */
+/* Latis design tokens (SPEC §8.1): cold, sharp and flat. Dark-first. Hairline borders do the work shadows and radii did. */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg-0: #0a0c0f;
-  --bg-1: #0e1114;
-  --surface: #151a1f;
-  --surface-2: #1b2127;
-  --surface-glass: rgba(21, 26, 31, 0.72);
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text-1: #e9ecef;
-  --text-2: #a4abb5;
-  --text-3: #808894;
-  --accent: #5eead4;
-  --accent-fg: #062621;
+  --bg-0: #06080b;
+  --bg-1: #090c10;
+  --surface: #0e1217;
+  --surface-2: #141920;
+  --surface-glass: rgba(14, 18, 23, 0.78);
+  --border: rgba(150, 180, 215, 0.11);
+  --border-strong: rgba(150, 180, 215, 0.22);
+  --text-1: #e4e9ef;
+  --text-2: #9ba7b4;
+  --text-3: #808c99;
+  --accent: #7cc7ff;
+  --accent-fg: #031526;
   --state-working: #f6b94c;
   --state-needs-you: #ff7a66;
   --state-done: #46d99a;
   --state-error: #f2557a;
   --state-idle: var(--text-3);
-  --grid-dot: rgba(255, 255, 255, 0.06);
-  --shadow-lift: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --grid-dot: rgba(150, 180, 215, 0.07);
+  --shadow-lift: 0 0 0 1px rgba(150, 180, 215, 0.12), 0 10px 28px rgba(0, 0, 0, 0.55);
 
   --hue-amber-sand: #d9a86c;
   --hue-slate-blue: #7d93c9;
@@ -30,24 +30,24 @@
 
 [data-theme="light"] {
   color-scheme: light;
-  --bg-0: #f6f7f9;
-  --bg-1: #eef0f3;
+  --bg-0: #f2f4f7;
+  --bg-1: #e9edf1;
   --surface: #ffffff;
-  --surface-2: #f3f5f7;
-  --surface-glass: rgba(255, 255, 255, 0.78);
-  --border: rgba(15, 20, 25, 0.08);
-  --border-strong: rgba(15, 20, 25, 0.16);
+  --surface-2: #f1f3f6;
+  --surface-glass: rgba(255, 255, 255, 0.8);
+  --border: rgba(10, 30, 55, 0.11);
+  --border-strong: rgba(10, 30, 55, 0.22);
   --text-1: #11151a;
   --text-2: #4a525c;
   --text-3: #666e78;
-  --accent: #0b7a6e;
+  --accent: #0b5cad;
   --accent-fg: #ffffff;
   --state-working: #875b00;
   --state-needs-you: #c03a26;
   --state-done: #167a4c;
   --state-error: #b8284f;
   --grid-dot: rgba(15, 20, 25, 0.12);
-  --shadow-lift: 0 12px 32px rgba(15, 20, 25, 0.12), 0 2px 6px rgba(15, 20, 25, 0.08);
+  --shadow-lift: 0 0 0 1px rgba(10, 30, 55, 0.1), 0 10px 28px rgba(10, 30, 55, 0.12);
 
   --hue-amber-sand: #b07a35;
   --hue-slate-blue: #4a63a3;
@@ -56,9 +56,9 @@
 }
 
 :root {
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-panel: 16px;
+  --radius-control: 2px;
+  --radius-card: 2px;
+  --radius-panel: 3px;
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-fast: 120ms;
   --dur-base: 200ms;

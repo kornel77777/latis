@@ -76,7 +76,7 @@ function scopeActive(scope: Scope): boolean {
   // A dialog, menu or the palette has the keyboard.
   if (document.querySelector("[role=dialog], [role=menu]")) return false;
   if (s.activeView) return false;
-  return (s.prefs?.layoutMode ?? "canvas") === scope;
+  return (s.prefs?.layoutMode ?? "lattice") === scope;
 }
 
 /** Runs a command by id (palette, buttons, tests). */

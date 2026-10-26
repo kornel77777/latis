@@ -45,7 +45,7 @@ export function MenuItem({
       {...(onSelect && { onSelect })}
       {...(disabled && { disabled })}
       className={cn(
-        "flex h-7 cursor-default select-none items-center gap-2 rounded-[6px] px-2 text-[13px] outline-none",
+        "flex h-7 cursor-default select-none items-center gap-2 rounded-control px-2 text-[13px] outline-none",
         "data-[highlighted]:bg-surface-2 data-[disabled]:opacity-45",
         danger ? "text-state-error" : "text-text-1",
       )}

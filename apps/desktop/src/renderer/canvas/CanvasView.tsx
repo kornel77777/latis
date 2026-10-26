@@ -206,7 +206,7 @@ export function CanvasView() {
         >
           <button
             role="menuitem"
-            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            className="flex h-7 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
             onClick={() => {
               void openFolder(menu);
               setMenu(null);
@@ -216,7 +216,7 @@ export function CanvasView() {
           </button>
           <button
             role="menuitem"
-            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            className="flex h-7 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
             onClick={() => {
               void newDemoChat(menu);
               setMenu(null);
@@ -226,7 +226,7 @@ export function CanvasView() {
           </button>
           <button
             role="menuitem"
-            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            className="flex h-7 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
             onClick={() => {
               void useWorkspace.getState().createNote(flow.screenToFlowPosition(menu));
               setMenu(null);
@@ -237,7 +237,7 @@ export function CanvasView() {
           </button>
           <button
             role="menuitem"
-            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            className="flex h-7 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
             onClick={() => {
               useWorkspace.setState({ cardLibraryAt: flow.screenToFlowPosition(menu) });
               setMenu(null);
@@ -248,7 +248,7 @@ export function CanvasView() {
           </button>
           <button
             role="menuitem"
-            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            className="flex h-7 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
             onClick={() => {
               useWorkspace.setState({ flowTemplatesAt: flow.screenToFlowPosition(menu) });
               setMenu(null);
@@ -259,7 +259,7 @@ export function CanvasView() {
           </button>
           <button
             role="menuitem"
-            className="flex h-7 w-full items-center gap-2 rounded-[6px] px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
+            className="flex h-7 w-full items-center gap-2 rounded-control px-2 text-left text-[13px] text-text-1 hover:bg-surface-2"
             onClick={() => {
               useWorkspace.getState().tidyUp();
               setMenu(null);

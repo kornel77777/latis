@@ -141,7 +141,7 @@ export function AgentList({ hideDemo = false, compact = false }: { hideDemo?: bo
             data-testid="agent-card"
             data-agent={a.id}
           >
-            <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: `var(--hue-${a.hue})` }} />
+            <span className="mt-1 h-2.5 w-2.5 shrink-0" style={{ background: `var(--hue-${a.hue})` }} />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 text-[13px] font-medium text-text-1">
                 {a.displayName}

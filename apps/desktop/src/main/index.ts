@@ -90,7 +90,7 @@ const agents = new AgentRegistry({
 
 // LATIS_SKIP_ONBOARDING=1 (e2e) starts as if the first-run tour was done.
 const DEFAULT_APPEARANCE: Appearance = {
-  accent: "aurora",
+  accent: "glacier",
   density: "comfortable",
   uiScale: 1,
   chatTextSize: 14,
@@ -111,9 +111,25 @@ const DEFAULT_PREFS: Prefs = {
   checklist: process.env.LATIS_SKIP_ONBOARDING === "1" ? null : [],
   maxSpawned: 6,
   keybindings: {},
-  layoutMode: "canvas",
+  // The lattice is where work happens; the canvas is the map. LATIS_LAYOUT=canvas starts on the canvas (most e2e specs).
+  layoutMode: process.env.LATIS_LAYOUT === "canvas" ? "canvas" : "lattice",
 };
+/** Once per data dir: move existing installs to the lattice and the cold accent (DECISIONS 2026-10-25). */
+let designMigrated = false;
+function migrateDesign() {
+  if (designMigrated) return;
+  designMigrated = true;
+  if (store.getSetting<boolean>("designV2")) return;
+  const saved = store.getSetting<Partial<Prefs>>("prefs");
+  if (saved) {
+    const next: Partial<Prefs> = { ...saved, layoutMode: DEFAULT_PREFS.layoutMode };
+    if (saved.appearance?.accent === "aurora") next.appearance = { ...saved.appearance, accent: "glacier" };
+    store.setSetting("prefs", next);
+  }
+  store.setSetting("designV2", true);
+}
 function prefs(): Prefs {
+  migrateDesign();
   const saved = store.getSetting<Partial<Prefs>>("prefs") ?? {};
   return { ...DEFAULT_PREFS, ...saved, appearance: { ...DEFAULT_APPEARANCE, ...saved.appearance } };
 }

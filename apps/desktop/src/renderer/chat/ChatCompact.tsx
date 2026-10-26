@@ -101,7 +101,7 @@ export const ChatTile = memo(function ChatTile({ chatId, selected }: { chatId: s
         {action}
       </p>
       {activity.pendingRequests > 0 && (
-        <div className="mt-5 flex items-center gap-3 self-start rounded-full bg-state-needs-you px-5 py-2 text-[28px] font-semibold text-bg-0">
+        <div className="mt-5 flex items-center gap-3 self-start rounded-control bg-state-needs-you px-5 py-2 text-[28px] font-semibold text-bg-0">
           <ShieldQuestion size={28} /> {activity.pendingRequests} waiting for you
         </div>
       )}
@@ -143,7 +143,7 @@ export const ChatCondensed = memo(function ChatCondensed({ chatId, selected }: {
           {activity.since && working && <span className="font-mono text-text-3">{elapsed(activity.since, now)}</span>}
         </div>
         {activity.pendingRequests > 0 && (
-          <div className="flex items-center gap-2 self-start rounded-full bg-state-needs-you px-4 py-1.5 text-[16px] font-semibold text-bg-0">
+          <div className="flex items-center gap-2 self-start rounded-control bg-state-needs-you px-4 py-1.5 text-[16px] font-semibold text-bg-0">
             <ShieldQuestion size={18} /> {activity.pendingRequests} waiting for you
           </div>
         )}
