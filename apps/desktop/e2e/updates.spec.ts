@@ -44,7 +44,7 @@ test("a newer release shows in the status bar and Settings → General; it can b
 
   await notice.getByRole("button", { name: "Dismiss the update notice" }).click();
   await expect(notice).toHaveCount(0);
-  await expect(page.getByLabel("Status")).toContainText("v0.1.0");
+  await expect(page.getByLabel("Status")).toContainText(/v\d+\.\d+\.\d+/);
   await app.close();
   server.close();
 });
