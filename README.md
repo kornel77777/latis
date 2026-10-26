@@ -68,3 +68,7 @@ Running from source, the Claude chat view may also use your own Claude sign-in. 
 - **Choices along the way:** `DECISIONS.md`.
 - **How each agent is integrated (verified against the real CLIs):** `docs/adapters/`.
 - **Releases:** pushing a tag like `v0.2.0` builds installers into a draft GitHub release (`.github/workflows/release.yml`).
+
+## License
+
+[MIT](LICENSE) © 2026 Kornel Omori

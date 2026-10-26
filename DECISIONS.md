@@ -14,6 +14,8 @@ Decision: keep the spec's default (`<dataDir>/worktrees`). Revisit in M3 if tool
 
 Not needed until the repo goes public.
 
+**2026-10-26:** MIT, at the user's choice, ahead of making the repo public (`LICENSE`, `"license": "MIT"` in the package files).
+
 ### 2026-10-22 — TypeScript 6.0, not 7.0
 
 Context: TS 7.0.2 is current, but typescript-eslint 8.72 supports `<6.1`. Decision: pin `~6.0.3`. Revisit when typescript-eslint supports 7.
