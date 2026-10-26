@@ -38,6 +38,7 @@ export function builtInCommands(): Command[] {
       run: () => useWorkspace.setState((s) => ({ paletteOpen: !s.paletteOpen, paletteQuery: "" })),
     },
     { id: "settings.open", title: "Open settings", category: "General", keys: ["Mod+,"], run: () => ws().setSettingsOpen(true) },
+    { id: "app.report", title: "Report a problem", category: "General", keys: [], run: () => void ws().reportProblem() },
     {
       id: "commands.open",
       title: "Commands and shortcuts",

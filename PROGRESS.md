@@ -7,6 +7,7 @@
 - Known: `m1.spec.ts` title check flaked once in a full run (passes alone); the canvas doesn't yet draw relationships (spawned-by, handoff, passed replies) as edges.
 - Chat transcripts follow a streaming reply in every view (canvas, lattice, lock-in) and stop following when the user scrolls up; e2e in `e2e/lattice.spec.ts`.
 - M7 has started (link policy, fuses, signing/notarization config, icon); auto-update, privacy doc, docs site, crash-report opt-in, perf and security passes and signed installers are still open.
+- 2026-10-26: **Privacy and diagnostics** (M7): `docs/privacy.md`; Settings → Data (open folder, export without secrets); local scrubbed log file and crash dumps (never uploaded); "Report a problem" copies diagnostics and opens a GitHub issue. Tests: 179 unit, 46 native, 28 e2e.
 - 2026-10-26: **Release notice** (M7, instead of auto-update for now): installed copies check GitHub Releases every 6 h and link to a newer version from the status bar and the new Settings → General (version, Check now, off switch). Tests: 173 unit, 45 native, 27 e2e.
 - 2026-10-26: **Claude, two ways** (DECISIONS 2026-10-26):
   - **Claude Code** runs the user's own `claude` in a terminal tile on their subscription. HTTP hooks give it status, Inbox approvals (answer in the terminal or Latis), the always-ask banner, recorded turns with checkpoints, resume after restart, and workspace tools.

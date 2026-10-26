@@ -433,3 +433,19 @@ Auto-update needs signed builds (macOS won't swap in an unsigned app, Windows sh
 - **What it offers:** only a newer tag whose page is on `github.com/kornel77777/latis/releases/`. Drafts and pre-releases never count, since `latest` excludes them. A 404 (no releases yet, or a private repo) means nothing to offer.
 - **Turning it off:** Settings → General → "Check for new versions". The request carries no user data, only the app version in the User-Agent.
 - **Where it doesn't run:** dev runs never check. `LATIS_UPDATE_FEED` points tests at a local server.
+
+### 2026-10-26: Crash reports and diagnostics stay local; "Report a problem" goes through the user
+
+§13 allows opt-in crash reports. Rather than run a crash service, Latis keeps everything on the machine:
+
+- **Logs:** main-process warnings and errors, uncaught exceptions and renderer crashes go to `<dataDir>/logs/latis.log`, scrubbed of home paths, bearer tokens, `sk-` keys, `key=value` secrets and emails, and rotated at 1 MB.
+- **Crash dumps:** Electron's `crashReporter` runs with `uploadToServer: false`.
+- **Report a problem** (title-bar menu, ⌘K, Settings → General) copies diagnostics to the clipboard: version, OS, installed agents and the scrubbed log tail. It then opens a GitHub new-issue page with only the version and OS filled in, so nothing goes into the URL beyond that, and the user decides what to paste.
+
+Settings → Data:
+
+- **Open:** opens the data folder.
+- **Export:** `VACUUM INTO` a copy with the API key and MCP secrets removed, plus cards, skills, Conductor preferences, manifests and sandbox projects. Sign-ins, tokens, logs and the browser profile are left out.
+- **Not done:** a "reset everything" button. The docs say to quit and delete the folder; moving an open SQLite database to the Trash isn't worth the risk.
+
+Everything that leaves the machine is listed in `docs/privacy.md`.

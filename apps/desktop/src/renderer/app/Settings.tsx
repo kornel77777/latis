@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderOpen, ImageIcon, RefreshCw, X } from "lucide-react";
+import { Bug, Download, FolderOpen, ImageIcon, RefreshCw, X } from "lucide-react";
 import type { Appearance, Theme } from "@latis/shared";
 import { ACCENTS } from "./useAppearance";
 import { Button, Dialog, cn } from "@latis/ui";
@@ -20,9 +20,11 @@ const sections: SettingsSection[] = [
   "Commands",
   "Appearance",
   "Notifications",
+  "Data",
 ];
 const BODY: Record<SettingsSection, () => React.ReactNode> = {
   General: GeneralSection,
+  Data: DataSection,
   Agents: AgentsSection,
   Permissions: PermissionsSection,
   Conductor: ConductorSection,
@@ -104,12 +106,72 @@ function GeneralSection() {
           <RefreshCw size={12} className={checking ? "animate-spin" : undefined} /> {checking ? "Checking…" : "Check now"}
         </Button>
       </Row>
+      <Row
+        label="Something wrong?"
+        hint="Copies diagnostics for you to check, and opens a new issue on GitHub. Latis sends nothing itself."
+      >
+        <Button size="sm" variant="secondary" onClick={() => void useWorkspace.getState().reportProblem()} data-testid="report-problem">
+          <Bug size={12} /> Report a problem…
+        </Button>
+      </Row>
       <Toggle
         label="Check for new versions"
         hint="About every 6 hours Latis asks GitHub for its latest release. Nothing about you or your work is sent, and nothing is installed."
         checked={prefs.checkUpdates}
         onChange={(v) => void setPrefs({ checkUpdates: v })}
       />
+    </div>
+  );
+}
+
+const PRIVACY_DOC = "https://github.com/kornel77777/latis/blob/main/docs/privacy.md";
+
+function DataSection() {
+  const [info, setInfo] = useState<{ dataDir: string; logFile: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const toast = useWorkspace((s) => s.toast);
+  useEffect(() => {
+    void latis.invoke("data:info").then(setInfo);
+  }, []);
+  return (
+    <div className="flex flex-col gap-2 text-[13px]" data-testid="data-settings">
+      <p className="text-[12px] leading-relaxed text-text-2">
+        Everything Latis keeps is in one folder on this computer. Latis has no account or server, sends no analytics, and keeps crash
+        reports here too. Your agents talk to their own providers, the same as when you run them yourself.{" "}
+        <a href={PRIVACY_DOC} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+          What leaves your computer
+        </a>
+      </p>
+      <Row label="Data folder" hint={info?.dataDir}>
+        <Button size="sm" variant="secondary" onClick={() => void latis.invoke("data:open")}>
+          <FolderOpen size={12} /> Open
+        </Button>
+      </Row>
+      <Row
+        label="Export the workspace"
+        hint="Canvas, chats, notes, cards, flows, skills and settings. API keys and connection secrets are left out."
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={exporting}
+          data-testid="data-export"
+          onClick={() => {
+            setExporting(true);
+            void latis
+              .invoke("data:export")
+              .then((r) => r.path && toast(`Exported to ${r.path}`))
+              .catch((err: unknown) => toast(err instanceof Error ? err.message : String(err)))
+              .finally(() => setExporting(false));
+          }}
+        >
+          <Download size={12} /> {exporting ? "Exporting…" : "Export…"}
+        </Button>
+      </Row>
+      <Row label="Log file" hint={info?.logFile}>
+        <span className="text-[12px] text-text-3">Warnings and errors, with paths and keys removed</span>
+      </Row>
+      <p className="text-[12px] text-text-3">To remove everything, quit Latis and delete the data folder.</p>
     </div>
   );
 }

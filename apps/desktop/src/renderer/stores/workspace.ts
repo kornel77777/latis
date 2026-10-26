@@ -50,7 +50,7 @@ export interface Toast {
 }
 
 export type SettingsSection =
-  "General" | "Agents" | "Permissions" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
+  "General" | "Data" | "Agents" | "Permissions" | "Conductor" | "Connections" | "Skills" | "Commands" | "Appearance" | "Notifications";
 
 export type ChatOptions = Partial<Pick<ChatSummary, "model" | "reasoning" | "permissionMode" | "title">>;
 
@@ -187,6 +187,8 @@ interface WorkspaceState {
   openAsTerminal(chatId: string): Promise<void>;
   signIn(agentId: string): Promise<void>;
   setPrefs(patch: Partial<Prefs>): Promise<void>;
+  /** Copies diagnostics and opens a new GitHub issue for the user to fill in (docs/privacy.md). */
+  reportProblem(): Promise<void>;
   setSettingsOpen(open: boolean, section?: SettingsSection): void;
   loadConnections(): Promise<void>;
   loadSkills(projectId: string | null, force?: boolean): Promise<Skill[]>;
@@ -743,6 +745,16 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
   },
 
+  async reportProblem() {
+    try {
+      const { diagnostics, issueUrl } = await latis.invoke("app:report");
+      await navigator.clipboard.writeText(diagnostics);
+      window.open(issueUrl, "_blank");
+      get().toast("Diagnostics copied. Read them, then paste them into the issue if you're happy to share them.");
+    } catch (err) {
+      get().toast(err instanceof Error ? err.message : String(err));
+    }
+  },
   async setPrefs(patch) {
     set({ prefs: await latis.invoke("prefs:set", patch) });
   },

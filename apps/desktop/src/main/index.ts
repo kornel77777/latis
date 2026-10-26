@@ -1,6 +1,6 @@
-import { app, BrowserWindow, dialog, nativeTheme, protocol, safeStorage, shell } from "electron";
+import { app, BrowserWindow, crashReporter, dialog, nativeTheme, protocol, safeStorage, shell } from "electron";
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, release } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -36,6 +36,9 @@ import { PtyManager } from "./terminal/pty-manager";
 import { Connections } from "./mcp/connections";
 import { TOOL_TIMEOUT_SEC, WorkspaceMcpServer, type HookEndpoint } from "./mcp/server";
 import { RELEASES_FEED, UpdateChecker } from "./updates";
+import { LogFile } from "./logs";
+import { exportWorkspace } from "./data-export";
+import { diagnostics, issueUrl } from "./diagnostics";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
 import { openLink } from "./security/links";
@@ -56,6 +59,10 @@ let win: BrowserWindow | null = null;
 const dataDir = resolveDataDir();
 mkdirSync(dataDir, { recursive: true });
 app.setPath("userData", join(dataDir, "electron"));
+// Warnings, errors and crashes stay on this machine (docs/privacy.md).
+const logs = new LogFile(join(dataDir, "logs"));
+logs.install();
+crashReporter.start({ uploadToServer: false });
 
 // Cards get their own origin each (§12.1). Must be registered before the app is ready.
 protocol.registerSchemesAsPrivileged([{ scheme: "card", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
@@ -1153,6 +1160,33 @@ registerHandlers({
   },
   "prefs:get": () => prefs(),
   "update:get": () => updates.state(),
+  "data:info": () => ({ dataDir, logFile: logs.file }),
+  "data:open": async () => ({ ok: (await shell.openPath(dataDir)) === "" }),
+  "data:export": async () => {
+    const options = {
+      title: "Export the workspace to…",
+      properties: ["openDirectory", "createDirectory"] as ("openDirectory" | "createDirectory")[],
+    };
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+    const target = r.filePaths[0];
+    if (r.canceled || !target) return { path: null };
+    eventLog.flush();
+    const path = exportWorkspace(dataDir, target);
+    if (!dataDir.includes("latis-e2e-")) shell.showItemInFolder(path);
+    return { path };
+  },
+  "app:report": async () => ({
+    diagnostics: diagnostics({
+      version: app.getVersion(),
+      platform: process.platform,
+      arch: process.arch,
+      osRelease: release(),
+      electron: process.versions.electron ?? "",
+      agents: await agents.list(),
+      logTail: logs.tail(),
+    }),
+    issueUrl: issueUrl(app.getVersion(), `${process.platform} ${release()}`),
+  }),
   "update:check": () => updates.check(),
   "prefs:set": (patch) => {
     const next = { ...prefs(), ...patch };
@@ -1284,6 +1318,7 @@ function createWindow() {
     void openLink(url, links);
   });
   win.on("closed", () => (win = null));
+  win.webContents.on("render-process-gone", (_e, d) => console.error(`[renderer] gone: ${d.reason} (exit ${d.exitCode})`));
 
   if (process.env.ELECTRON_RENDERER_URL) void win.loadURL(process.env.ELECTRON_RENDERER_URL);
   else void win.loadFile(join(here, "../renderer/index.html"));

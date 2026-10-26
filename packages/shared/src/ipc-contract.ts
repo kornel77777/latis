@@ -843,6 +843,13 @@ export const invokeContract = {
   "flow:setStart": { req: z.object({ nodeId: z.string(), input: z.string().max(20_000), oneTaskPerLine: z.boolean() }), res: ok },
   "prefs:get": { req: none, res: Prefs },
   "update:get": { req: none, res: UpdateState },
+  /** Settings → Data (§8.11). */
+  "data:info": { req: none, res: z.object({ dataDir: z.string(), logFile: z.string() }) },
+  "data:open": { req: none, res: ok },
+  /** Copies the workspace, without secrets, into a folder the user picks; null if they cancelled. */
+  "data:export": { req: none, res: z.object({ path: z.string().nullable() }) },
+  /** "Report a problem": diagnostics for the clipboard and the new-issue page. */
+  "app:report": { req: none, res: z.object({ diagnostics: z.string(), issueUrl: z.string().url() }) },
   "update:check": { req: none, res: UpdateState },
   "prefs:set": { req: Prefs.partial(), res: Prefs },
   /** Picks an image file for the canvas wallpaper; returns it as a data: URL, or null if cancelled. */

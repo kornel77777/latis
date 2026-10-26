@@ -1,4 +1,5 @@
 import {
+  Bug,
   FolderOpen,
   Grid2x2,
   Keyboard,
@@ -167,9 +168,10 @@ export function TitleBar() {
           <MenuItem onSelect={() => void loadAgents(true)}>
             <RefreshCw size={14} /> Re-check agents
           </MenuItem>
-          <MenuItem onSelect={() => void window.latis.invoke("app:info").then((i) => alert(`Latis ${i.version}\nData: ${i.dataDir}`))}>
-            About Latis
+          <MenuItem onSelect={() => void useWorkspace.getState().reportProblem()}>
+            <Bug size={14} /> Report a problem…
           </MenuItem>
+          <MenuItem onSelect={() => useWorkspace.getState().setSettingsOpen(true, "General")}>About Latis</MenuItem>
         </Menu>
       </div>
     </header>
