@@ -29,6 +29,15 @@ export default defineConfig({
     },
   },
   renderer: {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      // The CSP allows the dev server's HMR socket; release builds don't need it (§13).
+      {
+        name: "latis-csp",
+        apply: "build",
+        transformIndexHtml: (html: string) => html.replace(" ws://localhost:*", ""),
+      },
+    ],
   },
 });

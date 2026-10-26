@@ -7,6 +7,12 @@
 - Known: `m1.spec.ts` title check flaked once in a full run (passes alone); the canvas doesn't yet draw relationships (spawned-by, handoff, passed replies) as edges.
 - Chat transcripts follow a streaming reply in every view (canvas, lattice, lock-in) and stop following when the user scrolls up; e2e in `e2e/lattice.spec.ts`.
 - M7 has started (link policy, fuses, signing/notarization config, icon); auto-update, privacy doc, docs site, crash-report opt-in, perf and security passes and signed installers are still open.
+- 2026-10-26: **Performance and security pass** (M7, `docs/qa/M7.md`). Fixed:
+  - web permissions were open to cards; now only clipboard write, for Latis's own page
+  - `<webview>` blocked
+  - release CSP without the dev socket
+  - endless status-bar animations: idle CPU went from about 2% to 0.03%
+    Within budget: cold start 0.6 s, p95 frame 9 ms. Memory is near the 600 MB line. Tests: 182 unit, 46 native, 29 e2e.
 - 2026-10-26: **Privacy and diagnostics** (M7): `docs/privacy.md`; Settings → Data (open folder, export without secrets); local scrubbed log file and crash dumps (never uploaded); "Report a problem" copies diagnostics and opens a GitHub issue. Tests: 179 unit, 46 native, 28 e2e.
 - 2026-10-26: **Release notice** (M7, instead of auto-update for now): installed copies check GitHub Releases every 6 h and link to a newer version from the status bar and the new Settings → General (version, Check now, off switch). Tests: 173 unit, 45 native, 27 e2e.
 - 2026-10-26: **Claude, two ways** (DECISIONS 2026-10-26):

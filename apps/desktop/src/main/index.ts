@@ -1,4 +1,4 @@
-import { app, BrowserWindow, crashReporter, dialog, nativeTheme, protocol, safeStorage, shell } from "electron";
+import { app, BrowserWindow, crashReporter, dialog, nativeTheme, protocol, safeStorage, session, shell } from "electron";
 import { mkdirSync, writeFileSync, existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir, release } from "node:os";
 import { join, resolve, sep } from "node:path";
@@ -42,6 +42,7 @@ import { diagnostics, issueUrl } from "./diagnostics";
 import { WorkspaceService } from "./mcp/workspace";
 import { Skills } from "./skills";
 import { openLink } from "./security/links";
+import { appUrlMatcher, lockDownPermissions } from "./security/permissions";
 import { CARD_SIZE, Cards } from "./cards/cards";
 import { gateCard, starters } from "./cards/library";
 import { FlowEngine, nextRun } from "./flows/engine";
@@ -1324,7 +1325,11 @@ function createWindow() {
   else void win.loadFile(join(here, "../renderer/index.html"));
 }
 
+// §13: no <webview> anywhere; the dock browser is a WebContentsView Latis creates itself.
+app.on("web-contents-created", (_e, contents) => contents.on("will-attach-webview", (ev) => ev.preventDefault()));
+
 void app.whenReady().then(() => {
+  lockDownPermissions(session.defaultSession, appUrlMatcher(process.env.ELECTRON_RENDERER_URL));
   protocol.handle("card", (req) => cards.serve(req.url));
   createWindow();
   // Only installed copies check on their own; a dev run is newer than any release anyway.

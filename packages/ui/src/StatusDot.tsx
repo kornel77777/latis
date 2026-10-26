@@ -11,7 +11,8 @@ const label: Record<StatusKind, string> = {
 };
 
 /** State is never colour alone (SPEC §8.12): each state also has a distinct shape and a label. */
-export function StatusDot({ status, className }: { status: StatusKind; className?: string }) {
+/** `still`: no animation (legends and counts of zero; a running animation costs CPU even when nothing happens). */
+export function StatusDot({ status, className, still = false }: { status: StatusKind; className?: string; still?: boolean }) {
   return (
     <span
       role="img"
@@ -23,8 +24,8 @@ export function StatusDot({ status, className }: { status: StatusKind; className
         className={cn(
           "absolute inset-0",
           status === "idle" && "rounded-full border-[1.5px] border-state-idle",
-          status === "working" && "animate-latis-pulse rounded-full bg-state-working",
-          status === "needs-you" && "animate-latis-breathe rotate-45 rounded-[2px] bg-state-needs-you",
+          status === "working" && cn("rounded-full bg-state-working", !still && "animate-latis-pulse"),
+          status === "needs-you" && cn("rotate-45 rounded-[2px] bg-state-needs-you", !still && "animate-latis-breathe"),
           status === "done" && "rounded-full bg-state-done",
           status === "error" && "rounded-[2px] bg-state-error",
         )}

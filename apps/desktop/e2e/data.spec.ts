@@ -32,3 +32,10 @@ test("Settings → Data shows the folder and exports the workspace; Report a pro
   expect(report.issueUrl).toMatch(/^https:\/\/github\.com\/kornel77777\/latis\/issues\/new\?/);
   await app.close();
 });
+
+test("an idle window runs no animations (§14: idle CPU)", async () => {
+  const { app, page } = await launch(tempDataDir(), { LATIS_LAYOUT: "" });
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => document.getAnimations().map((a) => (a as CSSAnimation).animationName))).toEqual([]);
+  await app.close();
+});

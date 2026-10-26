@@ -111,7 +111,7 @@ export class ClaudeTerminalAdapter extends TerminalAdapter {
     if (!bin) throw new Error(`Claude Code isn't installed. Install it with: ${CLAUDE_TERMINAL_MANIFEST.installHint}`);
     const chatId = opts.chatId ?? sessionId;
     const endpoint = await this.claude.endpoint();
-    mkdirSync(this.claude.runDir, { recursive: true });
+    mkdirSync(this.claude.runDir, { recursive: true, mode: 0o700 });
     const settingsFile = join(this.claude.runDir, `claude-${chatId}-hooks.json`);
     const hook = {
       hooks: [

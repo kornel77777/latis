@@ -52,7 +52,7 @@ export function StatusBar() {
             title={k === "needs-you" ? "Jump to the next item (Ctrl+J)" : undefined}
             onClick={() => (k === "needs-you" ? jumpAttention(1) : undefined)}
           >
-            <StatusDot status={k} /> {n} {statusLabel[k].toLowerCase()}
+            <StatusDot status={k} still={n === 0} /> {n} {statusLabel[k].toLowerCase()}
           </button>
         );
       })}
