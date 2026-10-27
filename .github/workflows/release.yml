@@ -25,6 +25,12 @@ jobs:
             echo "Tag ${GITHUB_REF_NAME} doesn't match apps/desktop/package.json version $version" >&2
             exit 1
           fi
+      # electron-builder uploads several files at once; with no release yet, each upload created its own draft
+      # and the files ended up split between them. One draft made up front gets all of them.
+      - name: Create the draft release
+        run: gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --title "${GITHUB_REF_NAME#v}" --notes ""
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
     needs: check
