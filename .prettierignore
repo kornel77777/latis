@@ -3,4 +3,4 @@ dist
 release
 pnpm-lock.yaml
 **/migrations/meta
-SPEC.md
+docs/dev/SPEC.md

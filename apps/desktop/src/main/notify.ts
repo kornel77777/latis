@@ -23,7 +23,7 @@ export class Notifier {
 
   badge(items: AttentionItem[]): void {
     const count = items.filter((i) => NEEDS_YOU.has(i.kind)).length;
-    // macOS dock and Linux Unity launchers; Windows has no numeric badge API in Electron (DECISIONS.md).
+    // macOS dock and Linux Unity launchers; Windows has no numeric badge API in Electron (docs/dev/DECISIONS.md).
     app.setBadgeCount(count);
     for (const [id, n] of this.live) {
       if (!items.some((i) => i.id === id)) {

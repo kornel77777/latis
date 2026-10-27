@@ -1,5 +1,5 @@
 // Runs the "native" vitest project under Electron-as-Node, because better-sqlite3
-// is compiled for Electron's ABI (see DECISIONS.md).
+// is compiled for Electron's ABI (see docs/dev/DECISIONS.md).
 import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { createRequire } from "node:module";

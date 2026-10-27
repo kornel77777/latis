@@ -63,9 +63,9 @@ Running from source, the Claude chat view may also use your own Claude sign-in. 
 
 ## For contributors
 
-- **The plan:** `SPEC.md`.
-- **Where things stand:** `PROGRESS.md`.
-- **Choices along the way:** `DECISIONS.md`.
+- **The plan:** [`docs/dev/SPEC.md`](docs/dev/SPEC.md).
+- **Where things stand:** [`docs/dev/PROGRESS.md`](docs/dev/PROGRESS.md).
+- **Choices along the way:** [`docs/dev/DECISIONS.md`](docs/dev/DECISIONS.md).
 - **How each agent is integrated (verified against the real CLIs):** `docs/adapters/`.
 - **Releases:** pushing a tag like `v0.2.0` builds installers into a draft GitHub release (`.github/workflows/release.yml`).
 

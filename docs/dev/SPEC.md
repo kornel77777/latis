@@ -739,7 +739,7 @@ latis/
 ├─ fixtures/               # recorded adapter streams, fake scripts, temp-repo seeds
 ├─ docs/                   # adapters/*.md, privacy.md, architecture.md
 ├─ e2e/                    # Playwright tests
-├─ SPEC.md  PROGRESS.md  DECISIONS.md
+├─ docs/dev/SPEC.md  PROGRESS.md  DECISIONS.md
 └─ package.json (pnpm workspaces)
 ```
 
