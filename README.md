@@ -1,4 +1,16 @@
-# Latis
+<p align="center">
+  <img src="apps/desktop/build/icon.png" alt="Latis app icon" width="128" height="128">
+</p>
+
+<h1 align="center">Latis</h1>
+
+<p align="center">
+  <a href="https://github.com/kornel77777/latis/releases/latest"><strong>Download for macOS</strong></a>
+  &nbsp;·&nbsp;
+  <a href="docs/privacy.md">Privacy</a>
+  &nbsp;·&nbsp;
+  <a href="LICENSE">MIT license</a>
+</p>
 
 Mission control for your coding agents. Run Claude Code, Codex, Gemini CLI and others side by side, see at a glance which one is working, which one needs you and which one is done, and review and land their work safely.
 
