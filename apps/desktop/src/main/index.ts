@@ -68,7 +68,23 @@ crashReporter.start({ uploadToServer: false });
 // Cards get their own origin each (§12.1). Must be registered before the app is ready.
 protocol.registerSchemesAsPrivileged([{ scheme: "card", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
-if (!app.requestSingleInstanceLock() && !process.env.LATIS_DATA_DIR) app.quit();
+// One Latis per data folder. A second launch (Dock, Finder, Spotlight) brings the running window forward and
+// stops right here, before it touches the shared database.
+// Test runs use their own data folders and skip this; LATIS_SINGLE_INSTANCE=1 turns it back on (e2e).
+const singleInstance = !process.env.LATIS_DATA_DIR || process.env.LATIS_SINGLE_INSTANCE === "1";
+if (singleInstance && !app.requestSingleInstanceLock()) {
+  app.exit(0);
+  process.exit(0);
+}
+app.on("second-instance", () => {
+  if (!win) {
+    if (app.isReady()) createWindow();
+    return;
+  }
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+});
 
 const store = new WorkspaceStore(openDb(join(dataDir, "latis.db")));
 const eventLog = new EventLog(store);
