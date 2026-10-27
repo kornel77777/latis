@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename } from "node:path";
 import type { IPty } from "node-pty";
-import type { PtyInfo } from "@latis/shared";
+import type { PtyInfo } from "@lattiz/shared";
 
 // Terminals for the dock and terminal-only agents (SPEC §9.6). PTYs live in the main
 // process, so they survive canvas switches and renderer reloads; the renderer repaints
@@ -56,7 +56,7 @@ export class PtyManager {
       cols: spec.cols ?? 100,
       rows: spec.rows ?? 30,
       cwd: spec.cwd,
-      env: { ...spec.env, TERM: "xterm-256color", COLORTERM: "truecolor", TERM_PROGRAM: "Latis" } as Record<string, string>,
+      env: { ...spec.env, TERM: "xterm-256color", COLORTERM: "truecolor", TERM_PROGRAM: "Lattiz" } as Record<string, string>,
     });
     const id = randomUUID();
     const entry: Entry = {

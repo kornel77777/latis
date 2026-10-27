@@ -30,8 +30,8 @@ import {
   type StoredEvent,
   type Theme,
   type Turn,
-} from "@latis/shared";
-import { latis } from "../api";
+} from "@lattiz/shared";
+import { lattiz } from "../api";
 
 export interface ChatState {
   summary: ChatSummary;
@@ -238,7 +238,7 @@ function toFlowNode(n: CanvasNode): FlowNode {
     height: n.h,
     zIndex: n.z,
     data: n.data as FlowNode["data"],
-    dragHandle: n.type === "frame" || n.type === "flow" ? ".latis-frame-drag" : ".latis-drag",
+    dragHandle: n.type === "frame" || n.type === "flow" ? ".lattiz-frame-drag" : ".lattiz-drag",
     ...(n.parentId && { parentId: n.parentId }),
   };
 }
@@ -274,7 +274,7 @@ function scheduleSave(get: () => WorkspaceState, delay = 300) {
     const nodes = get()
       .nodes.filter((n) => ids.has(n.id))
       .map(geometry);
-    latis.invoke("canvas:saveNodes", { nodes }).catch((err: unknown) => {
+    lattiz.invoke("canvas:saveNodes", { nodes }).catch((err: unknown) => {
       console.error("save failed, retrying", err);
       ids.forEach((id) => dirty.add(id));
       scheduleSave(get, 2000);
@@ -301,7 +301,7 @@ const redoStack: UndoEntry[] = [];
 let undoing = false;
 function saveViews(views: FocusView[]) {
   useWorkspace.setState({ views });
-  latis.invoke("views:set", views).catch((err: unknown) => console.error("saving focus views failed", err));
+  lattiz.invoke("views:set", views).catch((err: unknown) => console.error("saving focus views failed", err));
 }
 
 /** Records an action; steps taken by undo/redo themselves aren't recorded again. */
@@ -321,7 +321,7 @@ async function applyGeometry(list: NodeGeometry[]): Promise<void> {
       return g ? { ...n, position: { x: g.x, y: g.y }, width: g.w, height: g.h } : n;
     }),
   }));
-  await latis.invoke("canvas:saveNodes", { nodes: list });
+  await lattiz.invoke("canvas:saveNodes", { nodes: list });
 }
 
 // Main → renderer events are applied once per animation frame (SPEC §5).
@@ -390,26 +390,26 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     if (!save) return;
     if (latticeTimer) clearTimeout(latticeTimer);
     latticeTimer = setTimeout(() => {
-      latis.invoke("lattice:set", get().lattice).catch((err: unknown) => console.error("saving the lattice failed", err));
+      lattiz.invoke("lattice:set", get().lattice).catch((err: unknown) => console.error("saving the lattice failed", err));
     }, 300);
   },
 
   async load() {
     try {
       const [canvas, theme, attention, ptys, prefs, reviews, views, info, scheduled, usage, lattice] = await Promise.all([
-        latis.invoke("canvas:load"),
-        latis.invoke("settings:getTheme"),
-        latis.invoke("attention:list"),
-        latis.invoke("pty:list"),
-        latis.invoke("prefs:get"),
-        latis.invoke("reviews:list"),
-        latis.invoke("views:get"),
-        latis.invoke("app:info"),
-        latis.invoke("schedule:list"),
-        latis.invoke("usage:get"),
-        latis.invoke("lattice:get"),
+        lattiz.invoke("canvas:load"),
+        lattiz.invoke("settings:getTheme"),
+        lattiz.invoke("attention:list"),
+        lattiz.invoke("pty:list"),
+        lattiz.invoke("prefs:get"),
+        lattiz.invoke("reviews:list"),
+        lattiz.invoke("views:get"),
+        lattiz.invoke("app:info"),
+        lattiz.invoke("schedule:list"),
+        lattiz.invoke("usage:get"),
+        lattiz.invoke("lattice:get"),
       ]);
-      void latis.invoke("update:get").then((update) => set({ update }));
+      void lattiz.invoke("update:get").then((update) => set({ update }));
       const chats: Record<string, ChatState> = {};
       for (const c of canvas.chats) chats[c.id] = { summary: c, turns: [], events: [], lastSeq: -1, loaded: false };
       set({
@@ -475,13 +475,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   saveViewport(v) {
     if (viewportTimer) clearTimeout(viewportTimer);
     viewportTimer = setTimeout(() => {
-      latis.invoke("canvas:saveViewport", { canvasId: get().canvasId, viewport: v }).catch(console.error);
+      lattiz.invoke("canvas:saveViewport", { canvasId: get().canvasId, viewport: v }).catch(console.error);
     }, 300);
   },
 
   async loadAgents(refresh) {
     try {
-      const agents = await latis.invoke("agents:list", { refresh: refresh ?? false });
+      const agents = await lattiz.invoke("agents:list", { refresh: refresh ?? false });
       if (refresh) set({ models: {} });
       set({ agents });
       // Model lists come from the agent CLI without sending a message (no tokens); fetch them so pickers show names.
@@ -498,14 +498,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   async loadModels(agentId) {
     const cached = get().models[agentId];
     if (cached) return cached;
-    const models = await latis.invoke("agents:models", { agentId });
+    const models = await lattiz.invoke("agents:models", { agentId });
     set((s) => ({ models: { ...s.models, [agentId]: models } }));
     return models;
   },
 
   async openFolder(at) {
     try {
-      const r = await latis.invoke("project:openFolder", { canvasId: get().canvasId, x: Math.round(at.x), y: Math.round(at.y) });
+      const r = await lattiz.invoke("project:openFolder", { canvasId: get().canvasId, x: Math.round(at.x), y: Math.round(at.y) });
       if (!r) return null;
       set((s) => ({
         projects: { ...s.projects, [r.project.id]: r.project },
@@ -521,7 +521,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async createChat({ agentId, projectId, x = 0, y = 0, draft, isolate }) {
     try {
-      const { node, chat, frame } = await latis.invoke("chat:create", {
+      const { node, chat, frame } = await lattiz.invoke("chat:create", {
         canvasId: get().canvasId,
         projectId,
         agentId,
@@ -544,7 +544,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
           const base = { ...n, selected: false };
           return frame && n.id === frame.id ? { ...base, width: frame.w, height: frame.h } : base;
         }),
-        { ...toFlowNode(node), selected: true, className: "latis-appear" },
+        { ...toFlowNode(node), selected: true, className: "lattiz-appear" },
       ]),
       chats: { ...s.chats, [chat.id]: { summary: chat, turns: [], events: [], lastSeq: -1, loaded: true } },
       ...(draft && { drafts: { ...s.drafts, [chat.id]: draft } }),
@@ -557,7 +557,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     set((s) => ({
       nodes: sortNodes([
         ...s.nodes.map((n) => ({ ...n, selected: false })),
-        ...nodes.map((n) => ({ ...toFlowNode(n), className: "latis-appear" })),
+        ...nodes.map((n) => ({ ...toFlowNode(n), className: "lattiz-appear" })),
       ]),
       chats: {
         ...s.chats,
@@ -573,7 +573,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     set((s) => ({
       nodes: sortNodes([
         ...s.nodes.map((n) => ({ ...n, selected: false })),
-        { ...toFlowNode(node), selected: true, className: "latis-appear" },
+        { ...toFlowNode(node), selected: true, className: "lattiz-appear" },
       ]),
     }));
     pushUndo({
@@ -592,7 +592,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   async loadTranscript(chatId) {
-    const t = await latis.invoke("chat:transcript", { chatId });
+    const t = await lattiz.invoke("chat:transcript", { chatId });
     set((s) => {
       const prev = s.chats[chatId];
       if (!prev) return s;
@@ -611,7 +611,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   async send(chatId, text, images) {
     let turn: Turn;
     try {
-      turn = await latis.invoke("chat:send", { chatId, text, ...(images?.length && { images }) });
+      turn = await lattiz.invoke("chat:send", { chatId, text, ...(images?.length && { images }) });
     } catch (err) {
       get().toast(`Message not sent: ${errorText(err)}`);
       return;
@@ -621,20 +621,20 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   async respond(chatId, requestId, response) {
-    const r = await latis.invoke("chat:respond", { chatId, requestId, response });
+    const r = await lattiz.invoke("chat:respond", { chatId, requestId, response });
     if (response.kind === "permission" && response.decision !== "deny") get().markStep("approve");
     if (!r.ok) get().toast("That request is no longer waiting. The agent may have been restarted.");
   },
   async interrupt(chatId) {
-    await latis.invoke("chat:interrupt", { chatId });
+    await lattiz.invoke("chat:interrupt", { chatId });
   },
   async restart(chatId) {
-    await latis.invoke("chat:restart", { chatId });
+    await lattiz.invoke("chat:restart", { chatId });
   },
 
   async setChatOptions(chatId, options) {
     try {
-      const summary = await latis.invoke("chat:setOptions", { chatId, ...options });
+      const summary = await lattiz.invoke("chat:setOptions", { chatId, ...options });
       applySummary(summary);
     } catch (err) {
       get().toast(errorText(err));
@@ -642,7 +642,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
 
   async reveal(chatId, path) {
-    const r = await latis.invoke("chat:reveal", { chatId, ...(path && { path }) });
+    const r = await lattiz.invoke("chat:reveal", { chatId, ...(path && { path }) });
     if (!r.ok) get().toast(`Couldn't open ${path ?? "the folder"}.`);
   },
 
@@ -654,7 +654,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 
   async setTheme(theme) {
-    set({ theme: await latis.invoke("settings:setTheme", theme) });
+    set({ theme: await lattiz.invoke("settings:setTheme", theme) });
   },
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   toggleDock: () => set((s) => ({ dockOpen: !s.dockOpen })),
@@ -662,7 +662,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async steer(chatId, text, images) {
     try {
-      const r = await latis.invoke("chat:steer", { chatId, text, ...(images?.length && { images }) });
+      const r = await lattiz.invoke("chat:steer", { chatId, text, ...(images?.length && { images }) });
       set((s) => ({ queues: { ...s.queues, [chatId]: r.queue } }));
       if (r.delivered === "sent") await get().loadTranscript(chatId);
     } catch (err) {
@@ -670,15 +670,15 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
   },
   async editQueued(chatId, id, text) {
-    const queue = await latis.invoke("chat:queueEdit", { chatId, id, text });
+    const queue = await lattiz.invoke("chat:queueEdit", { chatId, id, text });
     set((s) => ({ queues: { ...s.queues, [chatId]: queue } }));
   },
   async removeQueued(chatId, id) {
-    const queue = await latis.invoke("chat:queueRemove", { chatId, id });
+    const queue = await lattiz.invoke("chat:queueRemove", { chatId, id });
     set((s) => ({ queues: { ...s.queues, [chatId]: queue } }));
   },
   async sendNow(chatId, id) {
-    await latis.invoke("chat:sendNow", { chatId, id });
+    await lattiz.invoke("chat:sendNow", { chatId, id });
   },
 
   focusChat(chatId) {
@@ -691,10 +691,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   markSeen(chatId) {
     if (!get().attention.some((a) => a.chatId === chatId && (a.kind === "finished" || a.kind === "error" || a.kind === "rate_limited")))
       return;
-    void latis.invoke("chat:seen", { chatId }).catch(console.error);
+    void lattiz.invoke("chat:seen", { chatId }).catch(console.error);
   },
   async dismissAttention(id) {
-    await latis.invoke("attention:dismiss", { id });
+    await lattiz.invoke("attention:dismiss", { id });
   },
   jumpAttention(dir) {
     const items = get().attention;
@@ -709,7 +709,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async newTerminal(projectId) {
     try {
-      get().showPty(await latis.invoke("pty:create", { projectId }));
+      get().showPty(await lattiz.invoke("pty:create", { projectId }));
     } catch (err) {
       get().toast(`Couldn't open a terminal: ${errorText(err)}`);
     }
@@ -724,9 +724,9 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async closePty(id) {
     const p = get().ptys.find((x) => x.id === id);
-    await latis.invoke("pty:kill", { id });
+    await lattiz.invoke("pty:kill", { id });
     // A running terminal gets its exit event first; one that already exited is forgotten now.
-    if (p && !p.running) await latis.invoke("pty:kill", { id }).catch(() => undefined);
+    if (p && !p.running) await lattiz.invoke("pty:kill", { id }).catch(() => undefined);
     set((s) => {
       const ptys = s.ptys.filter((x) => x.id !== id);
       return { ptys, activePty: s.activePty === id ? (ptys.at(-1)?.id ?? null) : s.activePty };
@@ -734,14 +734,14 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async openAsTerminal(chatId) {
     try {
-      get().showPty(await latis.invoke("chat:openTerminal", { chatId }));
+      get().showPty(await lattiz.invoke("chat:openTerminal", { chatId }));
     } catch (err) {
       get().toast(`Couldn't open a terminal: ${errorText(err)}`);
     }
   },
   async signIn(agentId) {
     try {
-      get().showPty(await latis.invoke("agents:login", { agentId }));
+      get().showPty(await lattiz.invoke("agents:login", { agentId }));
     } catch (err) {
       get().toast(errorText(err));
     }
@@ -749,7 +749,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async reportProblem() {
     try {
-      const { diagnostics, issueUrl } = await latis.invoke("app:report");
+      const { diagnostics, issueUrl } = await lattiz.invoke("app:report");
       await navigator.clipboard.writeText(diagnostics);
       window.open(issueUrl, "_blank");
       get().toast("Diagnostics copied. Read them, then paste them into the issue if you're happy to share them.");
@@ -758,12 +758,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     }
   },
   async setPrefs(patch) {
-    set({ prefs: await latis.invoke("prefs:set", patch) });
+    set({ prefs: await lattiz.invoke("prefs:set", patch) });
   },
   setSettingsOpen: (open, section) => set({ settingsOpen: open, ...(section && { settingsSection: section }) }),
   async loadConnections() {
     try {
-      set({ connections: await latis.invoke("mcp:list") });
+      set({ connections: await lattiz.invoke("mcp:list") });
     } catch (err) {
       console.warn("loading connections failed", err);
     }
@@ -772,13 +772,13 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     const key = projectId ?? "";
     const cached = get().skills[key];
     if (cached && !force) return cached;
-    const list = await latis.invoke("skills:list", { projectId });
+    const list = await lattiz.invoke("skills:list", { projectId });
     set((s) => ({ skills: { ...s.skills, [key]: list } }));
     return list;
   },
   async setWorkspaceTools(chatId, on) {
     try {
-      applySummary(await latis.invoke("chat:setWorkspaceTools", { chatId, on }));
+      applySummary(await lattiz.invoke("chat:setWorkspaceTools", { chatId, on }));
       get().toast(on ? "This chat can now see and start other chats. It applies from its next message." : "Workspace tools removed.");
     } catch (err) {
       get().toast(errorText(err));
@@ -786,7 +786,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async setConnections(chatId, ids) {
     try {
-      applySummary(await latis.invoke("chat:setConnections", { chatId, ids }));
+      applySummary(await lattiz.invoke("chat:setConnections", { chatId, ids }));
     } catch (err) {
       get().toast(errorText(err));
     }
@@ -797,7 +797,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async startChat(agentId, projectId) {
     try {
-      const g = await latis.invoke("project:git", { projectId });
+      const g = await lattiz.invoke("project:git", { projectId });
       // §9.3 AC1: a second chat in the same repo gets the offer of its own copy (default on).
       if (g.chats > 0 && g.isRepo) {
         set({ isolateOffer: { agentId, projectId, isRepo: true } });
@@ -809,7 +809,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         get().toast("This folder isn't a git repository, so its chats share it and can't be undone or reviewed.", {
           label: "Initialise git",
           run: () =>
-            void latis
+            void lattiz
               .invoke("project:initGit", { projectId })
               .then(() => get().toast("Git initialised. New chats here can have their own copy."))
               .catch((err: unknown) => get().toast(errorText(err))),
@@ -822,12 +822,12 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     await get().createChat({ agentId, projectId });
   },
   async loadTimeline(chatId) {
-    const entries = await latis.invoke("chat:timeline", { chatId });
+    const entries = await lattiz.invoke("chat:timeline", { chatId });
     set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
   },
   async undoTurn(chatId, turnId) {
     try {
-      const entries = await latis.invoke("chat:undoTurn", { chatId, turnId });
+      const entries = await lattiz.invoke("chat:undoTurn", { chatId, turnId });
       set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
       get().toast("Turn undone. The agent will be told with your next message.", {
         label: "Redo",
@@ -839,7 +839,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async redoTurn(chatId, turnId) {
     try {
-      const entries = await latis.invoke("chat:redoTurn", { chatId, turnId });
+      const entries = await lattiz.invoke("chat:redoTurn", { chatId, turnId });
       set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
     } catch (err) {
       get().toast(errorText(err));
@@ -847,7 +847,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async restoreTo(chatId, turnId) {
     try {
-      const entries = await latis.invoke("chat:restoreTo", { chatId, turnId });
+      const entries = await lattiz.invoke("chat:restoreTo", { chatId, turnId });
       set((s) => ({ timelines: { ...s.timelines, [chatId]: entries } }));
       get().toast("Files restored. The agent will be told with your next message.");
     } catch (err) {
@@ -865,7 +865,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async createNote(at, text) {
     try {
-      const node = await latis.invoke("note:create", {
+      const node = await lattiz.invoke("note:create", {
         canvasId: get().canvasId,
         x: Math.round(at.x),
         y: Math.round(at.y),
@@ -874,7 +874,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       set((s) => ({
         nodes: sortNodes([
           ...s.nodes.map((n) => ({ ...n, selected: false })),
-          { ...toFlowNode(node), selected: true, className: "latis-appear" },
+          { ...toFlowNode(node), selected: true, className: "lattiz-appear" },
         ]),
         editingNote: node.id,
       }));
@@ -892,7 +892,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async createLabel(at) {
     try {
-      const node = await latis.invoke("label:create", {
+      const node = await lattiz.invoke("label:create", {
         canvasId: get().canvasId,
         x: Math.round(at.x - 130),
         y: Math.round(at.y - 32),
@@ -911,7 +911,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
       nodeId,
       setTimeout(() => {
         noteTimers.delete(nodeId);
-        latis.invoke("note:update", { nodeId, text }).catch((err: unknown) => get().toast(`Note not saved: ${errorText(err)}`));
+        lattiz.invoke("note:update", { nodeId, text }).catch((err: unknown) => get().toast(`Note not saved: ${errorText(err)}`));
       }, 400),
     );
   },
@@ -921,7 +921,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async deleteNodes(nodeIds) {
     try {
-      const { deleted } = await latis.invoke("canvas:delete", { nodeIds });
+      const { deleted } = await lattiz.invoke("canvas:delete", { nodeIds });
       if (!deleted.length) {
         get().toast("The Conductor is pinned to the canvas and can't be deleted.");
         return;
@@ -946,7 +946,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async restoreNodes(nodeIds) {
     try {
-      const canvas = await latis.invoke("canvas:restore", { nodeIds });
+      const canvas = await lattiz.invoke("canvas:restore", { nodeIds });
       const back = new Set(nodeIds);
       set((s) => {
         const chats = { ...s.chats };
@@ -986,7 +986,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async updateProject(projectId, patch) {
     try {
-      const p = await latis.invoke("project:update", { projectId, ...patch });
+      const p = await lattiz.invoke("project:update", { projectId, ...patch });
       set((s) => ({ projects: { ...s.projects, [p.id]: p } }));
     } catch (err) {
       get().toast(errorText(err));
@@ -994,7 +994,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
   },
   async locateProject(projectId) {
     try {
-      const p = await latis.invoke("project:locate", { projectId });
+      const p = await lattiz.invoke("project:locate", { projectId });
       if (p) set((s) => ({ projects: { ...s.projects, [p.id]: p } }));
     } catch (err) {
       get().toast(errorText(err));
@@ -1055,7 +1055,7 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
 
   async createSandbox() {
     try {
-      const r = await latis.invoke("project:createSandbox", { canvasId: get().canvasId, x: 0, y: 0 });
+      const r = await lattiz.invoke("project:createSandbox", { canvasId: get().canvasId, x: 0, y: 0 });
       set((s) => ({
         projects: { ...s.projects, [r.project.id]: r.project },
         nodes: r.existed ? s.nodes : sortNodes([...s.nodes, toFlowNode(r.node)]),
@@ -1117,72 +1117,72 @@ let subscribed = false;
 export function subscribeToMain(): void {
   if (subscribed) return;
   subscribed = true;
-  latis.on("chat:events", (raw) => {
+  lattiz.on("chat:events", (raw) => {
     const parsed = eventContract["chat:events"].safeParse(raw);
     if (!parsed.success) return console.warn("dropped invalid chat:events payload");
     pendingEvents.push(...parsed.data.events);
     frame ||= requestAnimationFrame(flushEvents);
   });
-  latis.on("chat:status", (raw) => {
+  lattiz.on("chat:status", (raw) => {
     const parsed = eventContract["chat:status"].safeParse(raw);
     if (!parsed.success) return console.warn("dropped invalid chat:status payload");
     setStatus(parsed.data.chatId, parsed.data.status);
   });
-  latis.on("chat:updated", (raw) => {
+  lattiz.on("chat:updated", (raw) => {
     const parsed = eventContract["chat:updated"].safeParse(raw);
     if (!parsed.success) return console.warn("dropped invalid chat:updated payload");
     applySummary(parsed.data);
   });
-  latis.on("chat:queue", (raw) => {
+  lattiz.on("chat:queue", (raw) => {
     const parsed = eventContract["chat:queue"].safeParse(raw);
     if (!parsed.success) return console.warn("dropped invalid chat:queue payload");
     const { chatId, queue } = parsed.data;
     useWorkspace.setState((s) => ({ queues: { ...s.queues, [chatId]: queue } }));
   });
-  latis.on("update:changed", (raw) => {
+  lattiz.on("update:changed", (raw) => {
     const parsed = eventContract["update:changed"].safeParse(raw);
     if (!parsed.success) return;
     const before = useWorkspace.getState().update?.available?.version;
     const next = parsed.data.available;
     useWorkspace.setState({ update: parsed.data });
     if (next && next.version !== before && useWorkspace.getState().prefs?.dismissedUpdate !== next.version)
-      useWorkspace.getState().toast(`Latis ${next.version} is out. Get it from the status bar.`);
+      useWorkspace.getState().toast(`Lattiz ${next.version} is out. Get it from the status bar.`);
   });
-  latis.on("browser:state", (raw) => {
+  lattiz.on("browser:state", (raw) => {
     const parsed = eventContract["browser:state"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ browser: parsed.data });
   });
-  latis.on("reviews:changed", (raw) => {
+  lattiz.on("reviews:changed", (raw) => {
     const parsed = eventContract["reviews:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ reviews: parsed.data });
   });
-  latis.on("chat:timeline", (raw) => {
+  lattiz.on("chat:timeline", (raw) => {
     const parsed = eventContract["chat:timeline"].safeParse(raw);
     if (parsed.success) useWorkspace.setState((s) => ({ timelines: { ...s.timelines, [parsed.data.chatId]: parsed.data.entries } }));
   });
-  latis.on("chat:turn", (raw) => {
+  lattiz.on("chat:turn", (raw) => {
     const parsed = eventContract["chat:turn"].safeParse(raw);
     if (parsed.success) addTurn(parsed.data);
   });
-  latis.on("attention:changed", (raw) => {
+  lattiz.on("attention:changed", (raw) => {
     const parsed = eventContract["attention:changed"].safeParse(raw);
     if (!parsed.success) return console.warn("dropped invalid attention payload");
     useWorkspace.setState({ attention: parsed.data });
   });
-  latis.on("pty:opened", (raw) => {
+  lattiz.on("pty:opened", (raw) => {
     const parsed = eventContract["pty:opened"].safeParse(raw);
     if (parsed.success && parsed.data.place === "dock") useWorkspace.getState().showPty(parsed.data);
   });
-  latis.on("pty:exit", (raw) => {
+  lattiz.on("pty:exit", (raw) => {
     const parsed = eventContract["pty:exit"].safeParse(raw);
     if (!parsed.success) return;
     useWorkspace.setState((s) => ({ ptys: s.ptys.map((p) => (p.id === parsed.data.id ? { ...p, running: false } : p)) }));
   });
-  latis.on("focus:chat", (raw) => {
+  lattiz.on("focus:chat", (raw) => {
     const parsed = eventContract["focus:chat"].safeParse(raw);
     if (parsed.success) useWorkspace.getState().focusChat(parsed.data.chatId);
   });
-  latis.on("canvas:upsert", (raw) => {
+  lattiz.on("canvas:upsert", (raw) => {
     const parsed = eventContract["canvas:upsert"].safeParse(raw);
     if (!parsed.success) return console.warn("dropped invalid canvas:upsert payload");
     const { nodes, chats, projects, reveal } = parsed.data;
@@ -1194,7 +1194,7 @@ export function subscribeToMain(): void {
         // Existing nodes keep where the user put them; data (note text) and frame sizes follow main.
         return u ? { ...n, data: u.data as FlowNode["data"], ...(u.type === "frame" && { width: u.w, height: u.h }) } : n;
       });
-      const added = nodes.filter((n) => !known.has(n.id)).map((n) => ({ ...toFlowNode(n), className: "latis-appear" }));
+      const added = nodes.filter((n) => !known.has(n.id)).map((n) => ({ ...toFlowNode(n), className: "lattiz-appear" }));
       const nextChats = { ...s.chats };
       for (const c of chats)
         nextChats[c.id] = nextChats[c.id]
@@ -1208,35 +1208,35 @@ export function subscribeToMain(): void {
     });
     if (reveal) useWorkspace.getState().focusNode(reveal);
   });
-  latis.on("schedule:changed", (raw) => {
+  lattiz.on("schedule:changed", (raw) => {
     const parsed = eventContract["schedule:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ scheduled: parsed.data });
   });
-  latis.on("usage:changed", (raw) => {
+  lattiz.on("usage:changed", (raw) => {
     const parsed = eventContract["usage:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ usage: parsed.data });
   });
-  latis.on("flow:changed", (raw) => {
+  lattiz.on("flow:changed", (raw) => {
     const parsed = eventContract["flow:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState((s) => ({ flows: { ...s.flows, [parsed.data.id]: parsed.data } }));
   });
-  latis.on("flow:edges", (raw) => {
+  lattiz.on("flow:edges", (raw) => {
     const parsed = eventContract["flow:edges"].safeParse(raw);
     if (parsed.success)
       useWorkspace.setState((s) => ({ flowEdges: [...s.flowEdges.filter((e) => e.flowId !== parsed.data.flowId), ...parsed.data.edges] }));
   });
-  latis.on("card:data", (raw) => {
+  lattiz.on("card:data", (raw) => {
     const parsed = eventContract["card:data"].safeParse(raw);
-    if (parsed.success) window.dispatchEvent(new CustomEvent("latis-card-data", { detail: parsed.data.cardId }));
+    if (parsed.success) window.dispatchEvent(new CustomEvent("lattiz-card-data", { detail: parsed.data.cardId }));
   });
-  latis.on("canvas:command", (raw) => {
+  lattiz.on("canvas:command", (raw) => {
     const parsed = eventContract["canvas:command"].safeParse(raw);
     if (!parsed.success) return;
     const cmd = parsed.data;
     if (cmd.type === "tidy") useWorkspace.getState().tidyUp();
     else useWorkspace.setState((s) => ({ views: [...s.views.filter((v) => v.id !== cmd.view.id), cmd.view], activeView: cmd.view.id }));
   });
-  latis.on("agents:changed", (raw) => {
+  lattiz.on("agents:changed", (raw) => {
     const parsed = eventContract["agents:changed"].safeParse(raw);
     if (parsed.success) useWorkspace.setState({ agents: parsed.data, models: {} });
   });

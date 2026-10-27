@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Bug, Download, FolderOpen, ImageIcon, RefreshCw, X } from "lucide-react";
-import type { Appearance, Theme } from "@latis/shared";
+import type { Appearance, Theme } from "@lattiz/shared";
 import { ACCENTS } from "./useAppearance";
-import { Button, Dialog, cn } from "@latis/ui";
-import { latis } from "../api";
+import { Button, Dialog, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace, type SettingsSection } from "../stores/workspace";
 import { AgentList } from "./AgentList";
 import { CommandsSection } from "./CommandsSettings";
@@ -75,7 +75,7 @@ function GeneralSection() {
   if (!prefs) return null;
   const check = () => {
     setChecking(true);
-    void latis
+    void lattiz
       .invoke("update:check")
       .then((u) => useWorkspace.setState({ update: u }))
       .finally(() => setChecking(false));
@@ -85,7 +85,7 @@ function GeneralSection() {
     : update.error
       ? `Couldn't check: ${update.error}`
       : update.available
-        ? `Latis ${update.available.version} is out.`
+        ? `Lattiz ${update.available.version} is out.`
         : "You have the latest version.";
   return (
     <div className="flex flex-col gap-2" data-testid="general-settings">
@@ -108,7 +108,7 @@ function GeneralSection() {
       </Row>
       <Row
         label="Something wrong?"
-        hint="Copies diagnostics for you to check, and opens a new issue on GitHub. Latis sends nothing itself."
+        hint="Copies diagnostics for you to check, and opens a new issue on GitHub. Lattiz sends nothing itself."
       >
         <Button size="sm" variant="secondary" onClick={() => void useWorkspace.getState().reportProblem()} data-testid="report-problem">
           <Bug size={12} /> Report a problem…
@@ -116,7 +116,7 @@ function GeneralSection() {
       </Row>
       <Toggle
         label="Check for new versions"
-        hint="About every 6 hours Latis asks GitHub for its latest release. Nothing about you or your work is sent, and nothing is installed."
+        hint="About every 6 hours Lattiz asks GitHub for its latest release. Nothing about you or your work is sent, and nothing is installed."
         checked={prefs.checkUpdates}
         onChange={(v) => void setPrefs({ checkUpdates: v })}
       />
@@ -124,26 +124,26 @@ function GeneralSection() {
   );
 }
 
-const PRIVACY_DOC = "https://github.com/kornel77777/latis/blob/main/docs/privacy.md";
+const PRIVACY_DOC = "https://github.com/kornel77777/lattiz/blob/main/docs/privacy.md";
 
 function DataSection() {
   const [info, setInfo] = useState<{ dataDir: string; logFile: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   const toast = useWorkspace((s) => s.toast);
   useEffect(() => {
-    void latis.invoke("data:info").then(setInfo);
+    void lattiz.invoke("data:info").then(setInfo);
   }, []);
   return (
     <div className="flex flex-col gap-2 text-[13px]" data-testid="data-settings">
       <p className="text-[12px] leading-relaxed text-text-2">
-        Everything Latis keeps is in one folder on this computer. Latis has no account or server, sends no analytics, and keeps crash
+        Everything Lattiz keeps is in one folder on this computer. Lattiz has no account or server, sends no analytics, and keeps crash
         reports here too. Your agents talk to their own providers, the same as when you run them yourself.{" "}
         <a href={PRIVACY_DOC} target="_blank" rel="noreferrer" className="text-accent hover:underline">
           What leaves your computer
         </a>
       </p>
       <Row label="Data folder" hint={info?.dataDir}>
-        <Button size="sm" variant="secondary" onClick={() => void latis.invoke("data:open")}>
+        <Button size="sm" variant="secondary" onClick={() => void lattiz.invoke("data:open")}>
           <FolderOpen size={12} /> Open
         </Button>
       </Row>
@@ -158,7 +158,7 @@ function DataSection() {
           data-testid="data-export"
           onClick={() => {
             setExporting(true);
-            void latis
+            void lattiz
               .invoke("data:export")
               .then((r) => r.path && toast(`Exported to ${r.path}`))
               .catch((err: unknown) => toast(err instanceof Error ? err.message : String(err)))
@@ -171,7 +171,7 @@ function DataSection() {
       <Row label="Log file" hint={info?.logFile}>
         <span className="text-[12px] text-text-3">Warnings and errors, with paths and keys removed</span>
       </Row>
-      <p className="text-[12px] text-text-3">To remove everything, quit Latis and delete the data folder.</p>
+      <p className="text-[12px] text-text-3">To remove everything, quit Lattiz and delete the data folder.</p>
     </div>
   );
 }
@@ -180,7 +180,7 @@ function AgentsSection() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const agents = useWorkspace((s) => s.agents);
   useEffect(() => {
-    void latis.invoke("agents:manifestErrors").then(setErrors);
+    void lattiz.invoke("agents:manifestErrors").then(setErrors);
   }, [agents]);
   return (
     <div className="flex flex-col gap-4">
@@ -190,7 +190,7 @@ function AgentsSection() {
         <p className="leading-relaxed">
           Drop a JSON manifest in the agents folder to add any ACP agent or terminal CLI without an app update, then Re-check agents.
         </p>
-        <Button size="sm" variant="secondary" className="mt-2" onClick={() => void latis.invoke("agents:openFolder")}>
+        <Button size="sm" variant="secondary" className="mt-2" onClick={() => void lattiz.invoke("agents:openFolder")}>
           <FolderOpen size={12} /> Open agents folder
         </Button>
         {Object.entries(errors).map(([file, why]) => (
@@ -229,7 +229,7 @@ function NotificationsSection() {
       />
       <Toggle
         label="When a chat finishes"
-        hint="Skipped while Latis is focused and the chat is on screen."
+        hint="Skipped while Lattiz is focused and the chat is on screen."
         checked={prefs.notifyFinished}
         onChange={(v) => void setPrefs({ notifyFinished: v })}
       />
@@ -414,7 +414,7 @@ function AppearanceSection() {
           size="sm"
           variant="secondary"
           onClick={() =>
-            void latis
+            void lattiz
               .invoke("appearance:pickWallpaper")
               .then((w) => w && set({ wallpaper: w }))
               .catch((err: unknown) => toast(err instanceof Error ? err.message : String(err)))

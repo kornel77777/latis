@@ -57,14 +57,14 @@
       }
       $("label").oninput = () => {
         state.label = $("label").value;
-        latis.data.set("countdown", state);
+        lattiz.data.set("countdown", state);
       };
       $("when").onchange = () => {
         state.when = $("when").value;
-        latis.data.set("countdown", state);
+        lattiz.data.set("countdown", state);
         tick();
       };
-      latis.data.get("countdown").then((v) => {
+      lattiz.data.get("countdown").then((v) => {
         state = v ?? state;
         $("label").value = state.label;
         $("when").value = state.when;

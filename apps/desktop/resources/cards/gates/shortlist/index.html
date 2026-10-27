@@ -14,7 +14,7 @@
       let inbox = [];
       const picked = new Set();
       async function show() {
-        inbox = (await latis.data.get("inbox")) ?? [];
+        inbox = (await lattiz.data.get("inbox")) ?? [];
         picked.clear();
         const list = document.getElementById("list");
         list.innerHTML = inbox.length ? "" : "<div class='empty'>Items appear here when the flow reaches this card.</div>";
@@ -34,11 +34,11 @@
       }
       document.getElementById("send").onclick = async () => {
         const chosen = inbox.filter((i) => picked.has(i.id));
-        await latis.sendToFlow({ text: chosen.map((i) => `- ${i.text.trim()}`).join("\n") });
-        await latis.data.set("inbox", []);
+        await lattiz.sendToFlow({ text: chosen.map((i) => `- ${i.text.trim()}`).join("\n") });
+        await lattiz.data.set("inbox", []);
         show();
       };
-      latis.data.onChange(show);
+      lattiz.data.onChange(show);
       show();
     </script>
   </body>

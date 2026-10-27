@@ -14,8 +14,8 @@ const crypto = {
 };
 
 function setup() {
-  const dir = mkdtempSync(join(tmpdir(), "latis-conn-"));
-  const store = new WorkspaceStore(openDb(join(dir, "latis.db")));
+  const dir = mkdtempSync(join(tmpdir(), "lattiz-conn-"));
+  const store = new WorkspaceStore(openDb(join(dir, "lattiz.db")));
   const home = join(dir, "home");
   mkdirSync(home);
   return { store, home, conns: new Connections(store, crypto, home) };
@@ -52,7 +52,7 @@ describe("MCP connections", () => {
 
   it("refuses the reserved name, duplicates, and secrets without a keychain", () => {
     const { store, conns } = setup();
-    expect(() => conns.save({ name: "latis", transport: "stdio", command: "x", shared: false })).toThrow(/reserved/);
+    expect(() => conns.save({ name: "lattiz", transport: "stdio", command: "x", shared: false })).toThrow(/reserved/);
     conns.save({ name: "a", transport: "stdio", command: "x", shared: false });
     expect(() => conns.save({ name: "a", transport: "stdio", command: "y", shared: false })).toThrow(/already/);
     const noKeychain = new Connections(store, { ...crypto, available: () => false });

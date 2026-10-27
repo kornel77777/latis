@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ArrowRight, Bot, FolderOpen, Sparkles } from "lucide-react";
 import * as RadixDialog from "@radix-ui/react-dialog";
-import { Button } from "@latis/ui";
-import type { Project } from "@latis/shared";
+import { Button } from "@lattiz/ui";
+import type { Project } from "@lattiz/shared";
 import { useWorkspace } from "../stores/workspace";
 import { AgentList } from "./AgentList";
 
@@ -60,7 +60,7 @@ export function Onboarding() {
             {step === 0 && (
               <>
                 <RadixDialog.Title className="flex items-center gap-2 text-[20px] font-semibold text-text-1">
-                  <Sparkles size={18} className="text-accent" /> Welcome to Latis
+                  <Sparkles size={18} className="text-accent" /> Welcome to Lattiz
                 </RadixDialog.Title>
                 <RadixDialog.Description className="mt-2 text-[14px] leading-relaxed text-text-2">
                   Run your coding agents side by side on one canvas. Each folder becomes a project; each chat is an agent working in it.
@@ -75,7 +75,7 @@ export function Onboarding() {
               <>
                 <RadixDialog.Title className="text-[17px] font-semibold text-text-1">Your agents</RadixDialog.Title>
                 <RadixDialog.Description className="mb-4 mt-1 text-[13px] text-text-2">
-                  Latis drives the agent CLIs you already have, signed in with your own accounts. Sign-in opens the agent's own login in a
+                  Lattiz drives the agent CLIs you already have, signed in with your own accounts. Sign-in opens the agent's own login in a
                   terminal.
                 </RadixDialog.Description>
                 <AgentList hideDemo compact />

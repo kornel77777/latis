@@ -3,7 +3,7 @@ import { WebContentsView, session, shell, type BrowserWindow, type Rectangle } f
 
 // Dock browser (SPEC §9.7): a sandboxed web view for previewing dev servers, with device
 // presets and an element picker. It runs in its own session partition with no preload and
-// no Node, so previewed pages can't reach Latis.
+// no Node, so previewed pages can't reach Lattiz.
 
 export interface BrowserState {
   url: string;
@@ -113,7 +113,7 @@ export class BrowserDock {
 
   private ensure(): WebContentsView {
     if (this.view) return this.view;
-    const ses = session.fromPartition("persist:latis-preview");
+    const ses = session.fromPartition("persist:lattiz-preview");
     ses.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
     const view = new WebContentsView({
       webPreferences: { session: ses, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true },
@@ -125,7 +125,7 @@ export class BrowserDock {
       return { action: "deny" };
     });
     const emit = () => this.onState(this.state());
-    // The error clears only when Latis navigates or reloads: after a failed load Chromium starts
+    // The error clears only when Lattiz navigates or reloads: after a failed load Chromium starts
     // loading its own error page, which would otherwise wipe the error we just recorded.
     wc.on("did-start-loading", emit);
     wc.on("did-stop-loading", emit);

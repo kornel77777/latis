@@ -16,8 +16,8 @@ import type {
   RequestResponse,
   SessionOptions,
   Theme,
-} from "@latis/shared";
-import { DEFAULT_ALWAYS_ASK } from "@latis/shared";
+} from "@lattiz/shared";
+import { DEFAULT_ALWAYS_ASK } from "@lattiz/shared";
 import conductorSystem from "../../resources/conductor/SYSTEM.md?raw";
 import { AgentRegistry } from "./agents/registry";
 import { shellEnv } from "./agents/shell-env";
@@ -28,7 +28,7 @@ import { git } from "./git/git";
 import { EventCoalescer } from "./ipc/coalescer";
 import { emit, registerHandlers } from "./ipc/register";
 import { Notifier } from "./notify";
-import { resolveDataDir } from "./paths";
+import { legacyDataDir, migrateLegacyDataDir, resolveDataDir } from "./paths";
 import { openDb } from "./store/db";
 import { EventLog } from "./store/event-log";
 import { CHAT_SIZE, WorkspaceStore } from "./store/workspace";
@@ -58,20 +58,23 @@ const here = fileURLToPath(new URL(".", import.meta.url));
 let win: BrowserWindow | null = null;
 
 const dataDir = resolveDataDir();
+// Up to 0.1.2 the app was called Latis; its data moves over on the first launch as Lattiz.
+const migratedFromLatis = !process.env.LATTIZ_DATA_DIR && migrateLegacyDataDir(dataDir, legacyDataDir());
 mkdirSync(dataDir, { recursive: true });
 app.setPath("userData", join(dataDir, "electron"));
 // Warnings, errors and crashes stay on this machine (docs/privacy.md).
 const logs = new LogFile(join(dataDir, "logs"));
 logs.install();
+if (migratedFromLatis) console.warn(`[data] moved the Latis data folder to ${dataDir}`);
 crashReporter.start({ uploadToServer: false });
 
 // Cards get their own origin each (§12.1). Must be registered before the app is ready.
 protocol.registerSchemesAsPrivileged([{ scheme: "card", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 
-// One Latis per data folder. A second launch (Dock, Finder, Spotlight) brings the running window forward and
+// One Lattiz per data folder. A second launch (Dock, Finder, Spotlight) brings the running window forward and
 // stops right here, before it touches the shared database.
-// Test runs use their own data folders and skip this; LATIS_SINGLE_INSTANCE=1 turns it back on (e2e).
-const singleInstance = !process.env.LATIS_DATA_DIR || process.env.LATIS_SINGLE_INSTANCE === "1";
+// Test runs use their own data folders and skip this; LATTIZ_SINGLE_INSTANCE=1 turns it back on (e2e).
+const singleInstance = !process.env.LATTIZ_DATA_DIR || process.env.LATTIZ_SINGLE_INSTANCE === "1";
 if (singleInstance && !app.requestSingleInstanceLock()) {
   app.exit(0);
   process.exit(0);
@@ -86,7 +89,7 @@ app.on("second-instance", () => {
   win.focus();
 });
 
-const store = new WorkspaceStore(openDb(join(dataDir, "latis.db")));
+const store = new WorkspaceStore(openDb(join(dataDir, "lattiz.db")));
 const eventLog = new EventLog(store);
 const canvasId = store.ensureDefaultCanvas();
 
@@ -103,15 +106,15 @@ const ptys = new PtyManager(() => import("node-pty"), {
   exit: (id, code) => emit(win?.webContents, "pty:exit", { id, code }),
 });
 
-// LATIS_REPLAY=<fixtures dir> swaps live agent CLIs for recorded streams (e2e tests; no network, no tokens).
-// LATIS_CLAUDE_REPLAY=<fixtures/claude-code> is the M1 spelling and still works.
+// LATTIZ_REPLAY=<fixtures dir> swaps live agent CLIs for recorded streams (e2e tests; no network, no tokens).
+// LATTIZ_CLAUDE_REPLAY=<fixtures/claude-code> is the M1 spelling and still works.
 const replayRoot =
-  process.env.LATIS_REPLAY ?? (process.env.LATIS_CLAUDE_REPLAY ? resolve(process.env.LATIS_CLAUDE_REPLAY, "..") : undefined);
-// LATIS_UPDATE_FEED (tests) points the release check at a local server.
+  process.env.LATTIZ_REPLAY ?? (process.env.LATTIZ_CLAUDE_REPLAY ? resolve(process.env.LATTIZ_CLAUDE_REPLAY, "..") : undefined);
+// LATTIZ_UPDATE_FEED (tests) points the release check at a local server.
 const updates = new UpdateChecker({
   current: app.getVersion(),
-  feed: process.env.LATIS_UPDATE_FEED ?? RELEASES_FEED,
-  ...(process.env.LATIS_UPDATE_FEED && { pagePrefix: new URL(process.env.LATIS_UPDATE_FEED).origin + "/" }),
+  feed: process.env.LATTIZ_UPDATE_FEED ?? RELEASES_FEED,
+  ...(process.env.LATTIZ_UPDATE_FEED && { pagePrefix: new URL(process.env.LATTIZ_UPDATE_FEED).origin + "/" }),
   onChange: (s) => emit(win?.webContents, "update:changed", s),
 });
 
@@ -134,12 +137,12 @@ function claudeApiKey(): string | null {
 /**
  * Whether the chat-view Claude may run on the user's own Claude sign-in. Anthropic doesn't allow third-party
  * products to offer that, so release builds don't (DECISIONS 2026-10-26). Running from source does, and so does
- * a personal build made with LATIS_PERSONAL=1 (electron-builder writes `latisPersonal` into package.json).
+ * a personal build made with LATTIZ_PERSONAL=1 (electron-builder writes `lattizPersonal` into package.json).
  */
 function claudeSubscriptionAllowed(): boolean {
   if (!app.isPackaged) return true;
   try {
-    return JSON.parse(readFileSync(join(app.getAppPath(), "package.json"), "utf8")).latisPersonal === true;
+    return JSON.parse(readFileSync(join(app.getAppPath(), "package.json"), "utf8")).lattizPersonal === true;
   } catch {
     return false;
   }
@@ -155,7 +158,7 @@ const agents = new AgentRegistry({
   claudeSubscription: claudeSubscriptionAllowed(),
 });
 
-// LATIS_SKIP_ONBOARDING=1 (e2e) starts as if the first-run tour was done.
+// LATTIZ_SKIP_ONBOARDING=1 (e2e) starts as if the first-run tour was done.
 const DEFAULT_APPEARANCE: Appearance = {
   accent: "glacier",
   density: "comfortable",
@@ -170,16 +173,16 @@ const DEFAULT_APPEARANCE: Appearance = {
   reduceMotion: false,
 };
 const DEFAULT_PREFS: Prefs = {
-  onboarded: process.env.LATIS_SKIP_ONBOARDING === "1",
+  onboarded: process.env.LATTIZ_SKIP_ONBOARDING === "1",
   notifyNeedsYou: true,
   notifyFinished: true,
   appearance: DEFAULT_APPEARANCE,
   // Tests skip the tour, and with it the checklist.
-  checklist: process.env.LATIS_SKIP_ONBOARDING === "1" ? null : [],
+  checklist: process.env.LATTIZ_SKIP_ONBOARDING === "1" ? null : [],
   maxSpawned: 6,
   keybindings: {},
-  // The lattice is where work happens; the canvas is the map. LATIS_LAYOUT=canvas starts on the canvas (most e2e specs).
-  layoutMode: process.env.LATIS_LAYOUT === "canvas" ? "canvas" : "lattice",
+  // The lattice is where work happens; the canvas is the map. LATTIZ_LAYOUT=canvas starts on the canvas (most e2e specs).
+  layoutMode: process.env.LATTIZ_LAYOUT === "canvas" ? "canvas" : "lattice",
   defaultPermissionMode: "auto-edit",
   alwaysAsk: DEFAULT_ALWAYS_ASK,
   checkUpdates: true,
@@ -357,7 +360,7 @@ async function exportCardPdf(cardId: string, theme: unknown) {
 }
 
 /** Puts a new card on the canvas and tells the renderer. */
-function showCard(node: import("@latis/shared").CanvasNode, reveal = true) {
+function showCard(node: import("@lattiz/shared").CanvasNode, reveal = true) {
   emit(win?.webContents, "canvas:upsert", { nodes: [node], chats: [], projects: [], reveal: reveal ? node.id : null });
 }
 
@@ -394,12 +397,12 @@ async function readyAgents(): Promise<string[]> {
   const ok = (id: string) => list.some((a) => a.id === id && a.installed && a.signedIn && (a.kind === "structured" || agents.isHooked(id)));
   // Claude Code in a terminal comes after the chat-view agents: it works, but its tile is a terminal.
   const order = ["claude-code", "codex", "gemini", "terminal:claude", ...list.map((a) => a.id)];
-  const ids = [...new Set(order)].filter((id) => ok(id) && (id !== "fake" || process.env.LATIS_DEMO_IN_PROJECTS === "1"));
+  const ids = [...new Set(order)].filter((id) => ok(id) && (id !== "fake" || process.env.LATTIZ_DEMO_IN_PROJECTS === "1"));
   // The demo agent stands in for everything in tests.
-  return process.env.LATIS_FLOW_AGENT ? [process.env.LATIS_FLOW_AGENT] : ids;
+  return process.env.LATTIZ_FLOW_AGENT ? [process.env.LATTIZ_FLOW_AGENT] : ids;
 }
 
-function createFlowFrom(spec: import("@latis/shared").FlowSpec, x: number, y: number) {
+function createFlowFrom(spec: import("@lattiz/shared").FlowSpec, x: number, y: number) {
   return buildFlow(
     {
       store,
@@ -428,7 +431,7 @@ const workspace = new WorkspaceService({
   agents: {
     available: async () =>
       (await agents.list()).filter(
-        (a) => a.installed && a.kind === "structured" && (a.id !== "fake" || process.env.LATIS_DEMO_IN_PROJECTS === "1"),
+        (a) => a.installed && a.kind === "structured" && (a.id !== "fake" || process.env.LATTIZ_DEMO_IN_PROJECTS === "1"),
       ),
   },
   changes,
@@ -470,15 +473,15 @@ const workspace = new WorkspaceService({
 });
 const mcpServer = new WorkspaceMcpServer(workspace);
 const mcpReady = mcpServer.start().catch((err: unknown) => console.error("[mcp] the workspace server didn't start", err));
-const shimPath = join(here, "latis-mcp.js");
+const shimPath = join(here, "lattiz-mcp.js");
 
-/** Latis's own server for a chat: HTTP where the agent takes it, otherwise the stdio shim. */
-function latisServer(chat: ChatSummary): McpServerConfig {
+/** Lattiz's own server for a chat: HTTP where the agent takes it, otherwise the stdio shim. */
+function lattizServer(chat: ChatSummary): McpServerConfig {
   const token = mcpServer.tokenFor(chat.id);
   const http = chat.agentId === "claude-code" || chat.agentId === "terminal:claude" || chat.agentId === "codex";
   return http
     ? {
-        name: "latis",
+        name: "lattiz",
         transport: "http",
         url: mcpServer.url,
         headers: { Authorization: `Bearer ${token}` },
@@ -486,25 +489,25 @@ function latisServer(chat: ChatSummary): McpServerConfig {
         trusted: true,
       }
     : {
-        name: "latis",
+        name: "lattiz",
         transport: "stdio",
         command: process.execPath,
         args: [shimPath],
-        env: { ELECTRON_RUN_AS_NODE: "1", LATIS_MCP_URL: mcpServer.url, LATIS_MCP_TOKEN: token },
+        env: { ELECTRON_RUN_AS_NODE: "1", LATTIZ_MCP_URL: mcpServer.url, LATTIZ_MCP_TOKEN: token },
         toolTimeoutSec: TOOL_TIMEOUT_SEC,
         trusted: true,
       };
 }
 
 const TOOLS_NOTE =
-  "You can see and coordinate the other chats in Latis through the `latis` MCP tools (list_chats, read_chat, spawn_chat, send_message, wait_for_chats, get_diff, create_note, focus). Use them when the user asks you to work with other chats or agents.";
+  "You can see and coordinate the other chats in Lattiz through the `lattiz` MCP tools (list_chats, read_chat, spawn_chat, send_message, wait_for_chats, get_diff, create_note, focus). Use them when the user asks you to work with other chats or agents.";
 
 async function sessionOptions(chat: ChatSummary): Promise<Partial<SessionOptions>> {
   const adapter = agents.get(chat.agentId);
   if (!adapter?.capabilities.mcp) return {};
   await mcpReady;
   const conductor = chat.role === "conductor";
-  const servers = [...(conductor || chat.workspaceTools ? [latisServer(chat)] : []), ...connections.configsFor(chat.connections)];
+  const servers = [...(conductor || chat.workspaceTools ? [lattizServer(chat)] : []), ...connections.configsFor(chat.connections)];
   let instructions: string | undefined;
   if (conductor) {
     ensureConductorDir();
@@ -567,9 +570,9 @@ const CONDUCTOR_ORDER = ["claude-code", "codex", "gemini", "terminal:claude"];
 
 /** The pinned Conductor chat (§10.2), created once at the canvas's top left. */
 async function ensureConductor() {
-  if (process.env.LATIS_SKIP_CONDUCTOR === "1" || store.conductor()) return;
+  if (process.env.LATTIZ_SKIP_CONDUCTOR === "1" || store.conductor()) return;
   const list = await agents.list();
-  const forced = process.env.LATIS_CONDUCTOR_AGENT;
+  const forced = process.env.LATTIZ_CONDUCTOR_AGENT;
   const ready = CONDUCTOR_ORDER.map((id) => list.find((a) => a.id === id && a.installed && a.signedIn)).find(Boolean);
   const agentId = forced ?? ready?.id ?? "claude-code";
   if (store.conductor()) return;
@@ -666,7 +669,7 @@ registerHandlers({
     version: app.getVersion(),
     platform: process.platform,
     dataDir,
-    demoInProjects: process.env.LATIS_DEMO_IN_PROJECTS === "1",
+    demoInProjects: process.env.LATTIZ_DEMO_IN_PROJECTS === "1",
   }),
   "canvas:load": () => store.loadCanvas(canvasId),
   "canvas:saveNodes": ({ nodes }) => {
@@ -705,7 +708,7 @@ registerHandlers({
     return info;
   },
   "agents:setApiKey": async ({ key }) => {
-    if (key && !safeStorage.isEncryptionAvailable()) throw new Error("There's no keychain to keep the key in, so Latis won't save it.");
+    if (key && !safeStorage.isEncryptionAvailable()) throw new Error("There's no keychain to keep the key in, so Lattiz won't save it.");
     if (key) store.setSetting("claudeApiKey", safeStorage.encryptString(key).toString("base64"));
     else store.setSetting("claudeApiKey", null);
     claudeKey = key;
@@ -989,7 +992,7 @@ registerHandlers({
     let at = fireAt;
     if (onReset) {
       const resets = usage.resetsAt(chat.agentId);
-      if (!resets) throw new Error("Latis doesn't know when this agent's limit resets. Pick a time instead.");
+      if (!resets) throw new Error("Lattiz doesn't know when this agent's limit resets. Pick a time instead.");
       // A minute of slack: limits reset on the provider's clock.
       at = Date.parse(resets) + 60_000;
     }
@@ -1037,7 +1040,7 @@ registerHandlers({
     const from = store.getChat(chatId);
     if (!from) throw new Error("That chat no longer exists.");
     const a = agents.get(agentId);
-    if (!a || (agents.isTerminal(agentId) && !agents.isHooked(agentId))) throw new Error("Pick an agent Latis can chat with.");
+    if (!a || (agents.isTerminal(agentId) && !agents.isHooked(agentId))) throw new Error("Pick an agent Lattiz can chat with.");
     if (agentId === from.agentId) throw new Error("Pick a different agent to continue with.");
     const project = from.projectId ? store.getProject(from.projectId) : undefined;
     const r = store.absoluteRect(from.nodeId);
@@ -1189,7 +1192,7 @@ registerHandlers({
     if (r.canceled || !target) return { path: null };
     eventLog.flush();
     const path = exportWorkspace(dataDir, target);
-    if (!dataDir.includes("latis-e2e-")) shell.showItemInFolder(path);
+    if (!dataDir.includes("lattiz-e2e-")) shell.showItemInFolder(path);
     return { path };
   },
   "app:report": async () => ({
@@ -1267,9 +1270,9 @@ registerHandlers({
     return skills.importFolder(folder);
   },
   "skills:read": ({ path }) => {
-    // Only files Latis listed as skills.
+    // Only files Lattiz listed as skills.
     const all = [...skills.list(null), ...store.listProjects().flatMap((p) => (p.folderMissing ? [] : skills.list(p.folderPath)))];
-    if (!all.some((s) => s.path === path)) throw new Error("That isn't a skill Latis knows.");
+    if (!all.some((s) => s.path === path)) throw new Error("That isn't a skill Lattiz knows.");
     return { body: skills.body(path) };
   },
   "conductor:setAgent": async ({ agentId }) => {
@@ -1324,7 +1327,7 @@ function createWindow() {
     openExternal: (url: string) => shell.openExternal(url),
     confirm: (message: string, detail: string) => confirmDialog(message, detail, "Open"),
   };
-  // §13: Latis's own window never navigates or opens windows; links go out through openLink.
+  // §13: Lattiz's own window never navigates or opens windows; links go out through openLink.
   win.webContents.setWindowOpenHandler(({ url }) => {
     void openLink(url, links);
     return { action: "deny" };
@@ -1341,7 +1344,7 @@ function createWindow() {
   else void win.loadFile(join(here, "../renderer/index.html"));
 }
 
-// §13: no <webview> anywhere; the dock browser is a WebContentsView Latis creates itself.
+// §13: no <webview> anywhere; the dock browser is a WebContentsView Lattiz creates itself.
 app.on("web-contents-created", (_e, contents) => contents.on("will-attach-webview", (ev) => ev.preventDefault()));
 
 void app.whenReady().then(() => {
@@ -1349,8 +1352,8 @@ void app.whenReady().then(() => {
   protocol.handle("card", (req) => cards.serve(req.url));
   createWindow();
   // Only installed copies check on their own; a dev run is newer than any release anyway.
-  if (app.isPackaged || process.env.LATIS_UPDATE_FEED)
-    updates.start(() => prefs().checkUpdates, process.env.LATIS_UPDATE_FEED ? 500 : 10_000);
+  if (app.isPackaged || process.env.LATTIZ_UPDATE_FEED)
+    updates.start(() => prefs().checkUpdates, process.env.LATTIZ_UPDATE_FEED ? 500 : 10_000);
   void ensureConductor().catch((err: unknown) => console.error("[conductor] couldn't create the Conductor", err));
   scheduler.start();
   flows.resumeAll();
@@ -1368,7 +1371,7 @@ app.on("before-quit", (e) => {
   if (quitting) return;
   // §9.6 AC3: warn before killing terminals that are still running something.
   const busy = ptys.busy();
-  if (busy.length && !process.env.LATIS_DATA_DIR?.includes("latis-e2e-")) {
+  if (busy.length && !process.env.LATTIZ_DATA_DIR?.includes("lattiz-e2e-")) {
     const choice = dialog.showMessageBoxSync({
       type: "warning",
       buttons: ["Quit", "Cancel"],

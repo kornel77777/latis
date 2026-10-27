@@ -1,4 +1,4 @@
-import { buildTranscript, type LatticeNode } from "@latis/shared";
+import { buildTranscript, type LatticeNode } from "@lattiz/shared";
 import { useWorkspace } from "../stores/workspace";
 import { paneIds, place, type Zone } from "./tree";
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppWindow } from "lucide-react";
-import { Dialog } from "@latis/ui";
-import { latis } from "../api";
+import { Dialog } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 
 // The starter card library (§12.3): bundled, offline mini-apps to put on the canvas.
@@ -12,13 +12,13 @@ export function CardLibrary() {
   const at = useWorkspace((s) => s.cardLibraryAt);
   const [list, setList] = useState<Starter[]>([]);
   useEffect(() => {
-    if (at && !list.length) void latis.invoke("card:library").then(setList);
+    if (at && !list.length) void lattiz.invoke("card:library").then(setList);
   }, [at, list.length]);
   const close = () => useWorkspace.setState({ cardLibraryAt: null });
   const pick = async (starter: string) => {
     const ws = useWorkspace.getState();
     try {
-      const node = await latis.invoke("card:create", { canvasId: ws.canvasId, starter, x: Math.round(at!.x), y: Math.round(at!.y) });
+      const node = await lattiz.invoke("card:create", { canvasId: ws.canvasId, starter, x: Math.round(at!.x), y: Math.round(at!.y) });
       ws.addNode(node);
     } catch (err) {
       ws.toast(err instanceof Error ? err.message : String(err));

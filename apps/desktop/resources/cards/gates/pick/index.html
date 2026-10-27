@@ -11,7 +11,7 @@
     <div id="list" class="items side"></div>
     <script>
       async function show() {
-        const inbox = (await latis.data.get("inbox")) ?? [];
+        const inbox = (await lattiz.data.get("inbox")) ?? [];
         const list = document.getElementById("list");
         list.innerHTML = inbox.length ? "" : "<div class='empty'>Options appear here when the flow reaches this card.</div>";
         for (const it of inbox) {
@@ -21,14 +21,14 @@
           el.children[0].textContent = it.label;
           el.children[1].textContent = it.text;
           el.querySelector("button").onclick = async () => {
-            await latis.sendToFlow({ text: it.text });
-            await latis.data.set("inbox", []);
+            await lattiz.sendToFlow({ text: it.text });
+            await lattiz.data.set("inbox", []);
             show();
           };
           list.appendChild(el);
         }
       }
-      latis.data.onChange(show);
+      lattiz.data.onChange(show);
       show();
     </script>
   </body>

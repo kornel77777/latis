@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { FlowSpec } from "@latis/shared";
+import type { FlowSpec } from "@lattiz/shared";
 import { Cards } from "../../src/main/cards/cards";
 import { gateCard } from "../../src/main/cards/library";
 import { buildFlow, columns } from "../../src/main/flows/build";
@@ -13,8 +13,8 @@ import { WorkspaceStore } from "../../src/main/store/workspace";
 
 /** A flow with stub agents: the test answers for each chat by title. */
 async function setup(spec: FlowSpec, opts: { now?: () => number } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "latis-flow-"));
-  const store = new WorkspaceStore(openDb(join(dir, "latis.db")));
+  const dir = mkdtempSync(join(tmpdir(), "lattiz-flow-"));
+  const store = new WorkspaceStore(openDb(join(dir, "lattiz.db")));
   const canvasId = store.ensureDefaultCanvas();
   const cards = new Cards(store, join(dir, "cards"), { confirm: async () => true });
   const sent: { chat: string; text: string }[] = [];
@@ -217,7 +217,7 @@ describe("flows engine", () => {
     f.store.updateFlow(f.flowId, { nextRunAt: new Date(2026, 9, 23, 8, 0).getTime() });
     f.engine.tick();
     expect(f.sent).toHaveLength(0);
-    now = new Date(2026, 9, 24, 9, 30).getTime(); // Latis was closed through 08:00
+    now = new Date(2026, 9, 24, 9, 30).getTime(); // Lattiz was closed through 08:00
     f.engine.tick();
     f.engine.tick();
     expect(f.sent).toHaveLength(1);
@@ -227,7 +227,7 @@ describe("flows engine", () => {
         .info()
         .run!.log.map((l) => l.text)
         .join("\n"),
-    ).toMatch(/while Latis was closed/);
+    ).toMatch(/while Lattiz was closed/);
     expect(f.info().nextRunAt).toBe(new Date(2026, 9, 25, 8, 0).getTime());
     f.engine.resumeAll();
     expect(f.sent).toHaveLength(2);

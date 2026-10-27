@@ -16,7 +16,7 @@ import {
   type Turn,
   type UsageWindow,
   type UserTurn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { EventLog } from "../store/event-log";
 import type { ChatOptionsPatch, WorkspaceStore } from "../store/workspace";
 
@@ -155,7 +155,7 @@ export class SessionSupervisor {
     this.notes.delete(chatId);
     // Notes reach the agent but not the transcript, which shows what the user typed.
     const typed = this.expand(chatId, text);
-    const forAgent = notes?.length ? `${notes.map((n) => `[Note from Latis] ${n}`).join("\n")}\n\n${typed}` : typed;
+    const forAgent = notes?.length ? `${notes.map((n) => `[Note from Lattiz] ${n}`).join("\n")}\n\n${typed}` : typed;
     await live.session.send({ text: forAgent, ...(images?.length && { images }) });
     return turn;
   }

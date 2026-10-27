@@ -1,10 +1,10 @@
-import type { UpdateState } from "@latis/shared";
+import type { UpdateState } from "@lattiz/shared";
 
-// "A new version is out" (SPEC §17 M7, DECISIONS 2026-10-26): Latis asks GitHub Releases for the latest
+// "A new version is out" (SPEC §17 M7, DECISIONS 2026-10-26): Lattiz asks GitHub Releases for the latest
 // release and links to it. Nothing is downloaded or installed; that needs signed builds (auto-update, later).
 
-export const RELEASES_FEED = "https://api.github.com/repos/kornel77777/latis/releases/latest";
-const RELEASES_PAGE = "https://github.com/kornel77777/latis/releases/";
+export const RELEASES_FEED = "https://api.github.com/repos/kornel77777/lattiz/releases/latest";
+const RELEASES_PAGE = "https://github.com/kornel77777/lattiz/releases/";
 
 type Version = { parts: [number, number, number]; pre: string | null };
 
@@ -28,7 +28,7 @@ export function isNewer(latest: string, current: string): boolean {
 
 export interface UpdateCheckerOptions {
   current: string;
-  /** The releases API URL (LATIS_UPDATE_FEED in tests). */
+  /** The releases API URL (LATTIZ_UPDATE_FEED in tests). */
   feed: string;
   /** Pages a release may link to; anything else isn't offered. */
   pagePrefix?: string;
@@ -51,7 +51,7 @@ export class UpdateChecker {
   async check(): Promise<UpdateState> {
     try {
       const res = await (this.opts.fetch ?? fetch)(this.opts.feed, {
-        headers: { accept: "application/vnd.github+json", "user-agent": `Latis/${this.opts.current}` },
+        headers: { accept: "application/vnd.github+json", "user-agent": `Lattiz/${this.opts.current}` },
         signal: AbortSignal.timeout(15_000),
       });
       // No releases yet (or a private repo) is a 404: nothing to offer, not an error.

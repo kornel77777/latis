@@ -1,9 +1,9 @@
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 
 declare global {
   interface Window {
-    latis: LatisApi;
+    lattiz: LattizApi;
   }
 }
 
-export const latis: LatisApi = window.latis;
+export const lattiz: LattizApi = window.lattiz;

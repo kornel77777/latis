@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, LogIn, Plus, RefreshCw, SquareTerminal, Trash2 } from "lucide-react";
-import type { AccountsState, AgentInfo } from "@latis/shared";
-import { latis } from "../api";
-import { Button, cn } from "@latis/ui";
+import type { AccountsState, AgentInfo } from "@lattiz/shared";
+import { lattiz } from "../api";
+import { Button, cn } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 
 /** One line of agent status, shared by Settings → Agents and onboarding (§6.4, §8.10). */
@@ -43,7 +43,7 @@ function ApiKeyRow({ agent }: { agent: AgentInfo }) {
   const toast = useWorkspace.getState().toast;
   const save = (value: string | null) => {
     setSaving(true);
-    latis
+    lattiz
       .invoke("agents:setApiKey", { agentId: "claude-code", key: value })
       .then((agents) => {
         useWorkspace.setState({ agents });
@@ -87,7 +87,7 @@ function ApiKeyRow({ agent }: { agent: AgentInfo }) {
         </Button>
       </div>
       <span className="text-[11.5px] leading-relaxed text-text-3">
-        For Latis&apos;s chat view, billed per use by Anthropic (console.anthropic.com). To use your Claude subscription instead, start a
+        For Lattiz&apos;s chat view, billed per use by Anthropic (console.anthropic.com). To use your Claude subscription instead, start a
         Claude Code chat: it runs in its own terminal.
       </span>
     </form>
@@ -120,7 +120,7 @@ function AccountsRow({ agent, state, onChange }: { agent: AgentInfo; state: Acco
         onChange={(e) => {
           setSwitching(true);
           toast("Switching once running turns have finished…");
-          void run(latis.invoke("accounts:switch", { agentId: agent.id, accountId: e.target.value || null })).finally(() =>
+          void run(lattiz.invoke("accounts:switch", { agentId: agent.id, accountId: e.target.value || null })).finally(() =>
             setSwitching(false),
           );
         }}
@@ -138,7 +138,7 @@ function AccountsRow({ agent, state, onChange }: { agent: AgentInfo; state: Acco
           variant="ghost"
           aria-label="Forget this account"
           title="Forget this account (its folder stays on disk)"
-          onClick={() => void run(latis.invoke("accounts:remove", { id: active }))}
+          onClick={() => void run(lattiz.invoke("accounts:remove", { id: active }))}
         >
           <Trash2 size={12} />
         </Button>
@@ -149,7 +149,7 @@ function AccountsRow({ agent, state, onChange }: { agent: AgentInfo; state: Acco
           onSubmit={(e) => {
             e.preventDefault();
             if (!label.trim()) return;
-            void run(latis.invoke("accounts:add", { agentId: agent.id, label: label.trim() })).then(() => {
+            void run(lattiz.invoke("accounts:add", { agentId: agent.id, label: label.trim() })).then(() => {
               setAdding(false);
               setLabel("");
               useWorkspace.getState().setSettingsOpen(false);
@@ -184,7 +184,7 @@ export function AgentList({ hideDemo = false, compact = false }: { hideDemo?: bo
   const [checking, setChecking] = useState(false);
   const [accounts, setAccounts] = useState<AccountsState | null>(null);
   useEffect(() => {
-    if (!compact) void latis.invoke("accounts:list").then(setAccounts);
+    if (!compact) void lattiz.invoke("accounts:list").then(setAccounts);
   }, [compact]);
   const list = agents
     .filter((a) => !hideDemo || a.id !== "fake")

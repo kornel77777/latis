@@ -4,7 +4,7 @@ import type { CanUseTool, HookInput, ModelInfo, Options, Query, SDKMessage, SDKU
 import type { QueryFn } from "./index";
 
 // Test double for the SDK's query(): replays recordings from fixtures/claude-code/*.jsonl.
-// Used by unit tests and, with LATIS_CLAUDE_REPLAY=<dir>, by e2e tests driving the real UI.
+// Used by unit tests and, with LATTIZ_CLAUDE_REPLAY=<dir>, by e2e tests driving the real UI.
 // It pauses at each recorded permission prompt until the app answers, like the real CLI.
 
 type Line = { kind: string; data: unknown };

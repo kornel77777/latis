@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentEvent } from "@latis/shared";
+import type { AgentEvent } from "@lattiz/shared";
 
 type ExitInfo = { code: number | null; signal: string | null };
 

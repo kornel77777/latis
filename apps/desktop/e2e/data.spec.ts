@@ -2,10 +2,10 @@ import { existsSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, stubFolderPicker, tempDataDir } from "./helpers";
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 
 test("Settings → Data shows the folder and exports the workspace; Report a problem builds scrubbed diagnostics", async () => {
   const dataDir = tempDataDir();
@@ -17,24 +17,24 @@ test("Settings → Data shows the folder and exports the workspace; Report a pro
   await expect(data).toContainText(dataDir);
   await expect(data.getByRole("link", { name: "What leaves your computer" })).toHaveAttribute("href", /docs\/privacy\.md$/);
 
-  const target = mkdtempSync(join(tmpdir(), "latis-e2e-export-"));
+  const target = mkdtempSync(join(tmpdir(), "lattiz-e2e-export-"));
   await stubFolderPicker(app, target);
   await data.getByTestId("data-export").click();
   await expect.poll(() => readdirSync(target).length, { timeout: 10_000 }).toBe(1);
   const out = join(target, readdirSync(target)[0]!);
-  expect(existsSync(join(out, "latis.db"))).toBe(true);
+  expect(existsSync(join(out, "lattiz.db"))).toBe(true);
   expect(existsSync(join(out, "README.txt"))).toBe(true);
   expect(existsSync(join(out, "electron"))).toBe(false);
 
-  const report = await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("app:report"));
-  expect(report.diagnostics).toMatch(/^Latis \d+\.\d+\.\d+ · /);
+  const report = await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("app:report"));
+  expect(report.diagnostics).toMatch(/^Lattiz \d+\.\d+\.\d+ · /);
   expect(report.diagnostics).not.toContain(dataDir.split("/").slice(0, 3).join("/") + "/");
-  expect(report.issueUrl).toMatch(/^https:\/\/github\.com\/kornel77777\/latis\/issues\/new\?/);
+  expect(report.issueUrl).toMatch(/^https:\/\/github\.com\/kornel77777\/lattiz\/issues\/new\?/);
   await app.close();
 });
 
 test("an idle window runs no animations (§14: idle CPU)", async () => {
-  const { app, page } = await launch(tempDataDir(), { LATIS_LAYOUT: "" });
+  const { app, page } = await launch(tempDataDir(), { LATTIZ_LAYOUT: "" });
   await page.waitForTimeout(1000);
   expect(await page.evaluate(() => document.getAnimations().map((a) => (a as CSSAnimation).animationName))).toEqual([]);
   await app.close();

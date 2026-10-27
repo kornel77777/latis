@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { parse as parseToml } from "smol-toml";
-import type { McpConnection, McpConnectionInput, McpImportCandidate, McpServerConfig } from "@latis/shared";
+import type { McpConnection, McpConnectionInput, McpImportCandidate, McpServerConfig } from "@lattiz/shared";
 import type { WorkspaceStore } from "../store/workspace";
 
 // MCP connections (SPEC §9.15). Env values and headers can hold API keys, so they're stored
@@ -22,8 +22,8 @@ interface Secrets {
 
 type Row = ReturnType<WorkspaceStore["mcpRows"]>[number];
 
-/** Names Latis uses itself, so a connection can't shadow the workspace tools. */
-export const RESERVED = new Set(["latis"]);
+/** Names Lattiz uses itself, so a connection can't shadow the workspace tools. */
+export const RESERVED = new Set(["lattiz"]);
 
 export class Connections {
   constructor(
@@ -62,7 +62,7 @@ export class Connections {
   }
 
   save(input: McpConnectionInput): McpConnection {
-    if (RESERVED.has(input.name.toLowerCase())) throw new Error(`"${input.name}" is reserved for Latis's own tools. Pick another name.`);
+    if (RESERVED.has(input.name.toLowerCase())) throw new Error(`"${input.name}" is reserved for Lattiz's own tools. Pick another name.`);
     if (input.transport === "stdio" && !input.command?.trim()) throw new Error("A stdio connection needs a command.");
     if (input.transport === "http" && !input.url) throw new Error("An HTTP connection needs a URL.");
     const clash = this.store.mcpRows().find((r) => r.name === input.name && r.id !== input.id);
@@ -74,7 +74,7 @@ export class Connections {
     const hasSecrets = Object.keys(secrets.env).length + Object.keys(secrets.headers).length > 0;
     if (hasSecrets && !this.crypto.available())
       throw new Error(
-        "This computer has no keychain Latis can use, so it can't store keys safely. Remove the env values and headers, or set up a keyring.",
+        "This computer has no keychain Lattiz can use, so it can't store keys safely. Remove the env values and headers, or set up a keyring.",
       );
     const row = this.store.saveMcpRow({
       id: input.id ?? randomUUID(),
@@ -130,7 +130,7 @@ export class Connections {
 
   private read(path: string): ImportedServer[] {
     const src = this.sources().find((s) => s.path === path);
-    if (!src) throw new Error("Latis only imports from the config files it lists.");
+    if (!src) throw new Error("Lattiz only imports from the config files it lists.");
     if (!existsSync(path)) return [];
     const raw = readFileSync(path, "utf8");
     // Only the MCP server section is read; the rest of the file is ignored.

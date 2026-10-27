@@ -28,18 +28,18 @@ const reply = (status: number, body?: unknown) =>
   vi.fn(async () => new Response(body === undefined ? null : JSON.stringify(body), { status })) as unknown as typeof fetch;
 
 describe("UpdateChecker", () => {
-  const page = "https://github.com/kornel77777/latis/releases/tag/v0.2.0";
+  const page = "https://github.com/kornel77777/lattiz/releases/tag/v0.2.0";
 
   it("offers a newer release and tells listeners", async () => {
     const onChange = vi.fn();
     const c = new UpdateChecker({
       current: "0.1.0",
       feed: "https://example.test/latest",
-      fetch: reply(200, { tag_name: "v0.2.0", html_url: page, name: "Latis 0.2", published_at: "2026-11-01T00:00:00Z" }),
+      fetch: reply(200, { tag_name: "v0.2.0", html_url: page, name: "Lattiz 0.2", published_at: "2026-11-01T00:00:00Z" }),
       onChange,
     });
     const s = await c.check();
-    expect(s.available).toEqual({ version: "0.2.0", url: page, name: "Latis 0.2", publishedAt: "2026-11-01T00:00:00Z" });
+    expect(s.available).toEqual({ version: "0.2.0", url: page, name: "Lattiz 0.2", publishedAt: "2026-11-01T00:00:00Z" });
     expect(s.error).toBeNull();
     expect(onChange).toHaveBeenCalledWith(s);
   });
@@ -56,7 +56,7 @@ describe("UpdateChecker", () => {
     const elsewhere = await new UpdateChecker({
       current: "0.1.0",
       feed: "x",
-      fetch: reply(200, { tag_name: "v0.2.0", html_url: "https://evil.example/latis.dmg" }),
+      fetch: reply(200, { tag_name: "v0.2.0", html_url: "https://evil.example/lattiz.dmg" }),
     }).check();
     expect(elsewhere.available).toBeNull();
   });

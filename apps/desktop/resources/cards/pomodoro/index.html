@@ -48,7 +48,7 @@
         if (--left > 0) return show();
         if (phase === "Focus") {
           sessions++;
-          latis.data.set("today", { date: new Date().toDateString(), sessions });
+          lattiz.data.set("today", { date: new Date().toDateString(), sessions });
         }
         phase = phase === "Focus" ? "Break" : "Focus";
         left = LEN[phase];
@@ -68,7 +68,7 @@
         left = LEN.Focus;
         show();
       };
-      latis.data.get("today").then((t) => {
+      lattiz.data.get("today").then((t) => {
         if (t && t.date === new Date().toDateString()) sessions = t.sessions;
         show();
       });

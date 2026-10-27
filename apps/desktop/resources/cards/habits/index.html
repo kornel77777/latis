@@ -49,7 +49,7 @@
         return d.toISOString().slice(0, 10);
       });
       let habits = [];
-      const save = () => latis.data.set("habits", habits);
+      const save = () => lattiz.data.set("habits", habits);
       function streak(h) {
         let n = 0;
         const d = new Date();
@@ -101,7 +101,7 @@
         save();
         render();
       };
-      latis.data.get("habits").then((v) => {
+      lattiz.data.get("habits").then((v) => {
         habits = v ?? [{ name: "Read 20 minutes", done: [] }];
         render();
       });

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Download, FolderOpen, Pencil, Plus, Trash2 } from "lucide-react";
-import type { McpConnection, McpConnectionInput, McpImportCandidate, Skill } from "@latis/shared";
-import { Button, cn } from "@latis/ui";
-import { latis } from "../api";
+import type { McpConnection, McpConnectionInput, McpImportCandidate, Skill } from "@lattiz/shared";
+import { Button, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 
 // Settings for M5: the Conductor (§10.2), MCP connections (§9.15) and skills (§9.14).
@@ -45,7 +45,7 @@ export function ConductorSection() {
               value={conductor.agentId}
               aria-label="Conductor agent"
               onChange={(e) =>
-                void latis
+                void lattiz
                   .invoke("conductor:setAgent", { agentId: e.target.value })
                   .then(() => toast("The Conductor will use this agent from its next message."))
                   .catch((err: unknown) => toast(errorText(err)))
@@ -60,7 +60,7 @@ export function ConductorSection() {
             </select>
           </Field>
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => void latis.invoke("conductor:openPrefs")}>
+            <Button size="sm" variant="secondary" onClick={() => void lattiz.invoke("conductor:openPrefs")}>
               <Pencil size={12} /> Edit my preferences (AGENTS.md)
             </Button>
             <Button
@@ -144,7 +144,7 @@ function ConnectionForm({ initial, onDone }: { initial: McpConnection | null; on
             }
           : { url: url.trim(), ...(headerObj && { headers: headerObj }) }),
       };
-      await latis.invoke("mcp:save", payload);
+      await lattiz.invoke("mcp:save", payload);
       await useWorkspace.getState().loadConnections();
       onDone();
     } catch (err) {
@@ -243,7 +243,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
   const { toast, loadConnections } = useWorkspace.getState();
   useEffect(() => {
-    void latis
+    void lattiz
       .invoke("mcp:importScan")
       .then(setFound)
       .catch((err: unknown) => toast(errorText(err)));
@@ -251,7 +251,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   const total = Object.values(chosen).flat().length;
   const run = async () => {
     let n = 0;
-    for (const [path, names] of Object.entries(chosen)) if (names.length) n += (await latis.invoke("mcp:import", { path, names })).length;
+    for (const [path, names] of Object.entries(chosen)) if (names.length) n += (await lattiz.invoke("mcp:import", { path, names })).length;
     await loadConnections();
     toast(n === 1 ? "Imported 1 connection." : `Imported ${n} connections.`);
     onDone();
@@ -269,7 +269,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex flex-col gap-3 rounded-panel border border-line p-3" data-testid="import-panel">
       <p className="text-[12px] text-text-2">
-        Pick what to copy. Latis copies exactly what&apos;s shown; values of the listed keys are copied too and stored encrypted.
+        Pick what to copy. Lattiz copies exactly what&apos;s shown; values of the listed keys are copied too and stored encrypted.
       </p>
       {found.map((c) => (
         <div key={c.path}>
@@ -326,7 +326,7 @@ export function ConnectionsSection() {
   const { toast, loadConnections } = useWorkspace.getState();
   const update = async (c: McpConnection, shared: boolean) => {
     try {
-      await latis.invoke("mcp:save", {
+      await lattiz.invoke("mcp:save", {
         id: c.id,
         name: c.name,
         transport: c.transport,
@@ -374,7 +374,7 @@ export function ConnectionsSection() {
               variant="ghost"
               aria-label={`Remove ${c.name}`}
               onClick={() =>
-                void latis
+                void lattiz
                   .invoke("mcp:remove", { id: c.id })
                   .then(loadConnections)
                   .catch((err: unknown) => toast(errorText(err)))
@@ -413,7 +413,7 @@ export function SkillsSection() {
       <p className="leading-relaxed text-text-2">
         Reusable instructions. Type <span className="font-mono text-text-1">/name</span> in any composer to send one with your message. A
         skill is a markdown file in your skills folder (or a folder with a <span className="font-mono">SKILL.md</span>); a project can have
-        its own in <span className="font-mono">.latis/skills/</span>.
+        its own in <span className="font-mono">.lattiz/skills/</span>.
       </p>
       {skills?.length === 0 && <p className="text-[12px] text-text-3">No skills yet. Add a .md file to the folder, then come back.</p>}
       {skills?.map((s) => (
@@ -424,14 +424,14 @@ export function SkillsSection() {
         </div>
       ))}
       <div className="flex gap-2">
-        <Button size="sm" variant="secondary" onClick={() => void latis.invoke("skills:openFolder")}>
+        <Button size="sm" variant="secondary" onClick={() => void lattiz.invoke("skills:openFolder")}>
           <FolderOpen size={12} /> Open skills folder
         </Button>
         <Button
           size="sm"
           variant="ghost"
           onClick={() =>
-            void latis
+            void lattiz
               .invoke("skills:import")
               .then((s) => {
                 if (s) toast(`Added /${s.name}.`);

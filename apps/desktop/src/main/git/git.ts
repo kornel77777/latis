@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { parseUnifiedDiff, countChanges, type DiffHunk } from "@latis/shared";
+import { parseUnifiedDiff, countChanges, type DiffHunk } from "@lattiz/shared";
 
 // Thin wrapper over the user's `git` (SPEC §4: shell out; ≥ 2.38 for merge-tree dry runs).
 // Nothing here touches the user's index, HEAD or branches except the explicit
@@ -31,10 +31,10 @@ export interface FileDiff {
 
 const ENV = { GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0", LC_ALL: "C" };
 const AUTHOR = {
-  GIT_AUTHOR_NAME: "Latis",
-  GIT_AUTHOR_EMAIL: "latis@localhost",
-  GIT_COMMITTER_NAME: "Latis",
-  GIT_COMMITTER_EMAIL: "latis@localhost",
+  GIT_AUTHOR_NAME: "Lattiz",
+  GIT_AUTHOR_EMAIL: "lattiz@localhost",
+  GIT_COMMITTER_NAME: "Lattiz",
+  GIT_COMMITTER_EMAIL: "lattiz@localhost",
 };
 
 export function git(
@@ -97,7 +97,7 @@ export async function currentBranch(dir: string): Promise<string | null> {
 export async function initRepo(dir: string): Promise<void> {
   await git(dir, ["init", "-q"]);
   await git(dir, ["add", "-A"]);
-  // The user's own identity when configured; Latis's otherwise, so the first commit can't fail.
+  // The user's own identity when configured; Lattiz's otherwise, so the first commit can't fail.
   const hasIdentity = await out(dir, ["config", "user.email"]).catch(() => "");
   await git(dir, ["commit", "-q", "--allow-empty", "-m", "Initial commit"], hasIdentity ? {} : { env: AUTHOR });
 }
@@ -107,7 +107,7 @@ export async function initRepo(dir: string): Promise<void> {
  * using a throwaway index so the user's staging area is untouched (§9.4 AC1).
  */
 export async function snapshot(dir: string, message: string): Promise<string> {
-  const tmp = mkdtempSync(join(tmpdir(), "latis-idx-"));
+  const tmp = mkdtempSync(join(tmpdir(), "lattiz-idx-"));
   const index = join(tmp, "index");
   try {
     const env = { GIT_INDEX_FILE: index, ...AUTHOR };
@@ -190,7 +190,7 @@ export async function revertHunk(dir: string, path: string, hunk: DiffHunk, crea
   const header = created ? `--- /dev/null\n+++ b/${path}\n` : `--- a/${path}\n+++ b/${path}\n`;
   const body = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@\n${hunk.lines.join("\n")}\n`;
   const patch = `diff --git a/${path} b/${path}\n${header}${body}`;
-  const tmp = mkdtempSync(join(tmpdir(), "latis-patch-"));
+  const tmp = mkdtempSync(join(tmpdir(), "lattiz-patch-"));
   try {
     writeFileSync(join(tmp, "p.diff"), patch);
     await git(dir, ["apply", "-R", "--recount", "--whitespace=nowarn", join(tmp, "p.diff")]);

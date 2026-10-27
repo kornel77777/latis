@@ -1,4 +1,4 @@
-import type { UsageState, UsageWindow } from "@latis/shared";
+import type { UsageState, UsageWindow } from "@lattiz/shared";
 import type { WorkspaceStore } from "./store/workspace";
 
 // Usage meter (SPEC §9.12): what each agent last reported about its account's usage windows and

@@ -12,8 +12,8 @@ const [name, prompt, ...rest] = process.argv.slice(2);
 if (!name || !prompt) throw new Error("usage: record-codex-stream.mjs <name> <prompt> [flags]");
 const flag = (f) => rest.includes(f);
 const arg = (f) => (rest.includes(f) ? rest[rest.indexOf(f) + 1] : undefined);
-const codex = arg("--codex") ?? process.env.LATIS_CODEX ?? "codex";
-const cwd = mkdtempSync(join(process.env.LATIS_TEST_TMP ?? tmpdir(), "latis-rec-"));
+const codex = arg("--codex") ?? process.env.LATTIZ_CODEX ?? "codex";
+const cwd = mkdtempSync(join(process.env.LATTIZ_TEST_TMP ?? tmpdir(), "lattiz-rec-"));
 writeFileSync(join(cwd, "README.md"), "# Recording sandbox\n");
 
 // Same mapping as the adapter (docs/adapters/codex.md).
@@ -22,7 +22,7 @@ const MODES = {
   ask: { approvalPolicy: "untrusted", sandbox: "workspace-write" },
   "auto-edit": { approvalPolicy: "untrusted", sandbox: "workspace-write" },
   "full-auto": { approvalPolicy: "never", sandbox: "danger-full-access" },
-  // Full-auto with an always-ask list: Codex asks about every command and Latis answers.
+  // Full-auto with an always-ask list: Codex asks about every command and Lattiz answers.
   "full-auto-guarded": { approvalPolicy: "untrusted", sandbox: "danger-full-access" },
 };
 const mode = MODES[arg("--mode") ?? "auto-edit"];
@@ -62,7 +62,7 @@ const request = (method, params) =>
   });
 
 async function handshake() {
-  await request("initialize", { clientInfo: { name: "latis", title: "Latis", version: "0.0.0" }, capabilities: null });
+  await request("initialize", { clientInfo: { name: "lattiz", title: "Lattiz", version: "0.0.0" }, capabilities: null });
   send({ method: "initialized" });
 }
 
@@ -116,7 +116,7 @@ await turn(thread.id, prompt, { steer: arg("--steer"), interrupt: flag("--interr
 
 if (arg("--then")) {
   if (flag("--resume")) {
-    // Restart the server and resume the thread, as Latis does after an app restart.
+    // Restart the server and resume the thread, as Lattiz does after an app restart.
     process.kill(-proc.pid, "SIGTERM");
     record("restart", {});
     start();

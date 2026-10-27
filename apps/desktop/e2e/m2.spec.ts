@@ -2,22 +2,22 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { fixturesRoot, launch, stubFolderPicker, tempDataDir } from "./helpers";
 
 // M2: Codex and Gemini (replayed), steering and the queue, the Inbox, terminals, terminal agents, onboarding.
 
-const shots = process.env.LATIS_SCREENSHOTS;
-const env = { LATIS_REPLAY: fixturesRoot };
+const shots = process.env.LATTIZ_SCREENSHOTS;
+const env = { LATTIZ_REPLAY: fixturesRoot };
 
 /** Calls the preload API in the renderer (e2e has no DOM types, hence the globalThis cast). */
 const ptySnapshot = (page: Page, id: string | null) =>
   page.evaluate(
-    (ptyId) => (globalThis as unknown as { latis: LatisApi }).latis.invoke("pty:snapshot", { id: ptyId! }).then((r) => r.data),
+    (ptyId) => (globalThis as unknown as { lattiz: LattizApi }).lattiz.invoke("pty:snapshot", { id: ptyId! }).then((r) => r.data),
     id,
   );
 const ptyWrite = (page: Page, id: string | null, data: string) =>
-  page.evaluate(([ptyId, d]) => (globalThis as unknown as { latis: LatisApi }).latis.invoke("pty:write", { id: ptyId!, data: d! }), [
+  page.evaluate(([ptyId, d]) => (globalThis as unknown as { lattiz: LattizApi }).lattiz.invoke("pty:write", { id: ptyId!, data: d! }), [
     id,
     data,
   ] as const);
@@ -52,7 +52,7 @@ test("Codex: diffs, approve from the Inbox (S3), and steering mid-turn (S2)", as
   const card = await newChat(page, /^Codex/);
   await expect(card).toHaveAttribute("data-agent", "codex");
 
-  // Auto-edit: Latis accepts the read and the in-folder patch itself; the edit shows as a diff.
+  // Auto-edit: Lattiz accepts the read and the in-folder patch itself; the edit shows as a diff.
   await send(card, "edit the heading /edit-file");
   await expect(card).toHaveAttribute("data-completed-turns", "1", { timeout: 15_000 });
   await expect(card.getByTestId("diff-stat").last()).toContainText("+2");
@@ -140,8 +140,8 @@ test("terminal dock, open as terminal, and a terminal-only agent from a manifest
   await expect(term).toBeVisible();
   const ptyId = await term.getAttribute("data-pty");
   const snapshot = () => ptySnapshot(page, ptyId);
-  await ptyWrite(page, ptyId, "echo latis-$((40+2))\r");
-  await expect.poll(snapshot, { timeout: 10_000 }).toContain("latis-42");
+  await ptyWrite(page, ptyId, "echo lattiz-$((40+2))\r");
+  await expect.poll(snapshot, { timeout: 10_000 }).toContain("lattiz-42");
 
   // A manifest agent runs as a terminal in its chat card; its approval prompt reaches the Inbox.
   const card = await newChat(page, /Fake CLI/);
@@ -175,9 +175,9 @@ test("terminal dock, open as terminal, and a terminal-only agent from a manifest
 
 test("first run: onboarding checks agents and starts chats in a sandbox project", async () => {
   const dataDir = tempDataDir();
-  const { app, page } = await launch(dataDir, { ...env, LATIS_SKIP_ONBOARDING: "0" });
+  const { app, page } = await launch(dataDir, { ...env, LATTIZ_SKIP_ONBOARDING: "0" });
   const tour = page.getByTestId("onboarding");
-  await expect(tour).toContainText("Welcome to Latis");
+  await expect(tour).toContainText("Welcome to Lattiz");
   await tour.getByTestId("onboarding-next").click();
   await expect(tour.locator("[data-agent='codex'] [data-testid='agent-state']")).toContainText("Signed in");
   await expect(tour.locator("[data-agent='claude-code'] [data-testid='agent-state']")).toContainText("Signed in");
@@ -192,7 +192,7 @@ test("first run: onboarding checks agents and starts chats in a sandbox project"
   await app.close();
 
   // Finished once: not shown again.
-  const again = await launch(dataDir, { ...env, LATIS_SKIP_ONBOARDING: "0" });
+  const again = await launch(dataDir, { ...env, LATTIZ_SKIP_ONBOARDING: "0" });
   await expect(again.page.getByTestId("chat-card")).toHaveCount(2);
   await expect(again.page.getByTestId("onboarding")).toHaveCount(0);
   await again.app.close();

@@ -22,9 +22,9 @@ function lock(devServer?: string) {
 }
 
 describe("lockDownPermissions", () => {
-  const app = "file:///Applications/Latis.app/Contents/Resources/app.asar/out/renderer/index.html";
+  const app = "file:///Applications/Lattiz.app/Contents/Resources/app.asar/out/renderer/index.html";
 
-  it("lets Latis's own page write to the clipboard and nothing else", () => {
+  it("lets Lattiz's own page write to the clipboard and nothing else", () => {
     const { ask, check } = lock();
     expect(ask("clipboard-sanitized-write", app)).toBe(true);
     expect(check("clipboard-sanitized-write", "file:///")).toBe(true);
@@ -41,7 +41,7 @@ describe("lockDownPermissions", () => {
     expect(check("clipboard-sanitized-write", "https://example.com")).toBe(false);
   });
 
-  it("treats the dev server as Latis while developing, but not look-alike hosts", () => {
+  it("treats the dev server as Lattiz while developing, but not look-alike hosts", () => {
     const { ask } = lock("http://localhost:5173");
     expect(ask("clipboard-sanitized-write", "http://localhost:5173/")).toBe(true);
     expect(ask("clipboard-sanitized-write", "http://localhost:51730/")).toBe(false);

@@ -3,13 +3,13 @@ import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, sep } from "node:path";
 import { and, eq } from "drizzle-orm";
-import type { CanvasNode } from "@latis/shared";
+import type { CanvasNode } from "@lattiz/shared";
 import { cardData, cards, nodes } from "../store/schema";
 import type { WorkspaceStore } from "../store/workspace";
 import { BRIDGE_JS } from "./bridge";
 
 // Cards (SPEC §12): small HTML apps on the canvas. Each is served from its own origin
-// (card://<id>/), shown in a sandboxed iframe, and reaches Latis only through the bridge.
+// (card://<id>/), shown in a sandboxed iframe, and reaches Lattiz only through the bridge.
 
 export const CARD_SIZE = { w: 420, h: 360 };
 const REFRESH_TIMEOUT_MS = 60_000;
@@ -254,7 +254,7 @@ export class Cards {
     if (!this.row(id)) return new Response("Not found", { status: 404 });
     const headers = { "content-security-policy": cardCsp(this.network(id)), "x-content-type-options": "nosniff" };
     const path = decodeURIComponent(u.pathname).replace(/^\/+/, "") || "index.html";
-    if (path === "__latis.js") return new Response(BRIDGE_JS, { headers: { ...headers, "content-type": MIME[".js"]! } });
+    if (path === "__lattiz.js") return new Response(BRIDGE_JS, { headers: { ...headers, "content-type": MIME[".js"]! } });
     const file = normalize(join(this.dir(id), path));
     if (!file.startsWith(this.dir(id) + sep) || !existsSync(file) || path === "refresh.mjs")
       return new Response("Not found", { status: 404, headers });
@@ -263,8 +263,8 @@ export class Cards {
     if (type.startsWith("text/html")) {
       const html = body.toString("utf8");
       // </script> can't appear inside a JSON string literal here, so escape "<".
-      const pre = snap?.cardId === id ? `<script>window.__latisSnapshot=${snap.json.replaceAll("<", "\\u003c")}</script>` : "";
-      const tag = `${pre}<script src="card://${id}/__latis.js"></script>`;
+      const pre = snap?.cardId === id ? `<script>window.__lattizSnapshot=${snap.json.replaceAll("<", "\\u003c")}</script>` : "";
+      const tag = `${pre}<script src="card://${id}/__lattiz.js"></script>`;
       body = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => `${m}${tag}`) : `${tag}${html}`;
     }
     return new Response(typeof body === "string" ? body : new Uint8Array(body), { headers: { ...headers, "content-type": type } });

@@ -12,7 +12,7 @@ import {
   type SessionOptions,
   type UsageSnapshot,
   type UserTurn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import { JsonRpcPeer, RpcError, type Params } from "../../rpc/peer";
 import { spawnTransport, type LineTransport } from "../../rpc/transport";
 import { SessionBase } from "../../session-base";
@@ -30,7 +30,7 @@ const MODES: Record<PermissionMode, { approvalPolicy: Approval; sandbox: Sandbox
   "full-auto": { approvalPolicy: "never", sandbox: "danger-full-access" },
 };
 /**
- * Full-auto with an always-ask list: Codex asks about every command and Latis accepts all but the listed ones
+ * Full-auto with an always-ask list: Codex asks about every command and Lattiz accepts all but the listed ones
  * (docs/adapters/codex.md → Always-ask list).
  */
 const GUARDED_FULL_AUTO = { approvalPolicy: "untrusted", sandbox: "danger-full-access" } as const;
@@ -70,7 +70,7 @@ function codexMcp(m: McpServerConfig): Record<string, unknown> {
     : { command: m.command, args: m.args ?? [], ...(m.env && { env: m.env }), ...timeout };
 }
 
-const CLIENT_INFO = { name: "latis", title: "Latis", version: "0.1.0" };
+const CLIENT_INFO = { name: "lattiz", title: "Lattiz", version: "0.1.0" };
 
 async function connect(transport: LineTransport, handlers: ConstructorParameters<typeof JsonRpcPeer>[1]): Promise<JsonRpcPeer> {
   const peer = new JsonRpcPeer(transport, handlers, { jsonrpc: false });
@@ -298,12 +298,12 @@ class CodexSession extends SessionBase implements AgentSession {
 
   private onRequest(method: string, params: Params): Promise<unknown> {
     const req = this.mapper.request(method, params);
-    if (!req) return Promise.reject(new RpcError(`Latis doesn't support ${method} yet`, -32601));
+    if (!req) return Promise.reject(new RpcError(`Lattiz doesn't support ${method} yet`, -32601));
     if (req.elicitation) {
       if (this.mode === "full-auto") return Promise.resolve({ action: "accept", content: {} });
       if (this.mode === "read-only") return Promise.resolve({ action: "decline", content: null });
     }
-    // Latis-side auto-answers that make the modes behave as documented (codex.md → Permission modes).
+    // Lattiz-side auto-answers that make the modes behave as documented (codex.md → Permission modes).
     else if (req.event.type === "permission.requested") {
       const event = req.event;
       const pattern = event.command !== undefined && this.mode !== "read-only" ? matchAlwaysAsk(event.command, this.alwaysAsk) : null;

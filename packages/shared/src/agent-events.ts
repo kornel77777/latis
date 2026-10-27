@@ -57,7 +57,7 @@ export const AgentEvent = z.discriminatedUnion("type", [
     type: z.literal("file.changed"),
     path: z.string(),
     change: z.enum(["created", "modified", "deleted"]),
-    // Latis extension: unified-diff hunks when the agent reports them (inline diffs, §8.5).
+    // Lattiz extension: unified-diff hunks when the agent reports them (inline diffs, §8.5).
     hunks: z.array(DiffHunk).optional(),
     additions: z.number().int().optional(),
     deletions: z.number().int().optional(),
@@ -70,7 +70,7 @@ export const AgentEvent = z.discriminatedUnion("type", [
     command: z.string().optional(),
     paths: z.array(z.string()).optional(),
     reason: z.string().optional(),
-    // Latis extension: the always-ask pattern this matched (§9.8 AC3). Only "allow once" is offered.
+    // Lattiz extension: the always-ask pattern this matched (§9.8 AC3). Only "allow once" is offered.
     alwaysAsk: z.string().optional(),
   }),
   z.object({
@@ -78,7 +78,7 @@ export const AgentEvent = z.discriminatedUnion("type", [
     id: z.string(),
     question: z.string(),
     options: z.array(z.string()).optional(),
-    // Latis extension: agents like Claude Code ask several structured questions at once.
+    // Lattiz extension: agents like Claude Code ask several structured questions at once.
     questions: z.array(QuestionSpec).optional(),
   }),
   z.object({ type: z.literal("plan.proposed"), id: z.string(), markdown: z.string() }),
@@ -91,7 +91,7 @@ export const AgentEvent = z.discriminatedUnion("type", [
     costUsd: z.number().optional(),
   }),
   z.object({ type: z.literal("rate_limited"), resetsAt: z.string().optional(), message: z.string() }),
-  // Latis extension: the account's usage windows as the agent reports them (§9.12). Not stored in transcripts.
+  // Lattiz extension: the account's usage windows as the agent reports them (§9.12). Not stored in transcripts.
   z.object({ type: z.literal("usage.window"), windows: z.array(UsageWindow) }),
   z.object({
     type: z.literal("turn.completed"),
@@ -99,9 +99,9 @@ export const AgentEvent = z.discriminatedUnion("type", [
     durationMs: z.number(),
   }),
   z.object({ type: z.literal("error"), message: z.string(), recoverable: z.boolean() }),
-  // Latis extension: a message the user sent into a running turn (§9.9). Agents don't echo steers back.
+  // Lattiz extension: a message the user sent into a running turn (§9.9). Agents don't echo steers back.
   z.object({ type: z.literal("user.steered"), text: z.string() }),
-  // Latis extension: state inferred from a terminal-only agent's output (§6.3); `detail` is the line that triggered it.
+  // Lattiz extension: state inferred from a terminal-only agent's output (§6.3); `detail` is the line that triggered it.
   z.object({ type: z.literal("agent.status"), status: z.enum(["working", "idle", "needs-you"]), detail: z.string().optional() }),
 ]);
 export type AgentEvent = z.infer<typeof AgentEvent>;

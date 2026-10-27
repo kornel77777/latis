@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { Options, Query, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { AgentEvent, buildTranscript, DEFAULT_ALWAYS_ASK, type SessionOptions, type StoredEvent, type Turn } from "@latis/shared";
+import { AgentEvent, buildTranscript, DEFAULT_ALWAYS_ASK, type SessionOptions, type StoredEvent, type Turn } from "@lattiz/shared";
 import { ClaudeCodeAdapter, NEEDS_API_KEY, type QueryFn } from "../../src/main/agents/adapters/claude-code";
 import { ClaudeMapper, toolKind } from "../../src/main/agents/adapters/claude-code/mapper";
 
@@ -178,7 +178,7 @@ function replayQuery(name: string, seen: Seen): QueryFn {
 
 async function drive(
   name: string,
-  onRequest: (e: AgentEvent, respond: (r: Parameters<import("@latis/shared").AgentSession["respond"]>[1]) => void) => void,
+  onRequest: (e: AgentEvent, respond: (r: Parameters<import("@lattiz/shared").AgentSession["respond"]>[1]) => void) => void,
   turns = ["go"],
   opts: Partial<SessionOptions> = {},
 ) {

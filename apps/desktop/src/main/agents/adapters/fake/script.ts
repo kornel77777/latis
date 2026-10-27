@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AgentEvent } from "@latis/shared";
+import { AgentEvent } from "@lattiz/shared";
 
 // FakeAdapter script format (SPEC §6.6). One JSON object per line in fixtures/fake/*.jsonl.
 
@@ -42,7 +42,7 @@ export interface ScriptContext {
   waitForResponse(requestId: string): Promise<"allow" | "deny">;
   exit(code: number): never;
   isInterrupted(): boolean;
-  /** Calls a Latis workspace tool (the chat must have been given them). Returns the result text. */
+  /** Calls a Lattiz workspace tool (the chat must have been given them). Returns the result text. */
   callTool?(tool: string, args: Record<string, unknown>): Promise<{ text: string; isError: boolean }>;
 }
 
@@ -113,7 +113,7 @@ export async function* playScript(steps: ScriptStep[], ctx: ScriptContext): Asyn
     } else if ("mcp" in step) {
       const id = `mcp-${++calls}`;
       const args = fillDeep(step.mcp.args) as Record<string, unknown>;
-      yield { type: "tool.started", id, kind: "mcp", name: `latis.${step.mcp.tool}`, input: args };
+      yield { type: "tool.started", id, kind: "mcp", name: `lattiz.${step.mcp.tool}`, input: args };
       const r = ctx.callTool ? await ctx.callTool(step.mcp.tool, args) : { text: "This chat has no workspace tools.", isError: true };
       if (step.as) {
         try {

@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 import { structuredPatch } from "diff";
-import { countChanges, type AgentEvent, type DiffHunk, type ToolKind } from "@latis/shared";
+import { countChanges, type AgentEvent, type DiffHunk, type ToolKind } from "@lattiz/shared";
 
 // ACP `session/update` notifications → AgentEvents (docs/adapters/acp.md).
 

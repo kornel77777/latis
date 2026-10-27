@@ -2,20 +2,20 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, stubFolderPicker, tempDataDir } from "./helpers";
 
 // M3 exit criterion against real agents: scenario S1 (SPEC §3). Opt-in, spends a few cents:
-//   LATIS_LIVE=1 [LATIS_AGENT_PATH=<dir with codex>] pnpm e2e -- e2e/live-m3.spec.ts
-test.skip(!process.env.LATIS_LIVE, "set LATIS_LIVE=1 to run against real agents");
+//   LATTIZ_LIVE=1 [LATTIZ_AGENT_PATH=<dir with codex>] pnpm e2e -- e2e/live-m3.spec.ts
+test.skip(!process.env.LATTIZ_LIVE, "set LATTIZ_LIVE=1 to run against real agents");
 test.setTimeout(420_000);
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" });
 
 async function setModel(page: Page, card: Locator, model: string, reasoning?: string) {
   const chatId = (await card.getAttribute("data-chat-id"))!;
-  await page.evaluate((o) => (globalThis as unknown as Api).latis.invoke("chat:setOptions", o), {
+  await page.evaluate((o) => (globalThis as unknown as Api).lattiz.invoke("chat:setOptions", o), {
     chatId,
     model,
     ...(reasoning && { reasoning }),
@@ -31,13 +31,13 @@ test("live S1: Claude Code and Codex in separate worktrees, notified, reviewed, 
   const dataDir = tempDataDir();
   const repo = join(dataDir, "store");
   mkdirSync(repo);
-  writeFileSync(join(repo, "README.md"), "# store\n\nA tiny shop for Latis live tests.\n");
+  writeFileSync(join(repo, "README.md"), "# store\n\nA tiny shop for Lattiz live tests.\n");
   git(repo, "init", "-q", "-b", "main");
   git(repo, "add", "-A");
   git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init");
 
   const { app, page } = await launch(dataDir);
-  const ready = (await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("agents:list", {})))
+  const ready = (await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("agents:list", {})))
     .filter((a) => a.installed && a.signedIn)
     .map((a) => a.id);
   test.skip(!ready.includes("claude-code") || !ready.includes("codex"), "needs Claude Code and Codex signed in");
@@ -71,7 +71,7 @@ test("live S1: Claude Code and Codex in separate worktrees, notified, reviewed, 
     }).toPass({ timeout: 180_000 });
   }
   // Notified as each finishes: two "finished" Inbox items.
-  const inbox = await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("attention:list"));
+  const inbox = await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("attention:list"));
   expect(inbox.filter((i) => i.kind === "finished")).toHaveLength(2);
   expect(existsSync(join(repo, "pricing.md"))).toBe(false);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { Skill } from "@latis/shared";
-import { cn } from "@latis/ui";
+import type { Skill } from "@lattiz/shared";
+import { cn } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 
 // `/name` in the composer attaches a skill (§9.14). While the word being typed starts with "/",

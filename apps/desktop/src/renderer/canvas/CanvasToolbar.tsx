@@ -1,7 +1,7 @@
 import { useReactFlow, useViewport } from "@xyflow/react";
 import { AppWindow, LayoutGrid, Maximize, Minus, Plus, Redo2, StickyNote, Type, Undo2, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "@latis/ui";
+import { cn } from "@lattiz/ui";
 import { display } from "../commands/keys";
 import { allCommands, bindingsOf, runCommand } from "../commands/registry";
 import { useWorkspace } from "../stores/workspace";

@@ -23,7 +23,7 @@ import {
 } from "../../src/main/git/git";
 
 async function repo(files: Record<string, string> = { "README.md": "# r\n" }): Promise<string> {
-  const dir = mkdtempSync(join(tmpdir(), "latis-git-"));
+  const dir = mkdtempSync(join(tmpdir(), "lattiz-git-"));
   for (const [p, c] of Object.entries(files)) {
     mkdirSync(join(dir, p, ".."), { recursive: true });
     writeFileSync(join(dir, p), c);
@@ -63,7 +63,7 @@ describe("git service", { timeout: 20_000 }, () => {
     writeFileSync(join(dir, "a.txt"), "two\n");
     writeFileSync(join(dir, "b.txt"), "created\n");
     const after = await snapshot(dir, "after");
-    await setRef(dir, "refs/latis/checkpoints/c/t-before", before);
+    await setRef(dir, "refs/lattiz/checkpoints/c/t-before", before);
     const files = await changedPaths(dir, before, after);
     await restorePaths(dir, before, files);
     expect(read(dir, "a.txt")).toBe("one\n");
@@ -100,33 +100,33 @@ describe("git service", { timeout: 20_000 }, () => {
   it("runs a chat in a worktree, detects conflicts with a dry run, and merges", async () => {
     const dir = await repo({ "shared.txt": "base\n" });
     const base = (await currentBranch(dir))!;
-    const wt1 = join(mkdtempSync(join(tmpdir(), "latis-wt-")), "one");
-    const wt2 = join(mkdtempSync(join(tmpdir(), "latis-wt-")), "two");
-    await addWorktree(dir, wt1, "latis/one", "HEAD");
-    await addWorktree(dir, wt2, "latis/two", "HEAD");
+    const wt1 = join(mkdtempSync(join(tmpdir(), "lattiz-wt-")), "one");
+    const wt2 = join(mkdtempSync(join(tmpdir(), "lattiz-wt-")), "two");
+    await addWorktree(dir, wt1, "lattiz/one", "HEAD");
+    await addWorktree(dir, wt2, "lattiz/two", "HEAD");
     writeFileSync(join(wt1, "pricing.txt"), "pricing\n");
     writeFileSync(join(wt2, "checkout.txt"), "checkout\n");
     writeFileSync(join(wt2, "shared.txt"), "two's version\n");
     expect(await commitAll(wt1, "one")).toBe(true);
     expect(await commitAll(wt1, "nothing new")).toBe(false);
     await commitAll(wt2, "two");
-    expect(await aheadCount(dir, base, "latis/one")).toBe(1);
-    expect(await mergeConflicts(dir, base, "latis/one")).toEqual([]);
-    await merge(dir, "latis/one", "merge", "Merge one");
+    expect(await aheadCount(dir, base, "lattiz/one")).toBe(1);
+    expect(await mergeConflicts(dir, base, "lattiz/one")).toEqual([]);
+    await merge(dir, "lattiz/one", "merge", "Merge one");
     expect(read(dir, "pricing.txt")).toBe("pricing\n");
 
     // Main moves on and touches the same file: the dry run reports it without changing anything.
     writeFileSync(join(dir, "shared.txt"), "main's version\n");
     await commitAll(dir, "main edit");
-    expect(await mergeConflicts(dir, base, "latis/two")).toEqual(["shared.txt"]);
+    expect(await mergeConflicts(dir, base, "lattiz/two")).toEqual(["shared.txt"]);
     expect(read(dir, "shared.txt")).toBe("main's version\n");
 
     // Removal: a merged branch goes quietly; an unmerged one is refused before anything is deleted.
-    await removeWorktree(dir, wt1, "latis/one", { base, deleteUnmerged: false });
+    await removeWorktree(dir, wt1, "lattiz/one", { base, deleteUnmerged: false });
     expect(existsSync(wt1)).toBe(false);
-    await expect(removeWorktree(dir, wt2, "latis/two", { base, deleteUnmerged: false })).rejects.toThrow(UnmergedError);
+    await expect(removeWorktree(dir, wt2, "lattiz/two", { base, deleteUnmerged: false })).rejects.toThrow(UnmergedError);
     expect(existsSync(join(wt2, "checkout.txt"))).toBe(true);
-    await removeWorktree(dir, wt2, "latis/two", { base, deleteUnmerged: true });
+    await removeWorktree(dir, wt2, "lattiz/two", { base, deleteUnmerged: true });
     expect(existsSync(wt2)).toBe(false);
   });
 });

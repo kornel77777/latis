@@ -35,7 +35,7 @@
       const NAMES = { "claude-code": "Claude Code", codex: "Codex", gemini: "Gemini CLI" };
       const at = (iso) => new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
       async function show() {
-        const u = await latis.usage();
+        const u = await lattiz.usage();
         const root = document.getElementById("list");
         const ids = Object.keys(u);
         if (!ids.length) {

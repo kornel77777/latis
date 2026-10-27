@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Plus, Search, SquareTerminal, X } from "lucide-react";
-import { cn } from "@latis/ui";
+import { cn } from "@lattiz/ui";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkspace } from "../stores/workspace";
 import { TerminalView, type TerminalHandle } from "../terminal/TerminalView";

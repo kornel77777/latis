@@ -1,15 +1,15 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import type { Skill } from "@latis/shared";
+import type { Skill } from "@lattiz/shared";
 
 // Skills (SPEC §9.14): reusable instructions as markdown. `<dataDir>/skills/*.md` for the user,
-// `<project>/.latis/skills/*.md` for a project; `<name>/SKILL.md` folders work in both places.
+// `<project>/.lattiz/skills/*.md` for a project; `<name>/SKILL.md` folders work in both places.
 // Typing /name in the composer sends the skill's text to the agent with the message.
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/i;
 
 export function projectSkillsDir(folder: string): string {
-  return join(folder, ".latis", "skills");
+  return join(folder, ".lattiz", "skills");
 }
 
 function parse(raw: string): { meta: Record<string, string>; body: string } {

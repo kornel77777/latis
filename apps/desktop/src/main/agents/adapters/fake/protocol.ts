@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AgentEvent } from "@latis/shared";
+import { AgentEvent } from "@lattiz/shared";
 
 // JSON-lines protocol between FakeAdapter (parent) and fake-runner (child),
 // shaped like the stdio protocols real agent CLIs speak.

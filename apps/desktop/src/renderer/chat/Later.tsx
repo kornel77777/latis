@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { AlarmClock, ArrowRightLeft, Clock, Repeat, X } from "lucide-react";
-import type { AgentEvent, ScheduledMessage } from "@latis/shared";
-import { Button, Dialog, cn } from "@latis/ui";
-import { latis } from "../api";
+import type { AgentEvent, ScheduledMessage } from "@lattiz/shared";
+import { Button, Dialog, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkspace } from "../stores/workspace";
 
@@ -93,7 +93,7 @@ export function SendLaterDialog({
       const opt = options.find((o) => o.id === when)!;
       const fireAt = when === "custom" ? Date.parse(custom) : opt.at?.();
       if (when === "custom" && (!custom || Number.isNaN(fireAt) || fireAt! < Date.now())) throw new Error("Pick a time in the future.");
-      await latis.invoke("schedule:create", {
+      await lattiz.invoke("schedule:create", {
         chatId,
         text,
         ...(when === "reset" ? { onReset: true } : { fireAt: fireAt! }),
@@ -194,7 +194,7 @@ export function ScheduledList({ chatId }: { chatId: string }) {
           <button
             aria-label="Cancel scheduled message"
             className="rounded-[2px] p-0.5 text-text-3 hover:bg-surface-2 hover:text-text-1"
-            onClick={() => void latis.invoke("schedule:cancel", { id: m.id })}
+            onClick={() => void lattiz.invoke("schedule:cancel", { id: m.id })}
           >
             <X size={12} />
           </button>
@@ -240,11 +240,11 @@ export function LimitBanner({ chatId }: { chatId: string }) {
           disabled={!resets}
           title={resets ? undefined : "The agent didn't say when the limit resets."}
           onClick={() =>
-            void latis
+            void lattiz
               .invoke("schedule:create", { chatId, text: "Continue where you left off.", onReset: true })
               .then(() => {
                 setDismissed(limit.seq);
-                toast("Scheduled: Latis will ask it to continue when the limit resets.");
+                toast("Scheduled: Lattiz will ask it to continue when the limit resets.");
               })
               .catch((err: unknown) => toast(errorText(err)))
           }
@@ -280,7 +280,7 @@ export function HandoffDialog() {
   useEffect(() => {
     if (!chatId) return;
     let live = true;
-    void latis
+    void lattiz
       .invoke("handoff:brief", { chatId })
       .then((r) => live && setBrief(r.brief))
       .catch((err: unknown) => live && setError(errorText(err)));
@@ -298,7 +298,7 @@ export function HandoffDialog() {
     if (!chatId || !brief?.trim() || !target) return;
     setBusy(true);
     try {
-      const { node, chat: created, frame } = await latis.invoke("handoff:start", { chatId, agentId: target, brief });
+      const { node, chat: created, frame } = await lattiz.invoke("handoff:start", { chatId, agentId: target, brief });
       useWorkspace.getState().addCreatedChat(node, created, frame);
       close();
     } catch (err) {

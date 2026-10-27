@@ -49,13 +49,13 @@ export interface McpServerConfig {
   env?: Record<string, string>;
   /** Seconds a tool call may take before the agent gives up (wait_for_chats blocks). */
   toolTimeoutSec?: number;
-  /** Latis's own server: its tools carry their guardrails in Latis, so the agent shouldn't ask per call. */
+  /** Lattiz's own server: its tools carry their guardrails in Lattiz, so the agent shouldn't ask per call. */
   trusted?: boolean;
 }
 
 export interface SessionOptions {
   cwd: string;
-  /** The Latis chat this session belongs to. */
+  /** The Lattiz chat this session belongs to. */
   chatId?: string;
   model?: string;
   reasoning?: string;
@@ -65,7 +65,7 @@ export interface SessionOptions {
   mcpServers?: McpServerConfig[];
   env?: Record<string, string>;
   /**
-   * Agents whose UI is a terminal report prompts the user typed there; Latis records the turn and takes its
+   * Agents whose UI is a terminal report prompts the user typed there; Lattiz records the turn and takes its
    * checkpoint before resolving.
    */
   onUserTurn?: (text: string) => Promise<void>;

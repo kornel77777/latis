@@ -1,5 +1,5 @@
 import { ArrowUpCircle, X } from "lucide-react";
-import { StatusDot, statusLabel, type StatusKind } from "@latis/ui";
+import { StatusDot, statusLabel, type StatusKind } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 import { useShallow } from "zustand/react/shallow";
 
@@ -21,7 +21,7 @@ function UpdateNotice() {
         className="flex items-center gap-1 rounded-[2px] px-1 text-accent hover:bg-surface-2"
         title={`${next.name}: download it from GitHub`}
       >
-        <ArrowUpCircle size={11} /> Latis {next.version} is out
+        <ArrowUpCircle size={11} /> Lattiz {next.version} is out
       </a>
       <button
         className="rounded-[2px] px-1 text-text-3 hover:bg-surface-2 hover:text-text-1"

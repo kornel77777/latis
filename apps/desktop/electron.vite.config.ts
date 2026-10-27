@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 // Only `dependencies` (native/runtime modules) are externalised and shipped; everything
-// else, including the @latis/* workspace packages, is a devDependency and gets bundled.
+// else, including the @lattiz/* workspace packages, is a devDependency and gets bundled.
 
 export default defineConfig({
   main: {
@@ -16,7 +16,7 @@ export default defineConfig({
         input: {
           index: resolve(root, "src/main/index.ts"),
           "fake-runner": resolve(root, "src/main/agents/adapters/fake/runner.ts"),
-          "latis-mcp": resolve(root, "src/main/mcp/shim.ts"),
+          "lattiz-mcp": resolve(root, "src/main/mcp/shim.ts"),
         },
       },
     },
@@ -34,7 +34,7 @@ export default defineConfig({
       tailwindcss(),
       // The CSP allows the dev server's HMR socket; release builds don't need it (§13).
       {
-        name: "latis-csp",
+        name: "lattiz-csp",
         apply: "build",
         transformIndexHtml: (html: string) => html.replace(" ws://localhost:*", ""),
       },

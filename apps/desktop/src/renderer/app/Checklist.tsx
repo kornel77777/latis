@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react";
-import { cn } from "@latis/ui";
+import { cn } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 
 // Getting started (§8.10 step 4): five steps that tick themselves off as you do them.

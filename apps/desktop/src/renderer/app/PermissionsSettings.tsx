@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, RotateCcw, X } from "lucide-react";
-import { DEFAULT_ALWAYS_ASK, matchAlwaysAsk, type AgentInfo } from "@latis/shared";
-import { Button, cn } from "@latis/ui";
+import { DEFAULT_ALWAYS_ASK, matchAlwaysAsk, type AgentInfo } from "@lattiz/shared";
+import { Button, cn } from "@lattiz/ui";
 import { MODES } from "../chat/pickers";
 import { useWorkspace } from "../stores/workspace";
 
@@ -68,7 +68,7 @@ export function PermissionsSection() {
             Commands that need your approval every time, even in Full-auto. A pattern matches any command that starts with its program and
             has its words in any order, so <code className="font-mono">rm -rf</code> also catches <code className="font-mono">rm -fr</code>{" "}
             and <code className="font-mono">sudo rm -Rf</code>, including inside <code className="font-mono">sh -c</code>. When in doubt,
-            Latis asks.
+            Lattiz asks.
           </p>
         </div>
         <ul className="flex flex-wrap gap-1.5" aria-label="Always-ask list" data-testid="always-ask-list">

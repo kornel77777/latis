@@ -1,17 +1,17 @@
 /// <reference lib="dom" />
 
 import { expect, test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // M4: the great UI.
 
-const shots = process.env.LATIS_SCREENSHOTS;
-type Api = { latis: LatisApi };
+const shots = process.env.LATTIZ_SCREENSHOTS;
+type Api = { lattiz: LattizApi };
 
 async function demoChats(page: Page, n: number): Promise<void> {
   await page.evaluate(async (count) => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const canvas = await api.invoke("canvas:load");
     for (let i = 0; i < count; i++)
       await api.invoke("chat:create", { canvasId: canvas.id, projectId: null, agentId: "fake", x: i * 500, y: 0 });
@@ -217,7 +217,7 @@ test("browser dock: dev-server detection, nothing-running page, and the element 
       `<!doctype html><title>Shop</title><body style="margin:0"><button id="buy" class="cta big" style="margin:40px;padding:12px 20px;background:#0f9f8f;color:white;border-radius:8px">Buy now</button></body>`,
     );
   });
-  // 3009: one of the ports Latis scans (§9.7 AC1); skip detection if something else already uses it.
+  // 3009: one of the ports Lattiz scans (§9.7 AC1); skip detection if something else already uses it.
   const port = await new Promise<number>((resolve) => {
     server.once("error", () => server.listen(0, "127.0.0.1", () => resolve((server.address() as { port: number }).port)));
     server.listen(3009, "127.0.0.1", () => resolve(3009));
@@ -276,7 +276,7 @@ test("browser dock: dev-server detection, nothing-running page, and the element 
 
 test("appearance, the getting-started checklist, and accessibility announcements", async () => {
   const { app, page } = await launch(tempDataDir());
-  await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("prefs:set", { checklist: [] }));
+  await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("prefs:set", { checklist: [] }));
   await demoChats(page, 1);
   const checklist = page.getByTestId("checklist");
   await expect(checklist).toContainText("0 of 5");

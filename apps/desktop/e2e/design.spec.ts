@@ -3,15 +3,15 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, stubFolderPicker, tempDataDir } from "./helpers";
 
 // Design review (M4 exit, §8): screenshots of each surface's states in both themes.
-//   LATIS_SCREENSHOTS=<dir> pnpm e2e -- e2e/design.spec.ts
-const shots = process.env.LATIS_SCREENSHOTS;
-test.skip(!shots, "set LATIS_SCREENSHOTS=<dir> to capture the design review");
+//   LATTIZ_SCREENSHOTS=<dir> pnpm e2e -- e2e/design.spec.ts
+const shots = process.env.LATTIZ_SCREENSHOTS;
+test.skip(!shots, "set LATTIZ_SCREENSHOTS=<dir> to capture the design review");
 test.setTimeout(180_000);
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 
 async function snap(page: Page, name: string) {
   await page.waitForTimeout(250);
@@ -21,8 +21,8 @@ async function snap(page: Page, name: string) {
 for (const theme of ["dark", "light"] as const) {
   test(`design review: ${theme}`, async () => {
     const dataDir = tempDataDir();
-    const { app, page } = await launch(dataDir, { LATIS_SKIP_ONBOARDING: "1" });
-    await page.evaluate((t) => (globalThis as unknown as Api).latis.invoke("settings:setTheme", t), theme);
+    const { app, page } = await launch(dataDir, { LATTIZ_SKIP_ONBOARDING: "1" });
+    await page.evaluate((t) => (globalThis as unknown as Api).lattiz.invoke("settings:setTheme", t), theme);
     await page.reload();
     await page.waitForSelector("[aria-label='Canvas']");
     await snap(page, `${theme}-01-empty`);
@@ -34,7 +34,7 @@ for (const theme of ["dark", "light"] as const) {
     await page.getByTestId("empty-open-folder").click();
     // Three demo chats in different states: needs you, done, error.
     await page.evaluate(async () => {
-      const api = (globalThis as unknown as Api).latis;
+      const api = (globalThis as unknown as Api).lattiz;
       const canvas = await api.invoke("canvas:load");
       for (let i = 0; i < 3; i++)
         await api.invoke("chat:create", { canvasId: canvas.id, projectId: null, agentId: "fake", x: 1100 + i * 500, y: 0 });
@@ -42,9 +42,9 @@ for (const theme of ["dark", "light"] as const) {
     await page.reload();
     await page.waitForSelector("[aria-label='Canvas']");
     // From the canvas data: off-screen cards aren't rendered, so the DOM doesn't list them all.
-    const ids = await page.evaluate(async () => (await (globalThis as unknown as Api).latis.invoke("canvas:load")).chats.map((c) => c.id));
+    const ids = await page.evaluate(async () => (await (globalThis as unknown as Api).lattiz.invoke("canvas:load")).chats.map((c) => c.id));
     await page.evaluate((list) => {
-      const api = (globalThis as unknown as Api).latis;
+      const api = (globalThis as unknown as Api).lattiz;
       void api.invoke("chat:send", { chatId: list[0]!, text: "Swap the hero image" });
       void api.invoke("chat:send", { chatId: list[1]!, text: "Summarise the README /ask" });
       void api.invoke("chat:send", { chatId: list[2]!, text: "Break please /crash" });

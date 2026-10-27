@@ -8,8 +8,8 @@ import { WorkspaceStore } from "../../src/main/store/workspace";
 
 describe("Accounts", () => {
   it("points the active account's CLI at its own home folder, and forgets accounts without deleting them", () => {
-    const dir = mkdtempSync(join(tmpdir(), "latis-acc-"));
-    const accounts = new Accounts(new WorkspaceStore(openDb(join(dir, "latis.db"))), dir);
+    const dir = mkdtempSync(join(tmpdir(), "lattiz-acc-"));
+    const accounts = new Accounts(new WorkspaceStore(openDb(join(dir, "lattiz.db"))), dir);
     expect(accounts.env("claude-code")).toEqual({});
     const work = accounts.add("claude-code", " Work ");
     expect(work.label).toBe("Work");

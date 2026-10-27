@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Play } from "lucide-react";
-import type { PtyInfo, TranscriptItem } from "@latis/shared";
-import { Button } from "@latis/ui";
-import { eventContract } from "@latis/shared";
-import { latis } from "../api";
+import type { PtyInfo, TranscriptItem } from "@lattiz/shared";
+import { Button } from "@lattiz/ui";
+import { eventContract } from "@lattiz/shared";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 import { TerminalView } from "../terminal/TerminalView";
 import { PermissionBlock } from "./items";
 
 /**
- * A terminal agent's chat card. Claude Code in a terminal also reports approvals to Latis (hooks); the ones only
- * Latis can answer, like the always-ask list, show as a banner over the terminal.
+ * A terminal agent's chat card. Claude Code in a terminal also reports approvals to Lattiz (hooks); the ones only
+ * Lattiz can answer, like the always-ask list, show as a banner over the terminal.
  */
 export function TerminalChatBody({
   chatId,
@@ -24,7 +24,7 @@ export function TerminalChatBody({
   const [error, setError] = useState<string | null>(null);
 
   const attach = useCallback(() => {
-    latis
+    lattiz
       .invoke("chat:attachTerminal", { chatId })
       .then((info) => {
         setError(null);
@@ -36,7 +36,7 @@ export function TerminalChatBody({
   useEffect(attach, [attach]);
   useEffect(
     () =>
-      latis.on("pty:exit", (raw) => {
+      lattiz.on("pty:exit", (raw) => {
         const parsed = eventContract["pty:exit"].safeParse(raw);
         if (parsed.success) setPty((p) => (p && p.id === parsed.data.id ? { ...p, running: false } : p));
       }),

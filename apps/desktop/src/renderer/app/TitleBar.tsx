@@ -18,8 +18,8 @@ import {
 } from "lucide-react";
 import { display } from "../commands/keys";
 import { allCommands, bindingsOf, runCommand } from "../commands/registry";
-import { Button, Menu, MenuItem, MenuSeparator, cn } from "@latis/ui";
-import type { Theme } from "@latis/shared";
+import { Button, Menu, MenuItem, MenuSeparator, cn } from "@lattiz/ui";
+import type { Theme } from "@lattiz/shared";
 import { AgentMenuItems } from "../canvas/AgentMenuItems";
 import { useCanvasActions } from "../canvas/useCanvasActions";
 import { useWorkspace } from "../stores/workspace";
@@ -40,7 +40,7 @@ export function TitleBar() {
     return k ? display(k) : "";
   };
   const { openView, closeView, focusSelection } = useWorkspace.getState();
-  const isMac = window.latis.platform === "darwin";
+  const isMac = window.lattiz.platform === "darwin";
   const themes: { id: Theme; label: string; icon: typeof Sun }[] = [
     { id: "dark", label: "Dark", icon: Moon },
     { id: "light", label: "Light", icon: Sun },
@@ -52,7 +52,7 @@ export function TitleBar() {
       className="drag-region flex h-10 shrink-0 items-center gap-2 border-b border-line bg-bg-0 pr-2"
       style={{ paddingLeft: isMac ? 84 : 12 }}
     >
-      <span className="text-[13px] font-semibold tracking-wide text-text-1">Latis</span>
+      <span className="text-[13px] font-semibold tracking-wide text-text-1">Lattiz</span>
       {!zen && (
         <nav className="no-drag ml-3 flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Canvases and Focus views" role="tablist">
           <div className="flex shrink-0 rounded-control border border-line bg-bg-1 p-0.5" role="radiogroup" aria-label="Layout">
@@ -167,7 +167,7 @@ export function TitleBar() {
           <MenuItem onSelect={() => void useWorkspace.getState().reportProblem()}>
             <Bug size={14} /> Report a problem…
           </MenuItem>
-          <MenuItem onSelect={() => useWorkspace.getState().setSettingsOpen(true, "General")}>About Latis</MenuItem>
+          <MenuItem onSelect={() => useWorkspace.getState().setSettingsOpen(true, "General")}>About Lattiz</MenuItem>
         </Menu>
       </div>
     </header>

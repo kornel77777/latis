@@ -1,16 +1,16 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // M5 exit criterion against real agents: scenario S4 (SPEC §3) with Claude Code as the Conductor.
 // Opt-in, spends real usage (a Conductor turn plus three short reviews):
-//   LATIS_LIVE=1 pnpm e2e -- e2e/live-m5.spec.ts
-test.skip(!process.env.LATIS_LIVE, "set LATIS_LIVE=1 to run against real agents");
+//   LATTIZ_LIVE=1 pnpm e2e -- e2e/live-m5.spec.ts
+test.skip(!process.env.LATTIZ_LIVE, "set LATTIZ_LIVE=1 to run against real agents");
 test.setTimeout(1_200_000);
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 
 test("live S4: Claude Code conducts three reviewers of the auth module and writes where they agree", async () => {
   const dataDir = tempDataDir();
@@ -47,8 +47,8 @@ export function login(email: string, password: string): string | null {
 `,
   );
 
-  const { app, page } = await launch(dataDir, { LATIS_SKIP_CONDUCTOR: "0" });
-  const agents = await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("agents:list", {}));
+  const { app, page } = await launch(dataDir, { LATTIZ_SKIP_CONDUCTOR: "0" });
+  const agents = await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("agents:list", {}));
   const ready = agents.filter((a) => a.installed && a.signedIn && a.kind === "structured" && a.id !== "fake").map((a) => a.id);
   test.skip(!ready.includes("claude-code"), "needs Claude Code signed in");
 
@@ -65,12 +65,12 @@ export function login(email: string, password: string): string | null {
   await conductor.getByTestId("composer").press("Enter");
 
   await expect(conductor).toHaveAttribute("data-status", /done|error/, { timeout: 1_100_000 });
-  const state = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const state = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   const c = state.chats.find((x) => x.role === "conductor")!;
   const reviewers = state.chats.filter((x) => x.spawnedBy === c.id);
   const note = state.nodes.find((n) => n.type === "note");
   const transcript = await page.evaluate(
-    async (id) => (globalThis as unknown as Api).latis.invoke("chat:transcript", { chatId: id }),
+    async (id) => (globalThis as unknown as Api).lattiz.invoke("chat:transcript", { chatId: id }),
     c.id,
   );
   const tools = transcript.events.flatMap((e) => (e.event.type === "tool.started" ? [e.event.name] : []));
@@ -108,12 +108,12 @@ test("live: Codex (HTTP) and Gemini (stdio shim) use the workspace tools after G
   mkdirSync(repo);
   writeFileSync(join(repo, "README.md"), "# notes\n");
   const { app, page } = await launch(dataDir);
-  app.process().stdout?.on("data", (d: Buffer) => process.env.LATIS_DEBUG && console.log("[main]", d.toString().trim().slice(0, 400)));
-  app.process().stderr?.on("data", (d: Buffer) => process.env.LATIS_DEBUG && console.log("[main!]", d.toString().trim().slice(0, 400)));
-  const agents = await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("agents:list", {}));
+  app.process().stdout?.on("data", (d: Buffer) => process.env.LATTIZ_DEBUG && console.log("[main]", d.toString().trim().slice(0, 400)));
+  app.process().stderr?.on("data", (d: Buffer) => process.env.LATTIZ_DEBUG && console.log("[main!]", d.toString().trim().slice(0, 400)));
+  const agents = await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("agents:list", {}));
   const ready = agents.filter((a) => a.installed && a.signedIn).map((a) => a.id);
-  // LATIS_LIVE_ONLY=codex limits the run (Gemini's free tier runs out of daily requests quickly).
-  const only = process.env.LATIS_LIVE_ONLY?.split(",");
+  // LATTIZ_LIVE_ONLY=codex limits the run (Gemini's free tier runs out of daily requests quickly).
+  const only = process.env.LATTIZ_LIVE_ONLY?.split(",");
   const which = ["codex", "gemini"].filter((a) => ready.includes(a) && (!only || only.includes(a)));
   test.skip(!which.length, "needs Codex or Gemini signed in");
 
@@ -124,7 +124,7 @@ test("live: Codex (HTTP) and Gemini (stdio shim) use the workspace tools after G
   for (const agentId of which) {
     const chatId = await page.evaluate(
       async (o) => {
-        const api = (globalThis as unknown as Api).latis;
+        const api = (globalThis as unknown as Api).lattiz;
         const canvas = await api.invoke("canvas:load");
         const { chat } = await api.invoke("chat:create", {
           canvasId: canvas.id,
@@ -136,7 +136,7 @@ test("live: Codex (HTTP) and Gemini (stdio shim) use the workspace tools after G
         await api.invoke("chat:setWorkspaceTools", { chatId: chat.id, on: true });
         await api.invoke("chat:send", {
           chatId: chat.id,
-          text: "Call the latis list_projects tool, then create_note with title 'Hello from you' and the project's folder as the markdown. Reply with the note id only.",
+          text: "Call the lattiz list_projects tool, then create_note with title 'Hello from you' and the project's folder as the markdown. Reply with the note id only.",
         });
         return chat.id;
       },
@@ -144,13 +144,13 @@ test("live: Codex (HTTP) and Gemini (stdio shim) use the workspace tools after G
     );
     const deadline = Date.now() + 180_000;
     while (Date.now() < deadline) {
-      const st = (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"))).chats.find(
+      const st = (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"))).chats.find(
         (c) => c.id === chatId,
       )?.status;
       if (st && /done|error|needs-you/.test(st)) break;
       await page.waitForTimeout(2000);
     }
-    const t = await page.evaluate(async (id) => (globalThis as unknown as Api).latis.invoke("chat:transcript", { chatId: id }), chatId);
+    const t = await page.evaluate(async (id) => (globalThis as unknown as Api).lattiz.invoke("chat:transcript", { chatId: id }), chatId);
     results[agentId] = {
       tools: t.events.flatMap((e) => (e.event.type === "tool.started" ? [e.event.name] : [])),
       failed: t.events
@@ -160,7 +160,7 @@ test("live: Codex (HTTP) and Gemini (stdio shim) use the workspace tools after G
       permissions: t.events.filter((e) => e.event.type === "permission.requested").map((e) => JSON.stringify(e.event).slice(0, 300)),
     };
   }
-  const notes = (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"))).nodes.filter(
+  const notes = (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"))).nodes.filter(
     (n) => n.type === "note",
   );
   console.log(JSON.stringify({ results, notes: notes.map((n) => n.data.text) }, null, 2));

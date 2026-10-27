@@ -15,15 +15,15 @@ export function shellEnv(): Promise<NodeJS.ProcessEnv> {
 }
 
 /**
- * Markers Claude Code sets for its own child processes. Latis started from inside a Claude Code session would
+ * Markers Claude Code sets for its own child processes. Lattiz started from inside a Claude Code session would
  * pass them on, and agents would think they're nested (for one, Claude Code stops saving transcripts).
  */
 const SESSION_MARKERS = ["CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CLAUDE_CODE_CHILD_SESSION", "CLAUDE_CODE_SSE_PORT"];
 
-/** LATIS_AGENT_PATH (dev/test): extra folders searched first for agent CLIs. */
+/** LATTIZ_AGENT_PATH (dev/test): extra folders searched first for agent CLIs. */
 async function withAgentPath(env: Promise<NodeJS.ProcessEnv>): Promise<NodeJS.ProcessEnv> {
   const e = Object.fromEntries(Object.entries(await env).filter(([k]) => !SESSION_MARKERS.includes(k)));
-  const extra = process.env.LATIS_AGENT_PATH;
+  const extra = process.env.LATTIZ_AGENT_PATH;
   return extra ? { ...e, PATH: `${extra}${process.platform === "win32" ? ";" : ":"}${e.PATH ?? ""}` } : e;
 }
 
@@ -31,7 +31,7 @@ function loginEnv(): Promise<NodeJS.ProcessEnv> {
   return (async () => {
     if (process.platform === "win32") return process.env;
     const shell = process.env.SHELL || "/bin/zsh";
-    const marker = "__LATIS_ENV__";
+    const marker = "__LATTIZ_ENV__";
     try {
       const { stdout } = await run(shell, ["-ilc", `printf '${marker}'; env; printf '${marker}'`], {
         timeout: 8000,

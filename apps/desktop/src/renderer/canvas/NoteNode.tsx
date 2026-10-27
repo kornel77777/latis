@@ -1,8 +1,8 @@
 import { memo, useEffect, useRef } from "react";
 import { NodeResizer, type NodeProps } from "@xyflow/react";
 import { Download, MoreHorizontal, Pencil, StickyNote, Trash2 } from "lucide-react";
-import { Button, Menu, MenuItem, MenuSeparator, cn } from "@latis/ui";
-import { latis } from "../api";
+import { Button, Menu, MenuItem, MenuSeparator, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { Markdown } from "../markdown/Markdown";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { FlowHandles } from "./flows";
@@ -34,7 +34,7 @@ export const NoteNode = memo(function NoteNode({ id, data, selected }: NodeProps
         <article
           data-testid="note"
           data-zoom="tile"
-          className="latis-drag flex h-full w-full flex-col rounded-card border-2 border-line bg-surface p-8"
+          className="lattiz-drag flex h-full w-full flex-col rounded-card border-2 border-line bg-surface p-8"
         >
           <StickyNote size={40} className="text-text-3" />
           <h3 className="mt-4 line-clamp-3 text-[44px] font-semibold leading-tight text-text-1">{titleOf(text)}</h3>
@@ -64,7 +64,7 @@ export const NoteNode = memo(function NoteNode({ id, data, selected }: NodeProps
         )}
         style={{ borderTop: "2px solid var(--text-3)" }}
       >
-        <header className="latis-drag flex h-8 shrink-0 cursor-grab items-center gap-1.5 px-2.5 text-[11.5px] text-text-3 active:cursor-grabbing">
+        <header className="lattiz-drag flex h-8 shrink-0 cursor-grab items-center gap-1.5 px-2.5 text-[11.5px] text-text-3 active:cursor-grabbing">
           <StickyNote size={12} /> <span className="flex-1">Note</span>
           <Menu
             trigger={
@@ -76,7 +76,7 @@ export const NoteNode = memo(function NoteNode({ id, data, selected }: NodeProps
             <MenuItem onSelect={() => setEditing(true)}>
               <Pencil size={13} /> Edit
             </MenuItem>
-            <MenuItem onSelect={() => void latis.invoke("note:export", { nodeId: id })}>
+            <MenuItem onSelect={() => void lattiz.invoke("note:export", { nodeId: id })}>
               <Download size={13} /> Export as .md…
             </MenuItem>
             <MenuSeparator />

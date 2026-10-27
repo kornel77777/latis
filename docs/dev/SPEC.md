@@ -1,6 +1,6 @@
-# Latis — Product & Technical Specification
+# Lattiz — Product & Technical Specification
 
-> **Name:** Latis
+> **Name:** Lattiz
 > **Version:** 0.1 (draft for implementation) · October 2026
 > **One-liner:** Mission control for your coding agents. Run Claude Code, Codex, Gemini and any other agent side by side on one calm, beautiful canvas, then review and land their work safely.
 
@@ -23,9 +23,9 @@
 
 ## 1. Product summary
 
-Latis is a **local-first desktop app** (Windows, macOS, Linux) where a developer runs many AI coding agents at once on a single infinite canvas. Each agent works in a project folder (optionally in its own git worktree). The user sees every agent's state at a glance, steers them, reviews their diffs in one place, and can orchestrate them, either by talking to a built-in conductor agent or by wiring agents into visual pipelines ("flows").
+Lattiz is a **local-first desktop app** (Windows, macOS, Linux) where a developer runs many AI coding agents at once on a single infinite canvas. Each agent works in a project folder (optionally in its own git worktree). The user sees every agent's state at a glance, steers them, reviews their diffs in one place, and can orchestrate them, either by talking to a built-in conductor agent or by wiring agents into visual pipelines ("flows").
 
-Latis is **not** an AI model and never resells tokens. It drives the agent CLIs/SDKs the user already has, with the user's own accounts. Prompts go from the user's machine straight to the provider.
+Lattiz is **not** an AI model and never resells tokens. It drives the agent CLIs/SDKs the user already has, with the user's own accounts. Prompts go from the user's machine straight to the provider.
 
 ### 1.1 Principles
 
@@ -57,11 +57,11 @@ Latis is **not** an AI model and never resells tokens. It drives the agent CLIs/
 
 ---
 
-## 2. Competitive position: where Latis is better
+## 2. Competitive position: where Lattiz is better
 
-Existing tools in this space (e.g. Morphy, Conductor, Parallel Code, CodeGrid and the agents' own desktop apps) prove the canvas/side-by-side idea. Latis's differentiators:
+Existing tools in this space (e.g. Morphy, Conductor, Parallel Code, CodeGrid and the agents' own desktop apps) prove the canvas/side-by-side idea. Lattiz's differentiators:
 
-| Gap in existing tools | Latis's answer | Spec |
+| Gap in existing tools | Lattiz's answer | Spec |
 |---|---|---|
 | Reviewing agent output means opening each chat | **Review Inbox**: every turn's diff across all agents in one queue; accept/revert per file or per hunk | §9.5 |
 | Isolation is opt-in, so agents clobber each other | **Worktree-by-default** when ≥2 chats share a repo, plus pre-merge conflict detection | §9.3 |
@@ -125,7 +125,7 @@ Existing tools in this space (e.g. Morphy, Conductor, Parallel Code, CodeGrid an
 │  Zustand stores ← event stream (batched per animation frame)                          │
 └───────────────────────────────▲───────────────────────────┬───────────────────────────┘
                                 │ typed IPC (zod-validated) │
-┌───────────────────────────────┴── Preload: window.latis ─▼───────────────────────────┐
+┌───────────────────────────────┴── Preload: window.lattiz ─▼───────────────────────────┐
 └───────────────────────────────▲───────────────────────────┬───────────────────────────┘
 ┌──────────────────────────────── Main process (AppCore) ───────────────────────────────┐
 │ AgentRuntime ── AdapterRegistry ── SessionSupervisor ──► agent child processes        │
@@ -139,7 +139,7 @@ Existing tools in this space (e.g. Morphy, Conductor, Parallel Code, CodeGrid an
 ### 5.1 Process rules
 
 - **Renderer:** `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`, strict CSP. UI only.
-- **Preload:** exposes one typed object `window.latis` generated from the IPC contract. Nothing else.
+- **Preload:** exposes one typed object `window.lattiz` generated from the IPC contract. Nothing else.
 - **Main:** owns all side effects. Agents run as child processes supervised by `SessionSupervisor`. **An adapter or agent crash must never crash the app**: the chat moves to `error` state with a "Restart" action.
 - Heavy CPU work (diff computation on huge files, Shiki highlighting) runs in worker threads / web workers.
 
@@ -270,7 +270,7 @@ Settings → Agents shows built-in and manifest agents with Detected / Not insta
 
 ### 6.5 Compliance & credentials (must-follow)
 
-- **Never read, copy or proxy another tool's credential files.** Let each agent's own CLI/SDK handle its sign-in; Latis only launches its login flow in a PTY and checks status via the tool itself.
+- **Never read, copy or proxy another tool's credential files.** Let each agent's own CLI/SDK handle its sign-in; Lattiz only launches its login flow in a PTY and checks status via the tool itself.
 - **Always support API-key mode** for every provider that offers one.
 - **Before any public distribution,** review each provider's current terms for third-party clients. In particular, check Anthropic's current policy on third-party products offering consumer Claude subscription login (including products built on the Claude Agent SDK) and OpenAI's equivalent for Codex. Record findings in `DECISIONS.md`. If a subscription path isn't permitted for distributed apps, ship with: (a) driving the user's own locally installed CLI under its own auth, where permitted, and (b) API-key mode.
 
@@ -283,8 +283,8 @@ A scripted adapter that replays event sequences from fixture files (`fixtures/fa
 ## 7. Data model
 
 All state lives in the **data directory**:
-- Windows `%APPDATA%\Latis`, macOS `~/Library/Application Support/Latis`, Linux `$XDG_CONFIG_HOME/latis` (default `~/.config/latis`).
-- Contents: `latis.db` (SQLite), `cards/` (one folder per card), `agents/` (manifests), `skills/`, `backgrounds/`, `logs/`, `worktrees/` (default worktree location; configurable to live next to the repo instead).
+- Windows `%APPDATA%\Lattiz`, macOS `~/Library/Application Support/Lattiz`, Linux `$XDG_CONFIG_HOME/lattiz` (default `~/.config/lattiz`).
+- Contents: `lattiz.db` (SQLite), `cards/` (one folder per card), `agents/` (manifests), `skills/`, `backgrounds/`, `logs/`, `worktrees/` (default worktree location; configurable to live next to the repo instead).
 
 ### 7.1 Tables (sketch; refine in drizzle schema)
 
@@ -358,7 +358,7 @@ Mood: **"Observatory at night."** Deep graphite surfaces, crisp type, a single l
 ### 8.2 App layout
 
 ```
-┌─[● ● ●]  Latis   [Canvas ▾][Website ×][Focus: Launch ×][+]        [⌘K Search]  [⚙]─┐
+┌─[● ● ●]  Lattiz   [Canvas ▾][Website ×][Focus: Launch ×][+]        [⌘K Search]  [⚙]─┐
 ├──────────────┬─────────────────────────────────────────────────────────┬─────────────┤
 │ Projects│Files│                                                         │  DOCK       │
 │ │Inbox (3)   │                 INFINITE CANVAS                         │ [Term][Web] │
@@ -487,7 +487,7 @@ Each feature lists acceptance criteria (AC). A feature is done when all AC pass 
 - AC5 Open as terminal: toggles the card body to the agent's native TUI on the same cwd and conversation (if `resume` supported); toggle back.
 
 ### 9.3 Parallel isolation (worktrees)
-- AC1 When a second chat targets a git repo that already has an active chat, Latis offers (default on) "Work in its own copy" → creates `git worktree` on branch `latis/<chat-slug>` from current HEAD.
+- AC1 When a second chat targets a git repo that already has an active chat, Lattiz offers (default on) "Work in its own copy" → creates `git worktree` on branch `lattiz/<chat-slug>` from current HEAD.
 - AC2 Branch/worktree chip visible on the chat header.
 - AC3 "Review changes…" opens the diff of the worktree branch vs. its base.
 - AC4 **Merge** brings changes into the base branch (merge or squash, user's choice). Before merging, run a dry-run merge; if conflicts exist, show the conflicting files and offer: open in editor, ask the agent to rebase/resolve, or cancel.
@@ -495,7 +495,7 @@ Each feature lists acceptance criteria (AC). A feature is done when all AC pass 
 - AC6 Non-git folders: isolation unavailable, with a one-click "Initialise git here" option.
 
 ### 9.4 Checkpoints, undo & timeline
-- AC1 Before each turn that may edit files, create a lightweight checkpoint (e.g. a stash-like commit object on a hidden ref `refs/latis/checkpoints/<chat>/<turn>`), without touching the user's index or branch.
+- AC1 Before each turn that may edit files, create a lightweight checkpoint (e.g. a stash-like commit object on a hidden ref `refs/lattiz/checkpoints/<chat>/<turn>`), without touching the user's index or branch.
 - AC2 ↶ **Undo turn** restores every file the turn changed; ↷ redoes. The agent is told in the next message that files were reverted.
 - AC3 Timeline view (chat `⋯` → Timeline) lists turns with files changed and lets the user restore to any checkpoint.
 - AC4 Works in worktrees and in the main folder. Requires git; degrades with a clear message otherwise.
@@ -536,7 +536,7 @@ Each feature lists acceptance criteria (AC). A feature is done when all AC pass 
 
 ### 9.11 Handoff ("Continue with…")
 - AC1 From the model picker or the rate-limit banner, choose another agent.
-- AC2 Latis builds a handoff brief: original goal, a summary of what was done (generated by the outgoing agent if available, else by a short summarisation call on the incoming agent), current `git diff --stat` + list of changed files, and open TODOs. The user can edit the brief before sending.
+- AC2 Lattiz builds a handoff brief: original goal, a summary of what was done (generated by the outgoing agent if available, else by a short summarisation call on the incoming agent), current `git diff --stat` + list of changed files, and open TODOs. The user can edit the brief before sending.
 - AC3 New chat opens beside the old one, same cwd/worktree, linked visually ("continued from").
 
 ### 9.12 Usage meter
@@ -548,7 +548,7 @@ Each feature lists acceptance criteria (AC). A feature is done when all AC pass 
 - Markdown notes on the canvas with live preview (headings, lists, tasks, code, tables, links). Can be flow outputs (§11). Stored in the DB (exportable as `.md`).
 
 ### 9.14 Skills (prompt snippets)
-- Reusable instructions stored as markdown (`skills/*.md`), attached via `/skill-name` in the composer; also importable `SKILL.md` folders. Project-level skills live in `<project>/.latis/skills/`.
+- Reusable instructions stored as markdown (`skills/*.md`), attached via `/skill-name` in the composer; also importable `SKILL.md` folders. Project-level skills live in `<project>/.lattiz/skills/`.
 
 ### 9.15 MCP connections
 - AC1 Add MCP servers (stdio command or HTTP URL, with headers/keys; OAuth sign-in where the server supports it).
@@ -565,9 +565,9 @@ Each feature lists acceptance criteria (AC). A feature is done when all AC pass 
 
 ### 10.1 Workspace MCP server
 
-Latis runs an MCP server that exposes the workspace itself as tools. It's offered over:
+Lattiz runs an MCP server that exposes the workspace itself as tools. It's offered over:
 - **Streamable HTTP** bound to `127.0.0.1` on a random port with a per-launch bearer token, and
-- a tiny **stdio shim binary** `latis-mcp` (bundled) that forwards to the running app, for agents that only support stdio.
+- a tiny **stdio shim binary** `lattiz-mcp` (bundled) that forwards to the running app, for agents that only support stdio.
 
 **Tools:**
 
@@ -590,7 +590,7 @@ Latis runs an MCP server that exposes the workspace itself as tools. It's offere
 ### 10.2 Conductor
 
 - A pinned, undeletable chat (default position top-left of the main canvas) running on a user-chosen agent (default: first ready of Claude Code → Codex → Gemini).
-- Uses the Workspace MCP server plus a built-in system prompt (`resources/conductor/SYSTEM.md`) that explains Latis concepts and tool usage, and a user-editable `AGENTS.md` for personal preferences.
+- Uses the Workspace MCP server plus a built-in system prompt (`resources/conductor/SYSTEM.md`) that explains Lattiz concepts and tool usage, and a user-editable `AGENTS.md` for personal preferences.
 - **Any** regular chat can be given the Workspace MCP tools via its `⋯` menu ("Give workspace tools"), so a Claude Code chat can itself orchestrate Codex chats.
 - Must handle requests like:
   - "Spawn two Claude and two Codex chats in ~/code/shop and have each find the slowest page; then compare."
@@ -670,7 +670,7 @@ A card is a small HTML app on the canvas, written by an agent on request ("make 
 - Optional per-card network allowlist (exact origins), granted only by the user via a prompt that names the domains.
 - A card can never read the user's files, keys, other cards' data or chats.
 
-### 12.2 Card bridge API (via `postMessage`, wrapped as `window.latis` inside the card)
+### 12.2 Card bridge API (via `postMessage`, wrapped as `window.lattiz` inside the card)
 - `data.get(key)`, `data.set(key, value)`, `data.list()`: persisted in `card_data`.
 - `refresh()`: runs the card's optional **refresh script** (written by the agent, stored in the card folder, shown to and approved by the user on first run) in a separate Node child process with cwd = card folder, no inherited env secrets, timeout 60 s; its JSON stdout is written into card data.
 - `ask(prompt)`: pre-fills the conductor's composer (user must press send).
@@ -681,7 +681,7 @@ A card is a small HTML app on the canvas, written by an agent on request ("make 
 ### 12.3 Storage & lifecycle
 - `cards/<id>/index.html` (+ optional `refresh.mjs`, assets).
 - Cards on non-visible canvases are unloaded after 30 s and restored on return.
-- Starter library (bundled, offline): Habit tracker, Countdown, Kanban, Repo dashboard (uses refresh script + `gh` CLI), Usage dashboard (reads Latis's own usage data through the bridge), Pomodoro.
+- Starter library (bundled, offline): Habit tracker, Countdown, Kanban, Repo dashboard (uses refresh script + `gh` CLI), Usage dashboard (reads Lattiz's own usage data through the bridge), Pomodoro.
 
 ---
 
@@ -718,13 +718,13 @@ Techniques: rAF-batched store updates, node virtualisation (§8.3), transcript v
 ## 15. Repository structure
 
 ```
-latis/
+lattiz/
 ├─ apps/desktop/
 │  ├─ src/main/            # AppCore services (§5)
 │  │  ├─ agents/           # registry, supervisor, adapters/{claude-code,codex,acp,terminal,fake}
 │  │  ├─ git/  pty/  store/  mcp/  flows/  cards/  scheduler/  usage/  attention/
 │  │  └─ index.ts
-│  ├─ src/preload/index.ts # window.latis from ipc-contract
+│  ├─ src/preload/index.ts # window.lattiz from ipc-contract
 │  └─ src/renderer/
 │     ├─ app/              # layout, routing between canvas/focus
 │     ├─ canvas/           # React Flow setup, node types, semantic zoom
@@ -734,7 +734,7 @@ latis/
 ├─ packages/
 │  ├─ shared/              # ipc-contract.ts, AgentEvent schema, types
 │  ├─ ui/                  # tokens.css, primitives (Button, Chip, Menu, Dialog…)
-│  └─ latis-mcp-shim/     # stdio → app forwarder
+│  └─ lattiz-mcp-shim/     # stdio → app forwarder
 ├─ resources/conductor/SYSTEM.md
 ├─ fixtures/               # recorded adapter streams, fake scripts, temp-repo seeds
 ├─ docs/                   # adapters/*.md, privacy.md, architecture.md
@@ -806,7 +806,7 @@ Each milestone ends with: all tests green, `PROGRESS.md` updated, app packaged l
 
 ## 18. Open questions (decide and log in DECISIONS.md)
 
-1. **Identity:** Latis logo and app icon design; check domain and trademark availability.
+1. **Identity:** Lattiz logo and app icon design; check domain and trademark availability.
 2. **License:** MIT/Apache-2.0 (encourages community adapters and manifests) vs. source-available.
 3. **Business model:** free + Pro (unlimited parallel agents, flows, remote) vs. fully free/open.
 4. **Primary QA platform** for early releases (Windows-first vs. macOS-first).

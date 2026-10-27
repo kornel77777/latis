@@ -1,16 +1,16 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // M6 exit criterion against real agents: scenario S6 (SPEC §3), a scheduled daily flow.
 // Opt-in, spends real usage:
-//   LATIS_LIVE=1 pnpm e2e -- e2e/live-m6.spec.ts
-test.skip(!process.env.LATIS_LIVE, "set LATIS_LIVE=1 to run against real agents");
+//   LATTIZ_LIVE=1 pnpm e2e -- e2e/live-m6.spec.ts
+test.skip(!process.env.LATTIZ_LIVE, "set LATTIZ_LIVE=1 to run against real agents");
 test.setTimeout(900_000);
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 
 test("live S6: a daily 08:00 flow; one agent checks dependency updates, another summarises, the result waits for approval in a note", async () => {
   const dataDir = tempDataDir();
@@ -21,13 +21,13 @@ test("live S6: a daily 08:00 flow; one agent checks dependency updates, another 
     JSON.stringify({ name: "shop", version: "1.0.0", dependencies: { express: "4.17.1", lodash: "4.17.15", zod: "3.22.0" } }, null, 2),
   );
   const { app, page } = await launch(dataDir);
-  const agents = await page.evaluate(() => (globalThis as unknown as Api).latis.invoke("agents:list", {}));
+  const agents = await page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("agents:list", {}));
   const ready = agents.filter((a) => a.installed && a.signedIn && a.kind === "structured" && a.id !== "fake").map((a) => a.id);
   test.skip(!ready.includes("claude-code") || !ready.includes("codex"), "needs Claude Code and Codex signed in");
 
   const r = await page.evaluate(
     async (cwd) =>
-      (globalThis as unknown as Api).latis.invoke("flow:create", {
+      (globalThis as unknown as Api).lattiz.invoke("flow:create", {
         canvasId: "main",
         x: 0,
         y: 0,
@@ -66,13 +66,13 @@ test("live S6: a daily 08:00 flow; one agent checks dependency updates, another 
   );
   expect(new Date(r.flow.nextRunAt!).getHours()).toBe(8);
   // Run the morning now instead of waiting for 08:00 (the schedule itself is covered by the native tests).
-  await page.evaluate(async (id) => (globalThis as unknown as Api).latis.invoke("flow:start", { flowId: id }), r.flow.id);
-  const flowInfo = async () => (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"))).flows[0]!;
+  await page.evaluate(async (id) => (globalThis as unknown as Api).lattiz.invoke("flow:start", { flowId: id }), r.flow.id);
+  const flowInfo = async () => (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"))).flows[0]!;
   await expect.poll(async () => (await flowInfo()).run!.approvals.length, { timeout: 800_000, intervals: [3000] }).toBe(1);
   const pending = (await flowInfo()).run!.approvals[0]!;
   console.log("digest awaiting approval:\n" + pending.text);
   await page.evaluate(
-    async (a) => (globalThis as unknown as Api).latis.invoke("flow:approve", { flowId: a.flowId, approvalId: a.id, action: "keep" }),
+    async (a) => (globalThis as unknown as Api).lattiz.invoke("flow:approve", { flowId: a.flowId, approvalId: a.id, action: "keep" }),
     { flowId: r.flow.id, id: pending.id },
   );
   const done = await flowInfo();
@@ -84,7 +84,7 @@ test("live S6: a daily 08:00 flow; one agent checks dependency updates, another 
     ),
   );
   expect(done.run!.status).toBe("done");
-  const note = (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"))).nodes.find(
+  const note = (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"))).nodes.find(
     (n) => n.type === "note",
   )!;
   expect(String(note.data.text)).toContain("### From Writer");
@@ -108,7 +108,7 @@ test("live S5 (handoff part): Claude Code starts a task in its own copy, Codex c
   await stubFolderPicker(app, repo);
   await page.getByTestId("empty-open-folder").click();
   const claude = await page.evaluate(async () => {
-    const l = (globalThis as unknown as Api).latis;
+    const l = (globalThis as unknown as Api).lattiz;
     const c = await l.invoke("canvas:load");
     const { chat } = await l.invoke("chat:create", {
       canvasId: c.id,
@@ -127,15 +127,18 @@ test("live S5 (handoff part): Claude Code starts a task in its own copy, Codex c
     return chat.id;
   });
   const status = async (id: string) =>
-    (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"))).chats.find((c) => c.id === id)!;
+    (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"))).chats.find((c) => c.id === id)!;
   await expect.poll(async () => (await status(claude)).status, { timeout: 300_000, intervals: [2000] }).toMatch(/done|error/);
-  const { brief } = await page.evaluate(async (id) => (globalThis as unknown as Api).latis.invoke("handoff:brief", { chatId: id }), claude);
+  const { brief } = await page.evaluate(
+    async (id) => (globalThis as unknown as Api).lattiz.invoke("handoff:brief", { chatId: id }),
+    claude,
+  );
   console.log(brief);
   expect(brief).toContain("src/cart.ts");
   expect(brief).toContain("- [ ] Apply discount codes");
   const started = await page.evaluate(
     async (o) =>
-      (globalThis as unknown as Api).latis.invoke("handoff:start", {
+      (globalThis as unknown as Api).lattiz.invoke("handoff:start", {
         chatId: o.id,
         agentId: "codex",
         brief: o.brief + "\n\nDo only the discount codes item: add applyDiscount(total, code) where SAVE10 takes 10% off.",
@@ -149,7 +152,7 @@ test("live S5 (handoff part): Claude Code starts a task in its own copy, Codex c
     if (st === "done" || st === "error" || Date.now() > deadline) break;
     if (st === "needs-you")
       await page.evaluate(async (id) => {
-        const l = (globalThis as unknown as Api).latis;
+        const l = (globalThis as unknown as Api).lattiz;
         for (const item of await l.invoke("attention:list"))
           if (item.chatId === id && item.refId)
             await l.invoke("chat:respond", { chatId: id, requestId: item.refId, response: { kind: "permission", decision: "allow-once" } });

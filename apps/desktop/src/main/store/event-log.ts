@@ -1,4 +1,4 @@
-import type { AgentEvent, StoredEvent } from "@latis/shared";
+import type { AgentEvent, StoredEvent } from "@lattiz/shared";
 import type { WorkspaceStore } from "./workspace";
 
 /**

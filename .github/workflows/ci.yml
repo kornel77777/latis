@@ -57,12 +57,12 @@ jobs:
           node-version: 24
       - run: corepack enable && corepack prepare pnpm@10.34.7 --activate
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @latis/desktop package
+      - run: pnpm --filter @lattiz/desktop package
       # ~700 MB per run across the three OSes: every push checks that packaging works, but only a manual run keeps
       # the result, so the storage quota stays free for e2e traces.
       - if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
-          name: latis-${{ matrix.os }}
+          name: lattiz-${{ matrix.os }}
           path: apps/desktop/release/
           retention-days: 2

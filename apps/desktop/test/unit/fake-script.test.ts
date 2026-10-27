@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import type { AgentEvent } from "@latis/shared";
+import type { AgentEvent } from "@lattiz/shared";
 import { parseScript, playScript, type ScriptContext } from "../../src/main/agents/adapters/fake/script";
 
 const fixture = (name: string) => readFileSync(new URL(`../../../../fixtures/fake/${name}.jsonl`, import.meta.url), "utf8");
@@ -45,12 +45,12 @@ describe("FakeAdapter scripts", () => {
     const text = events.flatMap((e) => (e.type === "message.delta" ? [e.text] : [])).join("");
     expect(text).toContain('To do "ship it"');
     expect(events.find((e) => e.type === "file.changed")).toMatchObject({
-      path: "notes/latis-demo.md",
+      path: "notes/lattiz-demo.md",
       change: "created",
       additions: 3,
       hunks: [{ lines: ["+# Demo", "+", "+Requested: ship it"] }],
     });
-    expect(files["notes/latis-demo.md"]).toContain("Requested: ship it");
+    expect(files["notes/lattiz-demo.md"]).toContain("Requested: ship it");
     expect(events.at(-1)).toMatchObject({ type: "turn.completed", status: "ok" });
   });
 

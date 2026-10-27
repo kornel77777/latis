@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCheck, Columns2, GitMerge, Rows3, X } from "lucide-react";
-import type { FileDiff, ReviewItem } from "@latis/shared";
-import { Button, cn } from "@latis/ui";
-import { latis } from "../api";
+import type { FileDiff, ReviewItem } from "@lattiz/shared";
+import { Button, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 import { FileDiffView } from "./DiffViewer";
 
@@ -67,8 +67,8 @@ export function ReviewPanel() {
     if (!panel.open || !target) return;
     let live = true;
     const load = panel.branchOf
-      ? latis.invoke("reviews:branchDiff", { chatId: panel.branchOf })
-      : latis.invoke("reviews:diff", { reviewId: target });
+      ? lattiz.invoke("reviews:branchDiff", { chatId: panel.branchOf })
+      : lattiz.invoke("reviews:diff", { reviewId: target });
     load
       .then((f) => {
         if (!live) return;
@@ -97,10 +97,10 @@ export function ReviewPanel() {
         if (n) openReview({ reviewId: n.id });
       },
       acceptAll: () => {
-        if (current) void act(() => latis.invoke("reviews:accept", { reviewId: current.id }));
+        if (current) void act(() => lattiz.invoke("reviews:accept", { reviewId: current.id }));
       },
       mark: () => {
-        if (current) void act(() => latis.invoke("reviews:markReviewed", { reviewId: current.id, reviewed: current.reviewedAt === null }));
+        if (current) void act(() => lattiz.invoke("reviews:markReviewed", { reviewId: current.id, reviewed: current.reviewedAt === null }));
       },
     };
   });
@@ -120,7 +120,7 @@ export function ReviewPanel() {
     >
       <header
         className="drag-region flex h-11 shrink-0 items-center gap-3 border-b border-line px-4"
-        style={{ paddingLeft: window.latis.platform === "darwin" ? 84 : 16 }}
+        style={{ paddingLeft: window.lattiz.platform === "darwin" ? 84 : 16 }}
       >
         <h2 className="text-[14px] font-semibold text-text-1">{branchChat ? `Changes on ${branchChat.worktree?.branch}` : "Review"}</h2>
         {!branchChat && <span className="text-[12px] text-text-3">{openCount} to review · ↑↓ items, A accept all, M mark reviewed</span>}
@@ -231,7 +231,7 @@ export function ReviewPanel() {
                   <Button
                     size="sm"
                     variant="secondary"
-                    onClick={() => void act(() => latis.invoke("reviews:accept", { reviewId: current.id }))}
+                    onClick={() => void act(() => lattiz.invoke("reviews:accept", { reviewId: current.id }))}
                     data-testid="accept-all"
                   >
                     <CheckCheck size={12} /> Accept all
@@ -240,7 +240,7 @@ export function ReviewPanel() {
                     size="sm"
                     variant="ghost"
                     onClick={() =>
-                      void act(() => latis.invoke("reviews:markReviewed", { reviewId: current.id, reviewed: current.reviewedAt === null }))
+                      void act(() => lattiz.invoke("reviews:markReviewed", { reviewId: current.id, reviewed: current.reviewedAt === null }))
                     }
                     data-testid="mark-reviewed"
                   >
@@ -292,14 +292,14 @@ export function ReviewPanel() {
                       ? {
                           accept: (hunk) =>
                             act(() =>
-                              latis.invoke("reviews:accept", { reviewId: current.id, path: f.path, ...(hunk !== undefined && { hunk }) }),
+                              lattiz.invoke("reviews:accept", { reviewId: current.id, path: f.path, ...(hunk !== undefined && { hunk }) }),
                             ),
                           revert: (hunk) =>
                             act(() =>
-                              latis.invoke("reviews:revert", { reviewId: current.id, path: f.path, ...(hunk !== undefined && { hunk }) }),
+                              lattiz.invoke("reviews:revert", { reviewId: current.id, path: f.path, ...(hunk !== undefined && { hunk }) }),
                             ),
                           ask: async (feedback, hunk) => {
-                            await latis.invoke("reviews:askChanges", {
+                            await lattiz.invoke("reviews:askChanges", {
                               reviewId: current.id,
                               path: f.path,
                               feedback,

@@ -13,7 +13,7 @@ const flag = (f) => rest.includes(f);
 const arg = (f) => (rest.includes(f) ? rest[rest.indexOf(f) + 1] : undefined);
 if (!name || !prompt || !arg("--agent")) throw new Error('usage: record-acp-stream.mjs <name> <prompt> --agent "cmd args" [flags]');
 const [command, ...args] = arg("--agent").split(" ");
-const cwd = mkdtempSync(join(process.env.LATIS_TEST_TMP ?? tmpdir(), "latis-rec-"));
+const cwd = mkdtempSync(join(process.env.LATTIZ_TEST_TMP ?? tmpdir(), "lattiz-rec-"));
 writeFileSync(join(cwd, "README.md"), "# Recording sandbox\n");
 
 const lines = [];
@@ -64,14 +64,14 @@ function answer(m) {
     // In preference order, like the adapter (allow_always can fail, e.g. Gemini in an untrusted folder).
     const option = want.map((k) => m.params.options.find((o) => o.kind === k)).find(Boolean) ?? m.params.options[0];
     send({ id: m.id, result: { outcome: { outcome: "selected", optionId: option.optionId } } });
-  } else send({ id: m.id, error: { code: -32601, message: `Latis recorder doesn't implement ${m.method}` } });
+  } else send({ id: m.id, error: { code: -32601, message: `Lattiz recorder doesn't implement ${m.method}` } });
 }
 
 const init = () =>
   request("initialize", {
     protocolVersion: 1,
     clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
-    clientInfo: { name: "latis", title: "Latis", version: "0.0.0" },
+    clientInfo: { name: "lattiz", title: "Lattiz", version: "0.0.0" },
   });
 
 async function turn(sessionId, text) {

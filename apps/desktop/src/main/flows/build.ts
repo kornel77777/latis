@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { CanvasNode, ChatSummary, FlowEdge, FlowInfo, FlowSpec, PermissionMode } from "@latis/shared";
+import type { CanvasNode, ChatSummary, FlowEdge, FlowInfo, FlowSpec, PermissionMode } from "@lattiz/shared";
 import { CHAT_SIZE, NOTE_SIZE, type WorkspaceStore } from "../store/workspace";
 import { nextRun } from "./engine";
 

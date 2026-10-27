@@ -52,7 +52,7 @@
         if (!rows?.length) el.innerHTML = "<li class='muted'>None</li>";
       }
       async function show() {
-        const d = await latis.data.list();
+        const d = await lattiz.data.list();
         $("repo").value = d.repo ?? "";
         list($("prs"), d.prs);
         list($("issues"), d.issues);
@@ -65,10 +65,10 @@
       }
       $("f").onsubmit = async (e) => {
         e.preventDefault();
-        await latis.data.set("repo", $("repo").value.trim());
+        await lattiz.data.set("repo", $("repo").value.trim());
         $("status").textContent = "Refreshing…";
         try {
-          await latis.refresh();
+          await lattiz.refresh();
         } catch (err) {
           $("status").textContent = err.message;
           $("status").className = "err";
@@ -76,7 +76,7 @@
         }
         show();
       };
-      latis.data.onChange(show);
+      lattiz.data.onChange(show);
       show();
     </script>
   </body>

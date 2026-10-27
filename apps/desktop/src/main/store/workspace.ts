@@ -26,7 +26,7 @@ import {
   type StoredEvent,
   type Transcript,
   type Turn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { Db } from "./db";
 import {
   attention,

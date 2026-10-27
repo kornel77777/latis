@@ -53,7 +53,7 @@
     <script>
       const COLS = ["To do", "Doing", "Done"];
       let items = [];
-      const save = () => latis.data.set("items", items);
+      const save = () => lattiz.data.set("items", items);
       function render() {
         const root = document.getElementById("cols");
         root.innerHTML = "";
@@ -102,7 +102,7 @@
         save();
         render();
       };
-      latis.data.get("items").then((v) => {
+      lattiz.data.get("items").then((v) => {
         items = v ?? [];
         render();
       });

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { AgentEvent, type AgentSession, type PermissionMode } from "@latis/shared";
+import { AgentEvent, type AgentSession, type PermissionMode } from "@lattiz/shared";
 import { AcpAdapter } from "../../src/main/agents/adapters/acp";
 import { AcpMapper, diffHunks, type SessionUpdate } from "../../src/main/agents/adapters/acp/mapper";
 import { BUILT_IN_MANIFESTS, loadManifests, type AgentManifest } from "../../src/main/agents/manifests";
@@ -107,7 +107,7 @@ describe("AcpMapper", () => {
 
 describe("manifests", () => {
   it("loads valid user manifests, reports bad ones, and keeps built-in ids reserved", () => {
-    const dir = mkdtempSync(join(tmpdir(), "latis-manifests-"));
+    const dir = mkdtempSync(join(tmpdir(), "lattiz-manifests-"));
     mkdirSync(dir, { recursive: true });
     writeFileSync(
       join(dir, "mine.json"),
@@ -135,7 +135,7 @@ function adapter() {
   return new AcpAdapter(MANIFEST, {
     transport: (cwd) => replayTransport(lib, cwd),
     executable: "/replay/acp",
-    probeDir: mkdtempSync(join(tmpdir(), "latis-probe-")),
+    probeDir: mkdtempSync(join(tmpdir(), "lattiz-probe-")),
   });
 }
 
@@ -167,7 +167,7 @@ describe("AcpAdapter (replayed Gemini CLI)", () => {
     return new AcpAdapter(BUILT_IN_MANIFESTS[0]!, {
       transport: (cwd) => replayTransport(lib, cwd),
       executable: "/replay/gemini",
-      probeDir: mkdtempSync(join(tmpdir(), "latis-probe-")),
+      probeDir: mkdtempSync(join(tmpdir(), "lattiz-probe-")),
     });
   };
 

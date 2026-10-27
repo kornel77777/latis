@@ -1,10 +1,10 @@
-import type { AgentInfo } from "@latis/shared";
+import type { AgentInfo } from "@lattiz/shared";
 import { scrub } from "./logs";
 
 // "Report a problem" (docs/privacy.md): the user gets this text on their clipboard and a new-issue page;
-// they read it and decide what to paste. Latis sends nothing itself.
+// they read it and decide what to paste. Lattiz sends nothing itself.
 
-export const ISSUES_NEW = "https://github.com/kornel77777/latis/issues/new";
+export const ISSUES_NEW = "https://github.com/kornel77777/lattiz/issues/new";
 
 export interface DiagnosticsInput {
   version: string;
@@ -22,7 +22,7 @@ export function diagnostics(d: DiagnosticsInput): string {
     .map((a) => `- ${a.displayName}${a.version ? ` ${a.version}` : ""}: ${a.kind}${a.signedIn ? ", ready" : ", not ready"}`);
   return scrub(
     [
-      `Latis ${d.version} · ${d.platform} ${d.osRelease} (${d.arch}) · Electron ${d.electron}`,
+      `Lattiz ${d.version} · ${d.platform} ${d.osRelease} (${d.arch}) · Electron ${d.electron}`,
       "",
       "Agents:",
       ...(agents.length ? agents : ["- none installed"]),
@@ -44,9 +44,9 @@ export function issueUrl(version: string, platform: string): string {
     "",
     "**Steps to reproduce**",
     "",
-    `Latis ${version} on ${platform}`,
+    `Lattiz ${version} on ${platform}`,
     "",
-    "<!-- Latis copied diagnostics to your clipboard. Read them, then paste them below if you're happy to share them. -->",
+    "<!-- Lattiz copied diagnostics to your clipboard. Read them, then paste them below if you're happy to share them. -->",
     "",
   ].join("\n");
   return `${ISSUES_NEW}?${new URLSearchParams({ body }).toString()}`;

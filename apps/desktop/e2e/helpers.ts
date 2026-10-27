@@ -7,26 +7,26 @@ import { fileURLToPath } from "node:url";
 const appDir = fileURLToPath(new URL("..", import.meta.url));
 
 export function tempDataDir(): string {
-  return mkdtempSync(join(process.env.LATIS_TEST_TMP ?? tmpdir(), "latis-e2e-"));
+  return mkdtempSync(join(process.env.LATTIZ_TEST_TMP ?? tmpdir(), "lattiz-e2e-"));
 }
 
 export const fixturesRoot = fileURLToPath(new URL("../../../fixtures", import.meta.url));
 export const claudeFixtures = fileURLToPath(new URL("../../../fixtures/claude-code", import.meta.url));
 
 export async function launch(dataDir: string, extraEnv: Record<string, string> = {}): Promise<{ app: ElectronApplication; page: Page }> {
-  // LATIS_E2E_EXECUTABLE runs the suite against a packaged build instead of out/.
-  const executablePath = process.env.LATIS_E2E_EXECUTABLE;
+  // LATTIZ_E2E_EXECUTABLE runs the suite against a packaged build instead of out/.
+  const executablePath = process.env.LATTIZ_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(executablePath ? { executablePath, args: [] } : { args: [appDir] }),
     env: {
       ...process.env,
-      LATIS_DATA_DIR: dataDir,
+      LATTIZ_DATA_DIR: dataDir,
       NODE_ENV: "production",
-      LATIS_SKIP_ONBOARDING: "1",
+      LATTIZ_SKIP_ONBOARDING: "1",
       // Most specs predate the Conductor (M5); m5.spec.ts turns it on.
-      LATIS_SKIP_CONDUCTOR: "1",
-      // The app opens on the lattice; most specs drive the canvas. Pass LATIS_LAYOUT: "" for the real default.
-      LATIS_LAYOUT: "canvas",
+      LATTIZ_SKIP_CONDUCTOR: "1",
+      // The app opens on the lattice; most specs drive the canvas. Pass LATTIZ_LAYOUT: "" for the real default.
+      LATTIZ_LAYOUT: "canvas",
       ...extraEnv,
     },
   });

@@ -9,13 +9,13 @@ const notarize = macSigned && Boolean(process.env.APPLE_ID && process.env.APPLE_
 
 /** @type {import("electron-builder").Configuration} */
 module.exports = {
-  appId: "dev.latis.app",
-  productName: "Latis",
+  appId: "dev.lattiz.app",
+  productName: "Lattiz",
   directories: { output: "release", buildResources: "build" },
   files: [
     "out/**",
     "package.json",
-    // Latis drives the user's installed `claude`; the SDK's bundled CLI binaries (~260 MB each) don't ship.
+    // Lattiz drives the user's installed `claude`; the SDK's bundled CLI binaries (~260 MB each) don't ship.
     "!**/node_modules/@anthropic-ai/claude-agent-sdk-*/**",
   ],
   asarUnpack: [
@@ -24,17 +24,17 @@ module.exports = {
     "**/node_modules/node-pty/**",
   ],
   // The app reads this to know whether it may auto-update (main/updates.ts): unsigned builds don't.
-  // latisPersonal (LATIS_PERSONAL=1 pnpm package): a build for your own machine, where the chat-view Claude may
+  // lattizPersonal (LATTIZ_PERSONAL=1 pnpm package): a build for your own machine, where the chat-view Claude may
   // run on your Claude sign-in. Release builds never set it (DECISIONS 2026-10-26).
-  extraMetadata: { latisSigned: macSigned || winSigned, latisPersonal: process.env.LATIS_PERSONAL === "1" },
-  // §13: refuse a modified app. RunAsNode stays on: the latis-mcp shim, the demo agent and card
+  extraMetadata: { lattizSigned: macSigned || winSigned, lattizPersonal: process.env.LATTIZ_PERSONAL === "1" },
+  // §13: refuse a modified app. RunAsNode stays on: the lattiz-mcp shim, the demo agent and card
   // refresh scripts run as Electron-as-Node child processes.
   electronFuses: {
     runAsNode: true,
     enableCookieEncryption: true,
     enableNodeOptionsEnvironmentVariable: false,
-    // Playwright drives Electron through the inspector, so test builds (LATIS_TEST_PACKAGE=1) keep it.
-    enableNodeCliInspectArguments: process.env.LATIS_TEST_PACKAGE === "1",
+    // Playwright drives Electron through the inspector, so test builds (LATTIZ_TEST_PACKAGE=1) keep it.
+    enableNodeCliInspectArguments: process.env.LATTIZ_TEST_PACKAGE === "1",
     enableEmbeddedAsarIntegrityValidation: true,
     onlyLoadAppFromAsar: true,
   },
@@ -46,7 +46,7 @@ module.exports = {
     require("node:child_process").execFileSync("codesign", ["--force", "--deep", "--sign", "-", app], { stdio: "inherit" });
   },
 
-  publish: [{ provider: "github", owner: "kornel77777", repo: "latis", releaseType: "draft" }],
+  publish: [{ provider: "github", owner: "kornel77777", repo: "lattiz", releaseType: "draft" }],
   mac: {
     category: "public.app-category.developer-tools",
     target: ["dmg", "zip"],
@@ -61,8 +61,8 @@ module.exports = {
   },
   win: { target: ["nsis"] },
   nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
-  // The package is "@latis/desktop"; Linux needs a file-safe program name.
-  linux: { target: ["AppImage", "deb"], category: "Development", maintainer: "Kornel Omori", executableName: "latis" },
-  // Without these the .deb is named after the package ("@latis/desktop").
-  deb: { packageName: "latis", artifactName: "latis_${version}_${arch}.${ext}" },
+  // The package is "@lattiz/desktop"; Linux needs a file-safe program name.
+  linux: { target: ["AppImage", "deb"], category: "Development", maintainer: "Kornel Omori", executableName: "lattiz" },
+  // Without these the .deb is named after the package ("@lattiz/desktop").
+  deb: { packageName: "lattiz", artifactName: "lattiz_${version}_${arch}.${ext}" },
 };

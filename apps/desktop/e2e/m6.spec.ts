@@ -4,15 +4,15 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { fixturesRoot, launch, stubFolderPicker, tempDataDir } from "./helpers";
 
 // M6: send later, limit handling and handoff (S5), with the demo agent hitting its limit
 // and the replayed Codex taking over in the same worktree.
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 const run = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" });
-const env = { LATIS_REPLAY: fixturesRoot };
+const env = { LATTIZ_REPLAY: fixturesRoot };
 
 test("S5: a chat hits its limit, continues with Codex in the same worktree; send later survives a restart", async () => {
   const dataDir = tempDataDir();
@@ -26,7 +26,7 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   await stubFolderPicker(app, repo);
   await page.getByTestId("empty-open-folder").click();
   await page.evaluate(async () => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const canvas = await api.invoke("canvas:load");
     await api.invoke("chat:create", { canvasId: canvas.id, projectId: canvas.projects[0]!.id, agentId: "fake", x: 0, y: 0, isolate: true });
   });
@@ -60,13 +60,13 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   await expect(second.getByTestId("continued-from")).toContainText("Continued from");
   // The brief went out as the new chat's first message (the replayed Codex then asks to run a command).
   await expect(second).toHaveAttribute("data-status", /working|needs-you/, { timeout: 20_000 });
-  const state = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const state = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   const [a, b] = [state.chats.find((c) => c.agentId === "fake")!, state.chats.find((c) => c.agentId === "codex")!];
   expect(b.continuedFrom).toBe(a.id);
   expect(b.cwd).toBe(a.cwd);
   expect(b.worktree?.id).toBe(a.worktree?.id);
   expect(b.projectId).toBe(a.projectId);
-  const t = await page.evaluate(async (id) => (globalThis as unknown as Api).latis.invoke("chat:transcript", { chatId: id }), b.id);
+  const t = await page.evaluate(async (id) => (globalThis as unknown as Api).lattiz.invoke("chat:transcript", { chatId: id }), b.id);
   expect(t.turns[0]!.userText).toContain("Use two decimals for money.");
 
   // Send later from the composer: tomorrow 09:00, still there after a restart, then cancelled.
@@ -77,7 +77,7 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   await page.getByTestId("schedule-send").click();
   // "tomorrow 09:00", or "in N h" when that's under 12 hours away.
   await expect(second.getByTestId("scheduled")).toContainText(/tomorrow|in \d+ h/);
-  const due = (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("schedule:list"))).find(
+  const due = (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("schedule:list"))).find(
     (m) => !m.onReset,
   )!.fireAt;
   expect([new Date(due).getHours(), new Date(due).getMinutes(), new Date(due).getDate()]).toEqual([
@@ -90,7 +90,7 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   await app.close();
 
   const again = await launch(dataDir, env);
-  const list = await again.page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("schedule:list"));
+  const list = await again.page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("schedule:list"));
   expect(list.map((m) => [m.text, m.onReset, m.repeatMs])).toEqual([
     ["Run the tests again", false, 86_400_000],
     ["Continue where you left off.", true, null],
@@ -101,7 +101,7 @@ test("S5: a chat hits its limit, continues with Codex in the same worktree; send
   await again.app.close();
 });
 
-test("cards: a starter card runs isolated (no network, no Latis access), keeps its data, and refreshes only after approval", async () => {
+test("cards: a starter card runs isolated (no network, no Lattiz access), keeps its data, and refreshes only after approval", async () => {
   const dataDir = tempDataDir();
   const { app, page } = await launch(dataDir);
   await page.locator(".react-flow__pane").click({ button: "right", position: { x: 400, y: 300 } });
@@ -116,7 +116,7 @@ test("cards: a starter card runs isolated (no network, no Latis access), keeps i
   await frame.getByRole("button", { name: "Add" }).click();
   await expect(frame.getByText("Stretch")).toBeVisible();
 
-  // Isolation (§12.1): opaque origin, no network, nothing of Latis reachable.
+  // Isolation (§12.1): opaque origin, no network, nothing of Lattiz reachable.
   const f = page.frames().find((x) => x.url().startsWith("card://"))!;
   const probe = await f.evaluate(async () => {
     const tryIt = async (fn: () => unknown) => {
@@ -132,12 +132,12 @@ test("cards: a starter card runs isolated (no network, no Latis access), keeps i
       fetch: await tryIt(() => fetch("https://example.com")),
       storage: await tryIt(() => localStorage.getItem("x")),
       parentDom: await tryIt(() => (parent as unknown as { document: Document }).document.title),
-      latisApi: await tryIt(() => {
-        if (!(parent as unknown as { latis?: unknown }).latis) throw new Error("absent");
+      lattizApi: await tryIt(() => {
+        if (!(parent as unknown as { lattiz?: unknown }).lattiz) throw new Error("absent");
       }),
     };
   });
-  expect(probe).toEqual({ origin: "null", fetch: "blocked", storage: "blocked", parentDom: "blocked", latisApi: "blocked" });
+  expect(probe).toEqual({ origin: "null", fetch: "blocked", storage: "blocked", parentDom: "blocked", lattizApi: "blocked" });
 
   // Its data survives a restart.
   await app.close();
@@ -182,14 +182,14 @@ test("cards: a starter card runs isolated (no network, no Latis access), keeps i
 
 test("S6: the Daily digest flow runs on a schedule; watchers feed the writer; the digest waits for approval, then lands in the note", async () => {
   const dataDir = tempDataDir();
-  const { app, page } = await launch(dataDir, { LATIS_DEMO_IN_PROJECTS: "1", LATIS_FLOW_AGENT: "fake" });
+  const { app, page } = await launch(dataDir, { LATTIZ_DEMO_IN_PROJECTS: "1", LATTIZ_FLOW_AGENT: "fake" });
   await page.locator(".react-flow__pane").click({ button: "right", position: { x: 300, y: 200 } });
   await page.getByTestId("menu-new-flow").click();
   await page.getByTestId("flow-templates").getByText("Daily digest").click();
   const frame = page.getByTestId("flow-frame");
   await expect(frame).toContainText("Daily digest");
   await expect(page.getByTestId("flow-schedule")).toHaveText("Daily at 08:00");
-  const state = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const state = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   const flow = state.flows[0]!;
   expect(new Date(flow.nextRunAt!).getHours()).toBe(8);
   expect(state.edges.map((e) => e.mode).sort()).toEqual(["approval", "every", "every", "wait_all", "wait_all"]);
@@ -198,12 +198,12 @@ test("S6: the Daily digest flow runs on a schedule; watchers feed the writer; th
   // Run it now (the demo agent's /review script answers each message).
   await page.evaluate(
     async (id) =>
-      (globalThis as unknown as Api).latis.invoke("flow:start", { flowId: id, input: "Check dependency updates for shop /review" }),
+      (globalThis as unknown as Api).lattiz.invoke("flow:start", { flowId: id, input: "Check dependency updates for shop /review" }),
     flow.id,
   );
   await expect(page.getByTestId("flow-approvals")).toHaveText(/1 to approve/, { timeout: 30_000 });
   const t = await page.evaluate(async () => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const c = await api.invoke("canvas:load");
     return api.invoke("chat:transcript", { chatId: c.chats.find((x) => x.title === "Writer")!.id });
   });
@@ -217,7 +217,7 @@ test("S6: the Daily digest flow runs on a schedule; watchers feed the writer; th
   await approvals.getByLabel("Output to approve").fill("Digest: two packages have updates.");
   await approvals.getByTestId("approve-keep").click();
   await expect(page.getByTestId("flow-status")).toHaveText("Done", { timeout: 10_000 });
-  const after = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const after = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   const note = after.nodes.find((n) => n.type === "note")!;
   expect(String(note.data.text)).toMatch(/^# Digest\n\n### From Writer · .+\n\nDigest: two packages have updates\./);
   expect(after.flows[0]!.run!.log.map((l) => l.text)).toEqual(
@@ -230,7 +230,7 @@ test("S6: the Daily digest flow runs on a schedule; watchers feed the writer; th
   await page.getByTestId("schedule-form").getByLabel("Time").fill("00:15");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("flow-schedule")).toHaveText("Hourly at :15");
-  const sched = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const sched = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   expect(new Date(sched.flows[0]!.nextRunAt!).getMinutes()).toBe(15);
   await app.close();
 });

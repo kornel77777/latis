@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { claudeFixtures, launch, stubFolderPicker, tempDataDir } from "./helpers";
 
-const shots = process.env.LATIS_SCREENSHOTS;
-const env = { LATIS_CLAUDE_REPLAY: claudeFixtures };
+const shots = process.env.LATTIZ_SCREENSHOTS;
+const env = { LATTIZ_CLAUDE_REPLAY: claudeFixtures };
 
 async function sendMessage(page: Page, text: string) {
   const card = page.getByTestId("chat-card");

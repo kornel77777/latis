@@ -2,20 +2,20 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, stubFolderPicker, tempDataDir } from "./helpers";
 
-// Claude Code in its own terminal, on the user's sign-in, wired to Latis through HTTP hooks
+// Claude Code in its own terminal, on the user's sign-in, wired to Lattiz through HTTP hooks
 // (docs/adapters/claude-code.md → Terminal). A fake `claude` on the agent PATH speaks the same hook protocol.
 
-const shots = process.env.LATIS_SCREENSHOTS;
-const env = { LATIS_AGENT_PATH: fileURLToPath(new URL("../../../fixtures/terminal/fake-claude", import.meta.url)) };
-type Api = { latis: LatisApi };
+const shots = process.env.LATTIZ_SCREENSHOTS;
+const env = { LATTIZ_AGENT_PATH: fileURLToPath(new URL("../../../fixtures/terminal/fake-claude", import.meta.url)) };
+type Api = { lattiz: LattizApi };
 
 const ptySnapshot = (page: Page, id: string | null) =>
-  page.evaluate((ptyId) => (globalThis as unknown as Api).latis.invoke("pty:snapshot", { id: ptyId! }).then((r) => r.data), id);
+  page.evaluate((ptyId) => (globalThis as unknown as Api).lattiz.invoke("pty:snapshot", { id: ptyId! }).then((r) => r.data), id);
 const ptyWrite = (page: Page, id: string | null, data: string) =>
-  page.evaluate(([ptyId, d]) => (globalThis as unknown as Api).latis.invoke("pty:write", { id: ptyId!, data: d! }), [id, data] as const);
+  page.evaluate(([ptyId, d]) => (globalThis as unknown as Api).lattiz.invoke("pty:write", { id: ptyId!, data: d! }), [id, data] as const);
 
 test("Claude Code in a terminal: hooks drive status, the always-ask banner and the Inbox, and the conversation resumes", async () => {
   const dataDir = tempDataDir();
@@ -41,7 +41,7 @@ test("Claude Code in a terminal: hooks drive status, the always-ask banner and t
   await expect.poll(out, { timeout: 10_000 }).toContain("Ran: ls");
   await expect(card).toHaveAttribute("data-status", "done", { timeout: 10_000 });
 
-  // A listed one waits for Latis: a banner over the terminal, the chat needs you, the Inbox has it.
+  // A listed one waits for Lattiz: a banner over the terminal, the chat needs you, the Inbox has it.
   await ptyWrite(page, ptyId, "run git push origin main\r");
   const banner = card.getByTestId("terminal-requests");
   await expect(banner).toBeVisible({ timeout: 10_000 });
@@ -56,11 +56,11 @@ test("Claude Code in a terminal: hooks drive status, the always-ask banner and t
   await expect(banner).toHaveCount(0);
   await expect(card).toHaveAttribute("data-status", "done", { timeout: 10_000 });
 
-  // Denied in Latis: the agent is told why.
+  // Denied in Lattiz: the agent is told why.
   await ptyWrite(page, ptyId, "run rm -rf build\r");
   await expect(banner).toBeVisible({ timeout: 10_000 });
   await banner.getByTestId("deny").click();
-  await expect.poll(out, { timeout: 10_000 }).toContain("Blocked: The user denied this in Latis.");
+  await expect.poll(out, { timeout: 10_000 }).toContain("Blocked: The user denied this in Lattiz.");
 
   // Turns typed in the terminal are recorded, so the chat has a timeline.
   await card.getByRole("button", { name: "Chat menu" }).click();

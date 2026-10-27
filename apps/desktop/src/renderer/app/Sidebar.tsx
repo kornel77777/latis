@@ -19,10 +19,10 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { AttentionItem, ChatSummary } from "@latis/shared";
-import { latis } from "../api";
+import type { AttentionItem, ChatSummary } from "@lattiz/shared";
+import { lattiz } from "../api";
 import { runCommand } from "../commands/registry";
-import { Button, StatusDot, cn } from "@latis/ui";
+import { Button, StatusDot, cn } from "@lattiz/ui";
 import { useShallow } from "zustand/react/shallow";
 import { PROJECT_COLORS } from "../canvas/ProjectFrame";
 import { useCanvasActions } from "../canvas/useCanvasActions";
@@ -387,7 +387,7 @@ function FilesTab() {
   useEffect(() => {
     if (!projectId) return;
     let live = true;
-    void latis.invoke("project:files", { projectId }).then((list) => live && setFiles({ projectId, list }));
+    void lattiz.invoke("project:files", { projectId }).then((list) => live && setFiles({ projectId, list }));
     return () => {
       live = false;
     };
@@ -426,7 +426,7 @@ function FilesTab() {
             <button
               key={f}
               title={f}
-              onClick={() => projectId && void latis.invoke("project:openFile", { projectId, path: f })}
+              onClick={() => projectId && void lattiz.invoke("project:openFile", { projectId, path: f })}
               className="flex h-6 w-full items-center gap-1.5 rounded-control px-1.5 text-left text-[12px] hover:bg-surface-2"
             >
               <FileText size={11} className="shrink-0 text-text-3" />

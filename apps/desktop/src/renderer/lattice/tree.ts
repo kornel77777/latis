@@ -1,4 +1,4 @@
-import type { LatticeNode } from "@latis/shared";
+import type { LatticeNode } from "@lattiz/shared";
 
 // The lattice: chats tiled in a tree of splits. Pure functions, so the layout rules are testable.
 

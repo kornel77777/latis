@@ -3,14 +3,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // M5: orchestration. The demo agent plays the Conductor; its script calls the real Workspace MCP
-// server through the `latis-mcp` stdio shim, and the chats it starts are demo chats too.
+// server through the `lattiz-mcp` stdio shim, and the chats it starts are demo chats too.
 
-type Api = { latis: LatisApi };
-const conductorEnv = { LATIS_SKIP_CONDUCTOR: "0", LATIS_CONDUCTOR_AGENT: "fake", LATIS_DEMO_IN_PROJECTS: "1" };
+type Api = { lattiz: LattizApi };
+const conductorEnv = { LATTIZ_SKIP_CONDUCTOR: "0", LATTIZ_CONDUCTOR_AGENT: "fake", LATTIZ_DEMO_IN_PROJECTS: "1" };
 
 test("S4: the Conductor spawns three reviewers, waits, reads and writes a summary note", async () => {
   const dataDir = tempDataDir();
@@ -28,7 +28,7 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
 
   // Three chats appear in a new project frame for the folder, each titled by the Conductor.
   // Off-screen cards aren't rendered, so this reads the canvas data rather than the DOM.
-  const load = () => page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const load = () => page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   await expect
     .poll(async () => (await load()).chats.flatMap((c) => (c.spawnedBy ? [c.title] : [])).sort(), { timeout: 20_000 })
     .toEqual(["Auth: readability", "Auth: security", "Auth: tests"]);
@@ -36,7 +36,7 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
 
   // The Conductor waited for all three, then wrote the note and finished.
   await expect.poll(async () => (await load()).chats.find((c) => c.role === "conductor")?.status, { timeout: 30_000 }).toBe("done");
-  const state = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const state = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   const reviewers = state.chats.filter((c) => c.spawnedBy);
   expect(reviewers).toHaveLength(3);
   expect(reviewers.every((c) => c.status === "done" && c.cwd === repo)).toBe(true);
@@ -46,17 +46,17 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
 
   // Each tool call shows as a step in the Conductor's own transcript (§10.1 guardrails).
   const transcript = await page.evaluate(
-    async (id) => (globalThis as unknown as Api).latis.invoke("chat:transcript", { chatId: id }),
+    async (id) => (globalThis as unknown as Api).lattiz.invoke("chat:transcript", { chatId: id }),
     state.chats.find((c) => c.role === "conductor")!.id,
   );
   const tools = transcript.events.flatMap((e) => (e.event.type === "tool.started" ? [e.event.name] : []));
   expect(tools).toEqual([
-    "latis.spawn_chat",
-    "latis.spawn_chat",
-    "latis.spawn_chat",
-    "latis.wait_for_chats",
-    "latis.read_chat",
-    "latis.create_note",
+    "lattiz.spawn_chat",
+    "lattiz.spawn_chat",
+    "lattiz.spawn_chat",
+    "lattiz.wait_for_chats",
+    "lattiz.read_chat",
+    "lattiz.create_note",
   ]);
   // The demo agent streams its reply without a final message event.
   const said = transcript.events.map((e) => (e.event.type === "message.delta" ? e.event.text : "")).join("");
@@ -66,7 +66,7 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
 
   // The Conductor is pinned: deleting it does nothing, and there's still exactly one after a restart.
   const deleted = await page.evaluate(
-    async (nodeId) => (globalThis as unknown as Api).latis.invoke("canvas:delete", { nodeIds: [nodeId] }),
+    async (nodeId) => (globalThis as unknown as Api).lattiz.invoke("canvas:delete", { nodeIds: [nodeId] }),
     state.chats.find((c) => c.role === "conductor")!.nodeId,
   );
   expect(deleted.deleted).toEqual([]);
@@ -75,7 +75,7 @@ test("S4: the Conductor spawns three reviewers, waits, reads and writes a summar
 
   const again = await launch(dataDir, conductorEnv);
   await expect(again.page.getByTestId("conductor-badge")).toHaveCount(1, { timeout: 15_000 });
-  const after = await again.page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"));
+  const after = await again.page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"));
   expect(after.chats.filter((c) => c.role === "conductor")).toHaveLength(1);
   await again.app.close();
 });
@@ -118,7 +118,7 @@ test("skills: /name suggests and sends the skill; connections: add one and attac
   await expect
     .poll(
       async () =>
-        (await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("canvas:load"))).chats[0]!.connections.length,
+        (await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("canvas:load"))).chats[0]!.connections.length,
     )
     .toBe(1);
   await app.close();

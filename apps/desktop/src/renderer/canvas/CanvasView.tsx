@@ -11,10 +11,10 @@ import {
   type EdgeTypes,
   type NodeTypes,
 } from "@xyflow/react";
-import { latis } from "../api";
+import { lattiz } from "../api";
 import { surfaces } from "../commands/registry";
 import { AppWindow, FolderOpen, LayoutGrid, Sparkles, StickyNote, Workflow } from "lucide-react";
-import { Button, cn } from "@latis/ui";
+import { Button, cn } from "@lattiz/ui";
 import { ChatNode } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
 import { Checklist } from "../app/Checklist";
@@ -38,7 +38,7 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = { flow: FlowEdgeView };
 
 let visibleTimer: ReturnType<typeof setTimeout> | null = null;
-/** Tells main which chats are on screen, so it can skip their notifications while Latis is focused (§8.6). */
+/** Tells main which chats are on screen, so it can skip their notifications while Lattiz is focused (§8.6). */
 function reportVisibleChats(container: HTMLElement | null) {
   if (visibleTimer) clearTimeout(visibleTimer);
   visibleTimer = setTimeout(() => {
@@ -50,7 +50,7 @@ function reportVisibleChats(container: HTMLElement | null) {
         return r.right > box.left && r.left < box.right && r.bottom > box.top && r.top < box.bottom && r.width > 40;
       })
       .map((el) => el.dataset.chatId!);
-    void window.latis.invoke("ui:visibleChats", { chatIds: ids }).catch(() => undefined);
+    void window.lattiz.invoke("ui:visibleChats", { chatIds: ids }).catch(() => undefined);
   }, 250);
 }
 
@@ -88,7 +88,7 @@ export function CanvasView() {
     const parent = ws.nodes.find((n) => n.id === c.source)?.parentId;
     const flowId = String((ws.nodes.find((n) => n.id === parent)?.data as { flowId?: string } | undefined)?.flowId ?? "");
     if (!flowId) return;
-    void latis
+    void lattiz
       .invoke("flow:connect", { flowId, source: c.source, target: c.target })
       .then((e) => useWorkspace.setState((s) => ({ flowEdges: [...s.flowEdges, e] })))
       .catch((err: unknown) =>
@@ -135,7 +135,7 @@ export function CanvasView() {
 
   return (
     <div ref={container} className="relative min-w-0 flex-1 bg-bg-1" onClick={() => setMenu(null)}>
-      {wallpaper && <div className="latis-wallpaper" style={{ backgroundImage: `url(${wallpaper})` }} data-testid="wallpaper" />}
+      {wallpaper && <div className="lattiz-wallpaper" style={{ backgroundImage: `url(${wallpaper})` }} data-testid="wallpaper" />}
       <ReactFlow
         nodes={nodes}
         nodeTypes={nodeTypes}

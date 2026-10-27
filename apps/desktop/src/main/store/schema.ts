@@ -134,7 +134,7 @@ export const worktrees = sqliteTable("worktrees", {
 });
 
 // SPEC §7.1 `checkpoints` (§9.4), one row per turn: before/after snapshot commits (also held by
-// refs/latis/checkpoints/<chat>/<turn>/…) and the files the turn changed.
+// refs/lattiz/checkpoints/<chat>/<turn>/…) and the files the turn changed.
 export const checkpoints = sqliteTable(
   "checkpoints",
   {
@@ -197,7 +197,7 @@ export const scheduled = sqliteTable(
   (t) => [index("scheduled_fire").on(t.fireAt)],
 );
 
-// Cards (§12): the HTML lives in <dataDir>/cards/<id>/; this row holds what Latis decides about it.
+// Cards (§12): the HTML lives in <dataDir>/cards/<id>/; this row holds what Lattiz decides about it.
 export const cards = sqliteTable("cards", {
   id: text("id").primaryKey(),
   nodeId: text("node_id").notNull(),

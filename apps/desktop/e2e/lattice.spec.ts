@@ -1,18 +1,18 @@
 /// <reference lib="dom" />
 
 import { expect, test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // The lattice (chats tiled side by side) and the command table (Settings → Commands).
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 const mod = process.platform === "darwin" ? "Meta" : "Control";
-const shots = process.env.LATIS_SCREENSHOTS;
+const shots = process.env.LATTIZ_SCREENSHOTS;
 
 async function demoChats(page: Page, n: number) {
   await page.evaluate(async (count) => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const canvas = await api.invoke("canvas:load");
     for (let i = 0; i < count; i++) {
       const { chat } = await api.invoke("chat:create", { canvasId: canvas.id, projectId: null, agentId: "fake", x: i * 500, y: 0 });
@@ -80,14 +80,14 @@ test("lattice: chats tile in, rearrange by drag, keyboard and presets, and the l
   await page.mouse.move(g.x + g.width / 2 + 120, g.y + g.height / 2 + 120, { steps: 5 });
   await page.mouse.up();
   await page.waitForTimeout(500);
-  const saved = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("lattice:get"));
+  const saved = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("lattice:get"));
   expect(saved.root?.kind).toBe("split");
   if (shots) await page.screenshot({ path: `${shots}/lattice-grid.png` });
   await app.close();
 
   const again = await launch(dataDir);
   await expect(again.page.getByTestId("lattice-pane")).toHaveCount(4);
-  expect(await again.page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("lattice:get"))).toEqual(saved);
+  expect(await again.page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("lattice:get"))).toEqual(saved);
   await again.app.close();
 });
 
@@ -120,7 +120,7 @@ test("commands: every shortcut is listed, can be re-bound by pressing keys, warn
   // Reset all puts the defaults back.
   await table.getByRole("button", { name: "Reset all" }).click();
   await expect(canvasRow.getByTestId("shortcut")).toHaveCount(1);
-  const prefs = await page.evaluate(async () => (globalThis as unknown as Api).latis.invoke("prefs:get"));
+  const prefs = await page.evaluate(async () => (globalThis as unknown as Api).lattiz.invoke("prefs:get"));
   expect(prefs.keybindings).toEqual({});
   await app.close();
 });
@@ -140,7 +140,7 @@ test("canvas: two-finger scroll / the wheel pans by default, and zooms when set 
 
   // Appearance → Scroll wheel → Zoom.
   await page.evaluate(async () => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const p = await api.invoke("prefs:get");
     await api.invoke("prefs:set", { appearance: { ...p.appearance, wheel: "zoom" } });
   });
@@ -195,7 +195,7 @@ test("lattice: a streaming reply keeps the transcript at the bottom until the us
 test("lattice is the default: stack agents, split a pane, message them all, pass a reply and ask for a review", async () => {
   const dataDir = tempDataDir();
   // The real default layout, not the canvas the other specs start on.
-  const { app, page } = await launch(dataDir, { LATIS_LAYOUT: "" });
+  const { app, page } = await launch(dataDir, { LATTIZ_LAYOUT: "" });
   await expect(page.getByTestId("lattice")).toBeVisible();
 
   // Empty lattice: one click starts an agent.

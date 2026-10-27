@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRightLeft, ChevronDown, Gauge, ShieldAlert, ShieldCheck, ShieldHalf, ShieldOff } from "lucide-react";
-import type { AgentModel, ChatSummary } from "@latis/shared";
-import { Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@latis/ui";
+import type { AgentModel, ChatSummary } from "@lattiz/shared";
+import { Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 
 type Mode = ChatSummary["permissionMode"];

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Check, MessageSquare, Undo2 } from "lucide-react";
-import type { DiffHunk, FileDiff } from "@latis/shared";
-import { Button, cn } from "@latis/ui";
+import type { DiffHunk, FileDiff } from "@lattiz/shared";
+import { Button, cn } from "@lattiz/ui";
 import { highlight } from "../markdown/highlight";
 
 // Diff viewer (§9.5 AC2): unified or split, highlighted per side with the Shiki worker.

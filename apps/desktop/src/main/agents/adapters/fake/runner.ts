@@ -7,7 +7,7 @@ import { createInterface } from "node:readline";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { McpServerConfig } from "@latis/shared";
+import type { McpServerConfig } from "@lattiz/shared";
 import { FromRunner, ToRunner } from "./protocol";
 import { parseScript, playScript } from "./script";
 
@@ -17,14 +17,14 @@ let interrupted = false;
 let busy = false;
 const queue: Extract<ToRunner, { type: "turn" }>[] = [];
 
-// The workspace tools, when the adapter passed them (LATIS_FAKE_MCP is the `latis` server config).
+// The workspace tools, when the adapter passed them (LATTIZ_FAKE_MCP is the `lattiz` server config).
 let client: Promise<Client> | null = null;
 function mcp(): Promise<Client> {
-  const raw = process.env.LATIS_FAKE_MCP;
+  const raw = process.env.LATTIZ_FAKE_MCP;
   if (!raw) throw new Error("This chat has no workspace tools.");
   client ??= (async () => {
     const cfg = JSON.parse(raw) as McpServerConfig;
-    const c = new Client({ name: "latis-fake", version: "0.1.0" });
+    const c = new Client({ name: "lattiz-fake", version: "0.1.0" });
     await c.connect(
       cfg.transport === "http"
         ? new StreamableHTTPClientTransport(new URL(cfg.url!), { requestInit: { headers: cfg.headers ?? {} } })

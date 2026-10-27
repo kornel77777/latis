@@ -12,7 +12,7 @@ import {
   type FocusView,
   type PermissionMode,
   type Project,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { WorkspaceStore } from "../store/workspace";
 
 // The workspace as tools (SPEC §10.1). The MCP server is a thin layer over this service, so the
@@ -345,7 +345,7 @@ export class WorkspaceService {
     });
     return {
       card_id: String(node.data.cardId),
-      note: "The card has no network access and talks to Latis only through window.latis (data.get/set/list, refresh, ask, exportPdf, theme).",
+      note: "The card has no network access and talks to Lattiz only through window.lattiz (data.get/set/list, refresh, ask, exportPdf, theme).",
     };
   }
 

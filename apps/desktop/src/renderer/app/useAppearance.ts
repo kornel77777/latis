@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { Accent, Appearance } from "@latis/shared";
+import type { Accent, Appearance } from "@lattiz/shared";
 
 // Applies appearance settings (§8.1, §8.11) to the root element as CSS variables and data attributes.
 

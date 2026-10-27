@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { FlowSpec, PermissionModeSchema } from "@latis/shared";
+import { FlowSpec, PermissionModeSchema } from "@lattiz/shared";
 import { ToolError, type WorkspaceService } from "./workspace";
 
 // Workspace MCP server (SPEC §10.1): Streamable HTTP on 127.0.0.1, a random port, and a bearer
@@ -22,7 +22,7 @@ async function run(fn: () => unknown): Promise<Result> {
     const value = await fn();
     return { content: [{ type: "text", text: typeof value === "string" ? value : JSON.stringify(value, null, 2) }] };
   } catch (err) {
-    const message = err instanceof ToolError ? err.message : `Latis couldn't do that: ${err instanceof Error ? err.message : String(err)}`;
+    const message = err instanceof ToolError ? err.message : `Lattiz couldn't do that: ${err instanceof Error ? err.message : String(err)}`;
     if (!(err instanceof ToolError)) console.warn("[mcp] tool failed", err);
     return { content: [{ type: "text", text: message }], isError: true };
   }
@@ -33,7 +33,7 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
   const read = { readOnlyHint: true, openWorldHint: false };
   server.registerTool(
     "list_projects",
-    { description: "Projects (folders) on the Latis canvas with their chat counts.", inputSchema: {}, annotations: read },
+    { description: "Projects (folders) on the Lattiz canvas with their chat counts.", inputSchema: {}, annotations: read },
     () => run(() => ws.listProjects()),
   );
   server.registerTool(
@@ -59,7 +59,7 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
     {
       description:
         "Start a new chat with a coding agent in a folder and send it a first message. Returns its id right away; the agent works in the background (use wait_for_chats). " +
-        "agent: claude-code (Latis chat view; needs the user's API key), terminal:claude (Claude Code in its own terminal, on the user's subscription), codex, gemini (or another installed agent id). own_copy: work in a separate git worktree so parallel chats don't clash.",
+        "agent: claude-code (Lattiz chat view; needs the user's API key), terminal:claude (Claude Code in its own terminal, on the user's subscription), codex, gemini (or another installed agent id). own_copy: work in a separate git worktree so parallel chats don't clash.",
       inputSchema: {
         agent: z.string(),
         cwd: z.string().describe("Folder to work in; ~ is allowed. It becomes a project on the canvas if it isn't one."),
@@ -146,9 +146,9 @@ export function registerTools(server: McpServer, ws: WorkspaceService, caller: s
     {
       description:
         "Put a small HTML app (a card) on the canvas: a tracker, dashboard, calculator… One self-contained index.html (inline CSS/JS). " +
-        "It runs sandboxed with NO network. Inside it, window.latis gives: data.get(key), data.set(key, value), data.list() (persisted), " +
+        "It runs sandboxed with NO network. Inside it, window.lattiz gives: data.get(key), data.set(key, value), data.list() (persisted), " +
         "refresh() (runs refresh_script, a Node .mjs that prints a JSON object merged into the data; the user approves it first), " +
-        "ask(prompt), exportPdf(), theme.tokens (CSS vars --latis-surface, --latis-text, --latis-muted, --latis-accent, --latis-line are set for you).",
+        "ask(prompt), exportPdf(), theme.tokens (CSS vars --lattiz-surface, --lattiz-text, --lattiz-muted, --lattiz-accent, --lattiz-line are set for you).",
       inputSchema: {
         title: z.string().min(1).max(80),
         html: z.string().min(1).max(500_000),
@@ -315,7 +315,7 @@ export class WorkspaceMcpServer implements HookEndpoint {
     } catch {
       return deny(400, "invalid JSON");
     }
-    const server = new McpServer({ name: "latis", version: "0.1.0" });
+    const server = new McpServer({ name: "lattiz", version: "0.1.0" });
     registerTools(server, this.ws, caller);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => {
@@ -343,7 +343,7 @@ export class WorkspaceMcpServer implements HookEndpoint {
       return deny(400, "invalid JSON");
     }
     const handler = this.hookHandlers.get(chatId);
-    // No session listening (e.g. Latis restarted under a running agent): let the agent carry on.
+    // No session listening (e.g. Lattiz restarted under a running agent): let the agent carry on.
     const out = handler ? await handler(input).catch((err: unknown) => (console.warn("[hooks] handler failed", err), {})) : {};
     if (!res.writableEnded) res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out ?? {}));
   }

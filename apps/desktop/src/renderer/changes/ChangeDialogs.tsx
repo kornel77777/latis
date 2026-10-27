@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, FolderOpen, GitBranch, GitMerge, History, MessageSquare, RotateCcw, Undo2 } from "lucide-react";
-import type { MergePreview } from "@latis/shared";
-import { Button, Dialog, cn } from "@latis/ui";
-import { latis } from "../api";
+import type { MergePreview } from "@lattiz/shared";
+import { Button, Dialog, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 
 const errorText = (err: unknown) =>
@@ -45,7 +45,7 @@ export function IsolateDialog() {
             <GitBranch size={13} /> Work in its own copy
           </span>
           <span className="block text-[12px] text-text-3">
-            A git worktree on a new <code className="font-mono">latis/…</code> branch, so the two agents can't trip over each other. Review
+            A git worktree on a new <code className="font-mono">lattiz/…</code> branch, so the two agents can't trip over each other. Review
             and merge it when it's done.
           </span>
         </span>
@@ -90,7 +90,7 @@ export function MergeDialog() {
   useEffect(() => {
     if (!chatId) return;
     let live = true;
-    latis
+    lattiz
       .invoke("worktree:mergePreview", { chatId })
       .then((p) => live && setPreview(p))
       .catch((err: unknown) => live && setError(errorText(err)));
@@ -103,7 +103,7 @@ export function MergeDialog() {
     if (!chatId) return;
     setBusy(true);
     try {
-      const r = await latis.invoke("worktree:merge", { chatId, mode });
+      const r = await lattiz.invoke("worktree:merge", { chatId, mode });
       if (r.merged) setMerged(true);
       else setPreview((p) => (p ? { ...p, conflicts: r.conflicts } : p));
     } catch (err) {
@@ -116,7 +116,7 @@ export function MergeDialog() {
     if (!chatId) return;
     setBusy(true);
     try {
-      const r = await latis.invoke("worktree:remove", { chatId, force });
+      const r = await lattiz.invoke("worktree:remove", { chatId, force });
       if (r.removed) {
         useWorkspace.getState().toast("The copy is removed. The chat works in the project folder now.");
         close();
@@ -175,7 +175,7 @@ export function MergeDialog() {
                       const id = chatId!;
                       const files = preview.conflicts;
                       close();
-                      void latis
+                      void lattiz
                         .invoke("worktree:askResolve", { chatId: id, files })
                         .catch((err: unknown) => useWorkspace.getState().toast(errorText(err)));
                     }}

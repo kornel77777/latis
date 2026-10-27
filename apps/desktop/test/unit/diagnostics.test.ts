@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AgentInfo } from "@latis/shared";
+import type { AgentInfo } from "@lattiz/shared";
 import { diagnostics, issueUrl, ISSUES_NEW } from "../../src/main/diagnostics";
 import { LogFile, scrub } from "../../src/main/logs";
 
@@ -23,7 +23,7 @@ describe("scrub", () => {
 
 describe("LogFile", () => {
   it("appends scrubbed lines and returns the tail", () => {
-    const log = new LogFile(mkdtempSync(join(tmpdir(), "latis-logs-")));
+    const log = new LogFile(mkdtempSync(join(tmpdir(), "lattiz-logs-")));
     log.write("warn", ["token=abc123def456"]);
     log.write("error", [new Error("boom")]);
     const text = readFileSync(log.file, "utf8");
@@ -34,12 +34,12 @@ describe("LogFile", () => {
   });
 
   it("rotates past 1 MB", () => {
-    const dir = mkdtempSync(join(tmpdir(), "latis-logs-"));
+    const dir = mkdtempSync(join(tmpdir(), "lattiz-logs-"));
     const log = new LogFile(dir);
     writeFileSync(log.file, "x".repeat(1024 * 1024 + 1));
     log.write("warn", ["fresh"]);
     expect(readFileSync(log.file, "utf8")).toMatch(/\[warn\] fresh\n$/);
-    expect(readFileSync(join(dir, "latis.1.log"), "utf8").length).toBe(1024 * 1024 + 1);
+    expect(readFileSync(join(dir, "lattiz.1.log"), "utf8").length).toBe(1024 * 1024 + 1);
   });
 });
 
@@ -73,7 +73,7 @@ describe("diagnostics", () => {
       ],
       logTail: "2026-10-26T00:00:00Z [warn] Bearer abcdefabcdefabcdef",
     });
-    expect(text).toContain("Latis 0.1.0 · darwin 25.0.0 (arm64) · Electron 45.0.0");
+    expect(text).toContain("Lattiz 0.1.0 · darwin 25.0.0 (arm64) · Electron 45.0.0");
     expect(text).toContain("- Codex 0.164.0: structured, ready");
     expect(text).toContain("- Claude Code: terminal, ready");
     expect(text).not.toContain("Gemini");
@@ -85,7 +85,7 @@ describe("diagnostics", () => {
     const url = new URL(issueUrl("0.1.0", "darwin 25.0.0"));
     expect(`${url.origin}${url.pathname}`).toBe(ISSUES_NEW);
     const body = url.searchParams.get("body")!;
-    expect(body).toContain("Latis 0.1.0 on darwin 25.0.0");
+    expect(body).toContain("Lattiz 0.1.0 on darwin 25.0.0");
     expect(body).not.toContain("[warn]");
   });
 });

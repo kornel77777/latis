@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, Plus, RotateCcw, Search, X } from "lucide-react";
-import { Button, cn } from "@latis/ui";
+import { Button, cn } from "@lattiz/ui";
 import { chordOf, display } from "../commands/keys";
 import { allCommands, bindingsOf, conflicts, runCommand, type Command } from "../commands/registry";
 import { useWorkspace } from "../stores/workspace";

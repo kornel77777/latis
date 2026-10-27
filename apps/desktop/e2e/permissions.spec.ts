@@ -1,19 +1,19 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { claudeFixtures, launch, stubFolderPicker, tempDataDir } from "./helpers";
 
-type Api = { latis: LatisApi };
-const shots = process.env.LATIS_SCREENSHOTS;
+type Api = { lattiz: LattizApi };
+const shots = process.env.LATTIZ_SCREENSHOTS;
 
 test("Settings → Permissions: default mode and the always-ask list, enforced in a Full-auto Claude Code chat", async () => {
   const dataDir = tempDataDir();
   const repo = join(dataDir, "repo");
   mkdirSync(repo);
   writeFileSync(join(repo, "README.md"), "# repo\n");
-  const { app, page } = await launch(dataDir, { LATIS_CLAUDE_REPLAY: claudeFixtures });
-  const prefs = () => page.evaluate(() => (globalThis as unknown as Api).latis.invoke("prefs:get"));
+  const { app, page } = await launch(dataDir, { LATTIZ_CLAUDE_REPLAY: claudeFixtures });
+  const prefs = () => page.evaluate(() => (globalThis as unknown as Api).lattiz.invoke("prefs:get"));
 
   // 1. New chats start in Full-auto; the list starts with the defaults and can be edited.
   await page.getByRole("button", { name: "Settings" }).click();

@@ -1,10 +1,10 @@
 :root {
   color-scheme: dark light;
-  --bg: var(--latis-surface, #14171c);
-  --fg: var(--latis-text, #e7eaee);
-  --muted: var(--latis-muted, #808894);
-  --line: var(--latis-line, #262a31);
-  --accent: var(--latis-accent, #5eead4);
+  --bg: var(--lattiz-surface, #14171c);
+  --fg: var(--lattiz-text, #e7eaee);
+  --muted: var(--lattiz-muted, #808894);
+  --line: var(--lattiz-line, #262a31);
+  --accent: var(--lattiz-accent, #5eead4);
 }
 * {
   box-sizing: border-box;
@@ -17,7 +17,7 @@ body {
 body {
   background: var(--bg);
   color: var(--fg);
-  font: 13px/1.45 var(--latis-font, -apple-system, BlinkMacSystemFont, "Inter", sans-serif);
+  font: 13px/1.45 var(--lattiz-font, -apple-system, BlinkMacSystemFont, "Inter", sans-serif);
   padding: 12px;
 }
 h1 {

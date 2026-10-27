@@ -54,15 +54,15 @@ Their processes are gone; resume semantics come with real adapters in M1 (§9.2 
 
 ### 2026-10-22: Drive the user's installed `claude`, don't ship the SDK's bundled CLI
 
-The Agent SDK bundles a ~263 MB CLI binary per platform. Latis passes `pathToClaudeCodeExecutable` = the user's `claude` (resolved through the login shell's PATH) and excludes the bundled binaries from the app. Why: SPEC §6.5 prefers the user's own CLI under its own auth, and the app stays small. Cost: users must install Claude Code; onboarding shows the install command.
+The Agent SDK bundles a ~263 MB CLI binary per platform. Lattiz passes `pathToClaudeCodeExecutable` = the user's `claude` (resolved through the login shell's PATH) and excludes the bundled binaries from the app. Why: SPEC §6.5 prefers the user's own CLI under its own auth, and the app stays small. Cost: users must install Claude Code; onboarding shows the install command.
 
 ### 2026-10-22: Permission-mode mapping for Claude Code
 
-Read-only → `default` + Latis denies non-read tools in `canUseTool`; Ask → `default`; Auto-edit → `acceptEdits`; Full-auto → `bypassPermissions`. `allowDangerouslySkipPermissions` is always set so a chat can switch into Full-auto live; the starting mode is unaffected.
+Read-only → `default` + Lattiz denies non-read tools in `canUseTool`; Ask → `default`; Auto-edit → `acceptEdits`; Full-auto → `bypassPermissions`. `allowDangerouslySkipPermissions` is always set so a chat can switch into Full-auto live; the starting mode is unaffected.
 
 ### 2026-10-22: "Always allow" stays session-scoped
 
-Claude's permission suggestions target `localSettings`, which writes into the repo's `.claude/settings.local.json`. Latis rewrites them to `destination: "session"` so it never edits the user's repo config. "Always for this project" behaves the same until Latis stores project rules itself.
+Claude's permission suggestions target `localSettings`, which writes into the repo's `.claude/settings.local.json`. Lattiz rewrites them to `destination: "session"` so it never edits the user's repo config. "Always for this project" behaves the same until Lattiz stores project rules itself.
 
 ### 2026-10-22: AgentEvent extensions
 
@@ -82,7 +82,7 @@ Simplest version of §8.5's "auto-titled from first exchange". No extra model ca
 
 ### 2026-10-22: Replay mode for e2e
 
-`LATIS_CLAUDE_REPLAY=<dir>` swaps the SDK's `query()` for a replayer of recorded streams that still waits on the app's permission answers. CI-safe, with no tokens or network. The real CLI is covered by the opt-in live test.
+`LATTIZ_CLAUDE_REPLAY=<dir>` swaps the SDK's `query()` for a replayer of recorded streams that still waits on the app's permission answers. CI-safe, with no tokens or network. The real CLI is covered by the opt-in live test.
 
 ### 2026-10-22: Shiki with the JavaScript regex engine
 
@@ -90,13 +90,13 @@ Avoids WASM, so the CSP needs no `wasm-unsafe-eval`. 15 common languages load la
 
 ## M2
 
-### 2026-10-23: Codex permission modes, plus Latis-side auto-accepts
+### 2026-10-23: Codex permission modes, plus Lattiz-side auto-accepts
 
-Read-only → `read-only` sandbox, `never`; Ask and Auto-edit → `workspace-write`, `untrusted`; Full-auto → `danger-full-access`, `never`. Recorded: `untrusted` asks before every patch and even `cat`. So Latis answers some requests itself: pure reads (Codex's own `commandActions` parse) in Ask and Auto-edit, and patches whose paths are all inside the chat folder in Auto-edit. Mode changes ride on the next `turn/start`.
+Read-only → `read-only` sandbox, `never`; Ask and Auto-edit → `workspace-write`, `untrusted`; Full-auto → `danger-full-access`, `never`. Recorded: `untrusted` asks before every patch and even `cat`. So Lattiz answers some requests itself: pure reads (Codex's own `commandActions` parse) in Ask and Auto-edit, and patches whose paths are all inside the chat folder in Auto-edit. Mode changes ride on the next `turn/start`.
 
 ### 2026-10-23: ACP modes map by name; emulation otherwise
 
-A manifest can map Latis modes to the agent's mode ids. Otherwise Latis matches well-known ids (`plan`, `default`, `autoEdit`/`acceptEdits`, `yolo`/`bypassPermissions`). On top, `session/request_permission` is answered by mode: Full-auto allows, Read-only rejects non-read kinds, Auto-edit allows in-folder edits. Latis declares no `fs`/`terminal` client capabilities, so agents work on disk with their own tools.
+A manifest can map Lattiz modes to the agent's mode ids. Otherwise Lattiz matches well-known ids (`plan`, `default`, `autoEdit`/`acceptEdits`, `yolo`/`bypassPermissions`). On top, `session/request_permission` is answered by mode: Full-auto allows, Read-only rejects non-read kinds, Auto-edit allows in-folder edits. Lattiz declares no `fs`/`terminal` client capabilities, so agents work on disk with their own tools.
 
 ### 2026-10-23: ACP model lists come from a probe session
 
@@ -112,7 +112,7 @@ The `attention` table gets a `data_json` (summary, detail) beyond the §7.1 sket
 
 ### 2026-10-23: Notifications and badge
 
-Native notifications for needs-you and finished, each toggleable, skipped when Latis is focused and the chat is on screen (the renderer reports visible chats). Permission notifications get Allow/Deny actions on macOS only (Electron's `actions` are macOS-only). The dock badge counts needs-you items via `app.setBadgeCount`. No Windows overlay badge yet, and no sound yet.
+Native notifications for needs-you and finished, each toggleable, skipped when Lattiz is focused and the chat is on screen (the renderer reports visible chats). Permission notifications get Allow/Deny actions on macOS only (Electron's `actions` are macOS-only). The dock badge counts needs-you items via `app.setBadgeCount`. No Windows overlay badge yet, and no sound yet.
 
 ### 2026-10-23: Terminal-only agents and `agent.status`
 
@@ -124,21 +124,21 @@ One process per conversation: the chat's live session is disposed, then `claude 
 
 ### 2026-10-23: Sign-in runs the agent's own login in a dock terminal
 
-`claude auth login`, `codex login`, `gemini` (its auth picker). When the terminal closes, Latis re-checks agents. Latis never reads credential files (§6.5).
+`claude auth login`, `codex login`, `gemini` (its auth picker). When the terminal closes, Lattiz re-checks agents. Lattiz never reads credential files (§6.5).
 
 ### 2026-10-23: Onboarding starts chats with editable drafts
 
-The first-run tour creates up to two chats (the first two ready agents) with a suggested first message in the composer, not sent. The interactive checklist is left for M4. `LATIS_SKIP_ONBOARDING=1` for tests.
+The first-run tour creates up to two chats (the first two ready agents) with a suggested first message in the composer, not sent. The interactive checklist is left for M4. `LATTIZ_SKIP_ONBOARDING=1` for tests.
 
 ### 2026-10-23: Replay for every agent
 
-`LATIS_REPLAY=<fixtures>` replays Claude (`claude-code/`), Codex (`codex/`) and the built-in ACP agent (`acp/`). The replay pauses at each recorded client message until the app sends it. `LATIS_AGENT_PATH` (dev/test) prepends folders to the PATH used to find agent CLIs.
+`LATTIZ_REPLAY=<fixtures>` replays Claude (`claude-code/`), Codex (`codex/`) and the built-in ACP agent (`acp/`). The replay pauses at each recorded client message until the app sends it. `LATTIZ_AGENT_PATH` (dev/test) prepends folders to the PATH used to find agent CLIs.
 
 ## M3
 
 ### 2026-10-23: Checkpoints are snapshot commits on hidden refs
 
-Before and after every turn, Latis snapshots the repo's working tree (tracked and untracked, minus ignored) as a commit object. It builds it in a throwaway index seeded from a copy of the real one (for the stat cache), so the user's staging area, HEAD and branches are never touched. Commits live under `refs/latis/checkpoints/<chat>/<turn>/{before,after}` so `git gc` keeps them. Undo/redo restore exactly the files the turn changed with `git restore --source=… --worktree`, deleting files the turn created. "Restore to before this turn" reverts the files this chat changed from that turn on. Chats sharing a folder can see each other's edits in their snapshots; that's what worktrees are for.
+Before and after every turn, Lattiz snapshots the repo's working tree (tracked and untracked, minus ignored) as a commit object. It builds it in a throwaway index seeded from a copy of the real one (for the stat cache), so the user's staging area, HEAD and branches are never touched. Commits live under `refs/lattiz/checkpoints/<chat>/<turn>/{before,after}` so `git gc` keeps them. Undo/redo restore exactly the files the turn changed with `git restore --source=… --worktree`, deleting files the turn created. "Restore to before this turn" reverts the files this chat changed from that turn on. Chats sharing a folder can see each other's edits in their snapshots; that's what worktrees are for.
 
 ### 2026-10-23: Tables beyond the §7.1 sketch
 
@@ -146,11 +146,11 @@ Before and after every turn, Latis snapshots the repo's working tree (tracked an
 
 ### 2026-10-23: The agent hears about reverts with the next message
 
-Undo, redo, restore and Review reverts queue a `[Note from Latis] …` line that goes in front of the user's next message to that chat (§9.4 AC2, §9.5 AC3). The transcript still shows only what the user typed.
+Undo, redo, restore and Review reverts queue a `[Note from Lattiz] …` line that goes in front of the user's next message to that chat (§9.4 AC2, §9.5 AC3). The transcript still shows only what the user typed.
 
 ### 2026-10-23: Worktrees
 
-- They go under `<dataDir>/worktrees/<repo>/<slug>` on `latis/<agent>-<rand>` branches from the current HEAD (§18 Q5 default).
+- They go under `<dataDir>/worktrees/<repo>/<slug>` on `lattiz/<agent>-<rand>` branches from the current HEAD (§18 Q5 default).
 - The second chat in a repo gets the offer, on by default.
 - Any chat can move into its own copy from its folder chip. This was needed for S1's "both in separate worktrees". Claude sessions are tied to a folder, so a moved Claude chat starts a new conversation; the supervisor says so.
 - For folders that aren't repos, a toast offers "Initialise git" rather than blocking.
@@ -165,15 +165,15 @@ Undo, redo, restore and Review reverts queue a `[Note from Latis] …` line that
 
 ### 2026-10-23: Hunk revert uses `git apply -R`
 
-A single hunk is reverse-applied to the working tree with `--recount`. If the file moved on since, Latis says so and suggests reverting the whole file instead. "Accept" is a review decision only; nothing changes on disk.
+A single hunk is reverse-applied to the working tree with `--recount`. If the file moved on since, Lattiz says so and suggests reverting the whole file instead. "Accept" is a review decision only; nothing changes on disk.
 
 ### 2026-10-23: git via `child_process.execFile`, not execa
 
-No extra dependency for a handful of calls. `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`. When the user has no git identity, Latis commits as `Latis <latis@localhost>`.
+No extra dependency for a handful of calls. `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`. When the user has no git identity, Lattiz commits as `Lattiz <lattiz@localhost>`.
 
-### 2026-10-23: ACP "always allow" is remembered by Latis; refused modes aren't fatal
+### 2026-10-23: ACP "always allow" is remembered by Lattiz; refused modes aren't fatal
 
-Gemini refuses `autoEdit`/`yolo` and `allow_always` in folders it doesn't trust, and the tool fails. Latis keeps the agent in its default mode when a switch is refused, and enforces the chat's mode on each permission request. "Always for this chat" is a Latis-side rule (tool kind, or program name for shell commands), answered with `allow_once`. Applies to every ACP agent.
+Gemini refuses `autoEdit`/`yolo` and `allow_always` in folders it doesn't trust, and the tool fails. Lattiz keeps the agent in its default mode when a switch is refused, and enforces the chat's mode on each permission request. "Always for this chat" is a Lattiz-side rule (tool kind, or program name for shell commands), answered with `allow_once`. Applies to every ACP agent.
 
 ### 2026-10-23: Agents run in their own process group
 
@@ -207,7 +207,7 @@ An FTS5 table `search(kind, ref, chat_id, body)` indexes user messages, agent re
 
 ### 2026-10-23: Dock browser is a native view
 
-A `WebContentsView` in its own `persist:latis-preview` session (sandboxed, no preload, permissions denied, new windows go to the system browser) is positioned over the dock area by the renderer. Native views draw above the DOM, so it hides while any dialog is open, and an error page is drawn by the renderer instead. Device presets use the DevTools protocol (metrics, touch, mobile UA). The picker runs in an isolated world and captures the element with `capturePage`. In device presets the screenshot's crop can be off, because the page is scaled into the dock.
+A `WebContentsView` in its own `persist:lattiz-preview` session (sandboxed, no preload, permissions denied, new windows go to the system browser) is positioned over the dock area by the renderer. Native views draw above the DOM, so it hides while any dialog is open, and an error page is drawn by the renderer instead. Device presets use the DevTools protocol (metrics, touch, mobile UA). The picker runs in an isolated world and captures the element with `capturePage`. In device presets the screenshot's crop can be off, because the page is scaled into the dock.
 
 ### 2026-10-23: Image attachments aren't stored in the transcript
 
@@ -219,9 +219,9 @@ Pasted or picked images go to the agent with the message, but turns store text o
 - To meet WCAG AA (§8.12), `--text-3` is `#808894` (dark) and `#666e78` (light).
 - The light theme's accent and state colours are darker than §8.1's table, all ≥ 4.5:1 on every surface. Accent `#0b7a6e`; working, needs-you, done and error `#875b00`, `#c03a26`, `#167a4c`, `#b8284f`.
 
-### 2026-10-23: LATIS_DEMO_IN_PROJECTS (tests)
+### 2026-10-23: LATTIZ_DEMO_IN_PROJECTS (tests)
 
-The demo agent stays out of real folders in the UI. With `LATIS_DEMO_IN_PROJECTS=1` it can work in projects, so e2e tests can drive real file changes (worktrees, review, merge) without tokens.
+The demo agent stays out of real folders in the UI. With `LATTIZ_DEMO_IN_PROJECTS=1` it can work in projects, so e2e tests can drive real file changes (worktrees, review, merge) without tokens.
 
 ### 2026-10-23: Workspace MCP server is stateless, with a token per chat
 
@@ -231,17 +231,17 @@ The server is stateless Streamable HTTP with JSON responses: every POST gets a f
 
 ### 2026-10-23: How agents get the workspace tools
 
-- Claude Code and Codex get the HTTP server directly (Claude: `mcpServers` with a `type: "http"` entry; Codex: `config.mcp_servers.latis` with `url`, `http_headers` and `tool_timeout_sec` on `thread/start`/`thread/resume`).
-- ACP agents and the demo agent get the stdio shim `latis-mcp` (`out/main/latis-mcp.js`, run as Electron-as-Node), which forwards each line to the server. ACP only promises stdio MCP, so this works with any of them.
+- Claude Code and Codex get the HTTP server directly (Claude: `mcpServers` with a `type: "http"` entry; Codex: `config.mcp_servers.lattiz` with `url`, `http_headers` and `tool_timeout_sec` on `thread/start`/`thread/resume`).
+- ACP agents and the demo agent get the stdio shim `lattiz-mcp` (`out/main/lattiz-mcp.js`, run as Electron-as-Node), which forwards each line to the server. ACP only promises stdio MCP, so this works with any of them.
 - `wait_for_chats` blocks, so tool timeouts are raised to 30 minutes (Codex `tool_timeout_sec`, Claude `MCP_TOOL_TIMEOUT`). The tool's own timeout tops out at 29.5 minutes.
-- Calls to `latis` tools don't ask the user. Claude's `canUseTool` and the ACP permission handler allow them, except in read-only chats. The guardrails are in Latis instead.
+- Calls to `lattiz` tools don't ask the user. Claude's `canUseTool` and the ACP permission handler allow them, except in read-only chats. The guardrails are in Lattiz instead.
 
 ### 2026-10-23: Workspace tool guardrails
 
 - A spawned chat runs in the caller's permission mode. `spawn_chat` accepts `permission_mode` only if it's stricter.
 - One caller may have at most `prefs.maxSpawned` chats (default 6) working or waiting at once (Settings → Conductor).
 - `close_chat` works only on chats the caller spawned, and only after a native confirmation dialog. It soft-deletes, so the chat stays restorable from ⌘K.
-- Every call shows in the caller's transcript as the agent's own MCP tool step. Latis doesn't add a second log.
+- Every call shows in the caller's transcript as the agent's own MCP tool step. Lattiz doesn't add a second log.
 - `wait_for_chats` returns as soon as no listed chat is working. A chat that needs the user counts as stopped and is reported with a note, so the Conductor can tell the user instead of hanging.
 
 ### 2026-10-23: Spec tools added and left for M6
@@ -254,33 +254,33 @@ Added `tidy_canvas` and `close_chat`. §10.2 asks the Conductor to tidy the canv
 - Its agent is the first one installed and signed in, in the order Claude Code, Codex, Gemini. It can be changed in Settings → Conductor, which starts a new conversation because a different agent can't resume the old one.
 - It works in `<dataDir>/conductor/`. Its instructions are `resources/conductor/SYSTEM.md` (bundled) plus `<dataDir>/conductor/AGENTS.md` (the user's, opened from Settings). These go in as a system prompt append (Claude), `developerInstructions` (Codex), or with the first message (ACP, which has no system prompt).
 - `softDelete` skips it, so it can't be deleted.
-- E2E: `LATIS_SKIP_CONDUCTOR=1` (the default in `helpers.ts`) and `LATIS_CONDUCTOR_AGENT=<id>`.
+- E2E: `LATTIZ_SKIP_CONDUCTOR=1` (the default in `helpers.ts`) and `LATTIZ_CONDUCTOR_AGENT=<id>`.
 
 ### 2026-10-23: MCP connections and secrets
 
 - Connections are stored in `mcp_servers`. Env values and headers are one JSON blob encrypted with `safeStorage`; the renderer only ever sees their key names. Where no keychain is available (`isEncryptionAvailable()` false, e.g. Linux without a keyring), saving a connection with secrets is refused rather than stored in plain text.
 - Shared connections go to every chat whose agent supports MCP. Other connections are attached per chat from its ⋯ menu.
 - Changes apply when the agent next starts. Toggling a connection or the workspace tools restarts the session, which resumes the conversation, but only between turns.
-- The name `latis` is reserved.
+- The name `lattiz` is reserved.
 
-**Import:** only after the user clicks Import, and only from a fixed list of files: Claude Desktop, `~/.claude.json`, Cursor, Gemini CLI, `~/.codex/config.toml`, VS Code. Latis reads only their MCP server section. Each server is shown with its command or URL and its key names before anything is copied.
+**Import:** only after the user clicks Import, and only from a fixed list of files: Claude Desktop, `~/.claude.json`, Cursor, Gemini CLI, `~/.codex/config.toml`, VS Code. Lattiz reads only their MCP server section. Each server is shown with its command or URL and its key names before anything is copied.
 
 **Not done:** OAuth sign-in for HTTP servers (§9.15 AC1). An agent that supports OAuth itself may still sign in on its own.
 
-### 2026-10-23: Skills are expanded by Latis
+### 2026-10-23: Skills are expanded by Lattiz
 
-A known `/name` in a message is replaced by `<skill name="…">…</skill>` blocks ahead of the text. The agent receives the expanded message; the transcript keeps what the user typed. Unknown `/words` (paths, agent slash commands, demo scripts) are left alone. A project's `.latis/skills/` wins over the user's `<dataDir>/skills/` on a name clash. `name:` and `description:` come from front matter when present.
+A known `/name` in a message is replaced by `<skill name="…">…</skill>` blocks ahead of the text. The agent receives the expanded message; the transcript keeps what the user typed. Unknown `/words` (paths, agent slash commands, demo scripts) are left alone. A project's `.lattiz/skills/` wins over the user's `<dataDir>/skills/` on a name clash. `name:` and `description:` come from front matter when present.
 
-### 2026-10-23: Codex approves Latis's tools; elicitations become approvals
+### 2026-10-23: Codex approves Lattiz's tools; elicitations become approvals
 
-Codex asks (`mcpServer/elicitation/request`) before any MCP tool that isn't marked read-only. For Latis's own server, Latis sets `default_tools_approval_mode = "approve"` (`McpServerConfig.trusted`). Other servers' elicitations are shown as ordinary permission requests and answered `accept`/`decline`. URL-mode elicitations (sign-in pages) aren't supported yet and are declined.
+Codex asks (`mcpServer/elicitation/request`) before any MCP tool that isn't marked read-only. For Lattiz's own server, Lattiz sets `default_tools_approval_mode = "approve"` (`McpServerConfig.trusted`). Other servers' elicitations are shown as ordinary permission requests and answered `accept`/`decline`. URL-mode elicitations (sign-in pages) aren't supported yet and are declined.
 
 ### 2026-10-23: Send later
 
 - Scheduled messages live in a `scheduled` table and are checked every 15 s.
-- A message more than 2 minutes late (Latis was closed) is sent once, with a `[Note from Latis]` saying when it was due.
+- A message more than 2 minutes late (Lattiz was closed) is sent once, with a `[Note from Lattiz]` saying when it was due.
 - Repeats skip the slots they missed rather than sending a burst.
-- "When the limit resets" is only offered once the agent has reported a limit with a reset time. Latis adds 1 minute of slack.
+- "When the limit resets" is only offered once the agent has reported a limit with a reset time. Lattiz adds 1 minute of slack.
 - A message is delivered like `send_message` mode "queue": sent if the chat is idle, otherwise after its turn.
 
 ### 2026-10-23: Usage meter
@@ -293,9 +293,9 @@ Codex asks (`mcpServer/elicitation/request`) before any MCP tool that isn't mark
 - A `rate_limited` event marks the agent limited until its reset time passes or a later turn finishes cleanly.
 - The meter is kept in settings, so the status bar has numbers after a restart.
 
-### 2026-10-23: Handoff brief is built by Latis
+### 2026-10-23: Handoff brief is built by Lattiz
 
-§9.11 asks for a summary "generated by the outgoing agent if available, else by a short summarisation call on the incoming agent". Latis uses the outgoing agent's last report (its final message) as that summary. When there's none, the brief tells the incoming agent to summarise the changed files first, so the incoming agent's first step is the summarisation. That avoids an extra model call on an agent that's out of usage.
+§9.11 asks for a summary "generated by the outgoing agent if available, else by a short summarisation call on the incoming agent". Lattiz uses the outgoing agent's last report (its final message) as that summary. When there's none, the brief tells the incoming agent to summarise the changed files first, so the incoming agent's first step is the summarisation. That avoids an extra model call on an agent that's out of usage.
 
 The brief contains:
 
@@ -310,7 +310,7 @@ The new chat shares the old one's cwd and worktree row. It's marked `continued_f
 
 An extra account is a folder under `<dataDir>/accounts/<agent>/<id>`. While it's active, the agent's CLI gets `CLAUDE_CONFIG_DIR`, `CODEX_HOME` or `GEMINI_CLI_HOME` pointing at that folder.
 
-- Sign-in runs the CLI's own login in a terminal with that variable set. Latis never reads the folder (§6.5).
+- Sign-in runs the CLI's own login in a terminal with that variable set. Lattiz never reads the folder (§6.5).
 - Switching waits until no chat of that agent is mid-turn, then restarts its sessions, which resume their conversations.
 - Forgetting an account leaves its folder on disk.
 - Second accounts haven't been signed in live yet. Gemini's `GEMINI_CLI_HOME` is taken from its bundle, not its docs.
@@ -318,12 +318,12 @@ An extra account is a folder under `<dataDir>/accounts/<agent>/<id>`. While it's
 ### 2026-10-23: Cards
 
 - **Isolation:** each card is served by a privileged `card://` scheme (`standard`, `secure`) at `card://<id>/`. It runs in `<iframe sandbox="allow-scripts allow-forms">`, so its security origin is opaque (`self.origin === "null"`): no storage, no access to the parent and no cookies. The renderer CSP adds `frame-src card:`.
-- **CSP:** the card CSP is the one in §12.1. Latis doesn't add `form-action 'none'`, because it stopped in-page form submit handlers from firing in Chromium. The sandbox already keeps a form from navigating anything but the card itself.
+- **CSP:** the card CSP is the one in §12.1. Lattiz doesn't add `form-action 'none'`, because it stopped in-page form submit handlers from firing in Chromium. The sandbox already keeps a form from navigating anything but the card itself.
 - **Network:** origins a card may reach are exact `https` origins (or `http` on localhost) with plain host names. Wildcards are refused because they would widen the CSP. The user grants them in a native dialog that lists them, and the card reloads with the new `connect-src`.
-- **Bridge:** `card://<id>/__latis.js` is injected at the top of `<head>`. It talks to the parent over `postMessage`.
+- **Bridge:** `card://<id>/__lattiz.js` is injected at the top of `<head>`. It talks to the parent over `postMessage`.
   - The card node only answers messages whose `source` is its own iframe's window, so one card can't call for another.
   - `ask()` is handled in the renderer: it fills the Conductor's composer and the user still presses Send.
-  - Theme tokens are sent on load and on every theme or accent change, and set as `--latis-*` CSS variables.
+  - Theme tokens are sent on load and on every theme or accent change, and set as `--lattiz-*` CSS variables.
 - **Refresh scripts:** `refresh.mjs` runs under Electron-as-Node in the card folder, with PATH, HOME, locale and temp variables only, for at most 60 s. It gets the card's data on stdin and its JSON stdout is merged into the data.
   - The user approves the script's exact text in a dialog. A changed script asks again (sha256).
   - `card://` never serves `refresh.mjs`.
@@ -343,9 +343,9 @@ An extra account is a folder under `<dataDir>/accounts/<agent>/<id>`. While it's
   - A run is done when nothing is in flight, waiting on approval or in a gate, queued or held.
   - Pause holds handoffs; Stop interrupts the run's chats and drops what's waiting.
 - **Restarts:** after a restart, items that were in flight to chats are sent again, since those turns can't still be running.
-- **Schedules:** checked every 15 s. A run due while Latis was closed happens once on launch, with a note in the run log, and the next run is the next slot after now. A scheduled run uses the Start node's saved input.
+- **Schedules:** checked every 15 s. A run due while Lattiz was closed happens once on launch, with a note in the run log, and the next run is the next slot after now. A scheduled run uses the Start node's saved input.
 - **Building flows:** the builder lays nodes out by longest path from the Start node (cycles fall back to spec order). A spec can set `cwd` and `permissionMode`; without `cwd` the chats work in `<dataDir>/flows/<id>/`. `agent: "auto"` spreads chats across ready agents in the order Claude Code, Codex, Gemini.
-- **Added beyond the spec:** a `start_flow` tool, so the Conductor can run what it builds. `LATIS_FLOW_AGENT=<id>` makes every flow chat use one agent (tests).
+- **Added beyond the spec:** a `start_flow` tool, so the Conductor can run what it builds. `LATTIZ_FLOW_AGENT=<id>` makes every flow chat use one agent (tests).
 - **Not done:** flow chats raise "finished" Inbox items like any chat, which is noisy for big flows.
 
 ### 2026-10-23: Commands and rebindable shortcuts
@@ -377,7 +377,7 @@ A second layout next to the canvas (`prefs.layoutMode`): every chat tiled in a t
 - Your messages are right-aligned bubbles.
 - The canvas has a floating toolbar (fit, zoom, tidy, label, note, card, flow, undo/redo) and section labels (a `label` node type).
 - **Sidebar:** Workspace (Canvas, Lattice, focus views), loose chats (the Conductor and demo chats now appear), collapsible projects. The Files tab is now a filterable file list.
-- **Design:** influenced by the reference screenshots (tinted cards, floating toolbar, section pills) but keeps Latis's own identity: the teal accent, the lattice motif and its own layout.
+- **Design:** influenced by the reference screenshots (tinted cards, floating toolbar, section pills) but keeps Lattiz's own identity: the teal accent, the lattice motif and its own layout.
 - **Bug found:** the tint CSS first used a non-existent `--line` token, which made borders fall back to the text colour. The card bridge had the same mistake. Both use `--border` now.
 
 ### 2026-10-23: Focus mode is called "Lock In"
@@ -394,7 +394,7 @@ Virtuoso's `followOutput` only reacts to new items, so a reply growing in place 
 
 ### 2026-10-25: The lattice is the workspace; the canvas is the map
 
-At the user's request the app opens on the lattice (`layoutMode` default `"lattice"`, ⌘1; the canvas moved to ⌘2 and second place in the title bar and sidebar). Existing data dirs are moved over once (`designV2` setting), which also swaps the old default accent Aurora for Glacier. `LATIS_LAYOUT=canvas` starts on the canvas; the e2e helper sets it because most specs drive the canvas. The canvas stays for seeing how chats, notes, cards and flows relate.
+At the user's request the app opens on the lattice (`layoutMode` default `"lattice"`, ⌘1; the canvas moved to ⌘2 and second place in the title bar and sidebar). Existing data dirs are moved over once (`designV2` setting), which also swaps the old default accent Aurora for Glacier. `LATTIZ_LAYOUT=canvas` starts on the canvas; the e2e helper sets it because most specs drive the canvas. The canvas stays for seeing how chats, notes, cards and flows relate.
 
 Working with several agents happens in the lattice:
 
@@ -405,7 +405,7 @@ Working with several agents happens in the lattice:
 
 ### 2026-10-25: Cold, sharp visual language
 
-Radii are 2–3px (`--radius-*`), pills became squares (status dots keep their shapes for accessibility, §8.12), shadows became hairlines, the palette moved to blue-steel greys with an ice-blue accent (Glacier). Agent colour is a 2px rule on the chat header and on your messages instead of a wash. Toolbar labels use `.latis-caps` (mono, uppercase). Lattice panes sit 4px apart on `bg-0`; the focused one gets a 1px accent outline.
+Radii are 2–3px (`--radius-*`), pills became squares (status dots keep their shapes for accessibility, §8.12), shadows became hairlines, the palette moved to blue-steel greys with an ice-blue accent (Glacier). Agent colour is a 2px rule on the chat header and on your messages instead of a wash. Toolbar labels use `.lattiz-caps` (mono, uppercase). Lattice panes sit 4px apart on `bg-0`; the focused one gets a 1px accent outline.
 
 ### 2026-10-26: The always-ask list is enforced per agent; Settings → Permissions
 
@@ -417,30 +417,30 @@ Settings → Permissions holds the default mode for new chats (moved from its ow
 
 ### 2026-10-26: Claude in public builds: the terminal on the user's sign-in, the chat view on an API key
 
-Anthropic's Agent SDK overview says third-party products may not offer claude.ai login or rate limits unless approved, and points to API keys ([source](https://code.claude.com/docs/en/agent-sdk/overview)). Its support article still lets people use the SDK within their own plan's limits ([source](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)). Latis is going public as a free GitHub repo, so:
+Anthropic's Agent SDK overview says third-party products may not offer claude.ai login or rate limits unless approved, and points to API keys ([source](https://code.claude.com/docs/en/agent-sdk/overview)). Its support article still lets people use the SDK within their own plan's limits ([source](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)). Lattiz is going public as a free GitHub repo, so:
 
-- **Claude Code (`terminal:claude`)**, the default way to use a subscription, runs the user's own `claude` in its own terminal UI. Latis only adds a settings file of HTTP hooks (docs/adapters/claude-code.md → Terminal), which brings back status, Inbox approvals, the always-ask list, turns and checkpoints, resume and workspace tools.
+- **Claude Code (`terminal:claude`)**, the default way to use a subscription, runs the user's own `claude` in its own terminal UI. Lattiz only adds a settings file of HTTP hooks (docs/adapters/claude-code.md → Terminal), which brings back status, Inbox approvals, the always-ask list, turns and checkpoints, resume and workspace tools.
 - **Claude (`claude-code`, the chat view)** needs an Anthropic API key in release builds. The key is kept in the OS keychain via `safeStorage`, or taken from `ANTHROPIC_API_KEY` in the shell. Renamed from "Claude Code" per the SDK branding rules.
-- **Personal use:** running from source and `LATIS_PERSONAL=1 pnpm package` builds keep the chat view on the user's own sign-in. Release CI never sets the flag.
+- **Personal use:** running from source and `LATTIZ_PERSONAL=1 pnpm package` builds keep the chat view on the user's own sign-in. Release CI never sets the flag.
 - **Approval:** asking Anthropic for approval of subscription login in the chat view is open for later.
 
 OpenAI: nothing found that addresses third-party Codex app-server clients on a ChatGPT sign-in ([Codex auth](https://developers.openai.com/codex/auth), [Codex with ChatGPT](https://help.openai.com/en/articles/11369540)). Codex keeps its own sign-in. Re-check before each release.
 
 ### 2026-10-26: A release notice instead of auto-update, for now
 
-Auto-update needs signed builds (macOS won't swap in an unsigned app, Windows shows SmartScreen), and signing waits until there's demand. So installed copies ask GitHub's releases API (`/repos/kornel77777/latis/releases/latest`):
+Auto-update needs signed builds (macOS won't swap in an unsigned app, Windows shows SmartScreen), and signing waits until there's demand. So installed copies ask GitHub's releases API (`/repos/kornel77777/lattiz/releases/latest`):
 
 - **When:** 10 s after launch, then every 6 hours.
 - **What it shows:** a link in the status bar and in Settings → General, plus a toast the first time a version appears. Nothing is downloaded.
-- **What it offers:** only a newer tag whose page is on `github.com/kornel77777/latis/releases/`. Drafts and pre-releases never count, since `latest` excludes them. A 404 (no releases yet, or a private repo) means nothing to offer.
+- **What it offers:** only a newer tag whose page is on `github.com/kornel77777/lattiz/releases/`. Drafts and pre-releases never count, since `latest` excludes them. A 404 (no releases yet, or a private repo) means nothing to offer.
 - **Turning it off:** Settings → General → "Check for new versions". The request carries no user data, only the app version in the User-Agent.
-- **Where it doesn't run:** dev runs never check. `LATIS_UPDATE_FEED` points tests at a local server.
+- **Where it doesn't run:** dev runs never check. `LATTIZ_UPDATE_FEED` points tests at a local server.
 
 ### 2026-10-26: Crash reports and diagnostics stay local; "Report a problem" goes through the user
 
-§13 allows opt-in crash reports. Rather than run a crash service, Latis keeps everything on the machine:
+§13 allows opt-in crash reports. Rather than run a crash service, Lattiz keeps everything on the machine:
 
-- **Logs:** main-process warnings and errors, uncaught exceptions and renderer crashes go to `<dataDir>/logs/latis.log`, scrubbed of home paths, bearer tokens, `sk-` keys, `key=value` secrets and emails, and rotated at 1 MB.
+- **Logs:** main-process warnings and errors, uncaught exceptions and renderer crashes go to `<dataDir>/logs/lattiz.log`, scrubbed of home paths, bearer tokens, `sk-` keys, `key=value` secrets and emails, and rotated at 1 MB.
 - **Crash dumps:** Electron's `crashReporter` runs with `uploadToServer: false`.
 - **Report a problem** (title-bar menu, ⌘K, Settings → General) copies diagnostics to the clipboard: version, OS, installed agents and the scrubbed log tail. It then opens a GitHub new-issue page with only the version and OS filled in, so nothing goes into the URL beyond that, and the user decides what to paste.
 
@@ -462,3 +462,12 @@ At the user's request, `release.yml` builds only the macOS installers. Windows a
 - **Canvas movement:** dragging empty canvas with the left (or middle) button pans, like most canvas apps. A selection box is now Shift + drag, and Space + drag no longer exists. Arrow keys move the view by 15% of the visible area, Shift + arrow by 50%.
 - **"Focus":** the focus views of §8.7 are called "Focus" again ("Lock In" before, DECISIONS 2026-10-23), at the user's request.
 - **Menu items:** they have a minimum height instead of a fixed one, so items with a second line (hints, install commands) no longer overlap the next item.
+
+### 2026-10-27: Renamed from Latis to Lattiz
+
+Two products already used the name: another "Latis" that runs agents from an outline, and "Lattis", a workspace for parallel coding agents, plus an unrelated latisintel.com. At the user's choice the app is now **Lattiz** (lattiz.dev was free). It sounds like "Lattis"; the user accepted that risk.
+
+- **Everything was renamed:** code, packages (`@lattiz/*`), environment variables (`LATTIZ_*`), the `window.lattiz` bridge, the MCP server name, the bundle id (`dev.lattiz.app`), the repo (`kornel77777/lattiz`, and GitHub forwards the old URL), docs and fixtures. History in these notes now uses the new name too.
+- **Data:** on the first launch, the old data folder (`…/Latis`, `latis.db`) moves to `…/Lattiz`, `lattiz.db` (`paths.ts`, `migrateLegacyDataDir`).
+- **Secrets:** they were encrypted under the old app name in the keychain and have to be entered again (Anthropic API key, MCP connection values).
+- **Release notices:** copies of 0.1.x only offer releases whose page is under `kornel77777/latis/`, so they won't announce 0.2.0. Upgrade by hand.

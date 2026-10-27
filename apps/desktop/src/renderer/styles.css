@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@latis/ui/tokens.css";
+@import "@lattiz/ui/tokens.css";
 @import "@xyflow/react/dist/base.css";
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/jetbrains-mono";
@@ -30,13 +30,13 @@
   --shadow-lift: var(--shadow-lift);
   --font-sans: var(--font-ui);
   --font-mono: var(--font-mono);
-  --ease-latis: var(--ease);
+  --ease-lattiz: var(--ease);
   --duration-fast: var(--dur-fast);
-  --animate-latis-pulse: latis-pulse 1.6s var(--ease) infinite;
-  --animate-latis-breathe: latis-breathe 2.4s ease-in-out infinite;
+  --animate-lattiz-pulse: lattiz-pulse 1.6s var(--ease) infinite;
+  --animate-lattiz-breathe: lattiz-breathe 2.4s ease-in-out infinite;
 }
 
-@keyframes latis-pulse {
+@keyframes lattiz-pulse {
   0%,
   100% {
     opacity: 1;
@@ -45,7 +45,7 @@
     opacity: 0.45;
   }
 }
-@keyframes latis-breathe {
+@keyframes lattiz-breathe {
   0%,
   100% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--state-needs-you) 60%, transparent);
@@ -55,8 +55,8 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .animate-latis-pulse,
-  .animate-latis-breathe {
+  .animate-lattiz-pulse,
+  .animate-lattiz-breathe {
     animation: none;
   }
 }
@@ -131,7 +131,7 @@ body {
 }
 
 /* Section labels and toolbars: small, uppercase, mono. */
-.latis-caps {
+.lattiz-caps {
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 500;
@@ -154,16 +154,16 @@ body {
 }
 
 /* New nodes ease in (§8.3 placement); none when reduced motion is preferred. */
-@keyframes latis-appear {
+@keyframes lattiz-appear {
   from {
     opacity: 0;
   }
 }
-.react-flow__node.latis-appear > * {
-  animation: latis-appear 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+.react-flow__node.lattiz-appear > * {
+  animation: lattiz-appear 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
-  .react-flow__node.latis-appear > * {
+  .react-flow__node.lattiz-appear > * {
     animation: none;
   }
 }
@@ -174,7 +174,7 @@ body {
   background: color-mix(in srgb, var(--surface) calc(var(--card-opacity, 0.85) * 100%), transparent);
   backdrop-filter: blur(20px);
 }
-[data-density="compact"] .latis-item {
+[data-density="compact"] .lattiz-item {
   padding-top: 2px;
   padding-bottom: 2px;
 }
@@ -194,7 +194,7 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
-.latis-wallpaper {
+.lattiz-wallpaper {
   position: absolute;
   inset: 0;
   background-size: cover;
@@ -204,39 +204,39 @@ body {
 }
 
 /* Flow connect handles (§11): small accent dots on the sides of nodes inside a flow. */
-.react-flow__handle.latis-handle {
+.react-flow__handle.lattiz-handle {
   width: 10px;
   height: 10px;
   border: 2px solid var(--surface);
   background: var(--accent);
 }
-.react-flow__handle.latis-handle:hover {
+.react-flow__handle.lattiz-handle:hover {
   transform: translate(-50%, -50%) scale(1.3);
 }
-.react-flow__handle-right.latis-handle:hover {
+.react-flow__handle-right.lattiz-handle:hover {
   transform: translate(50%, -50%) scale(1.3);
 }
 
 /* Chats wear their agent's colour (Appearance → Tint chats): a hard 2px rule on the header and on your messages.
    Flat surfaces, no washes; the colour is an identifier, not decoration. */
-.latis-chat > header {
+.lattiz-chat > header {
   box-shadow: inset 0 2px 0 var(--tint);
 }
-.latis-chat[data-tinted] {
+.lattiz-chat[data-tinted] {
   border-color: color-mix(in srgb, var(--tint) 18%, var(--border));
 }
-.latis-chat[data-tinted] > header {
+.lattiz-chat[data-tinted] > header {
   background: color-mix(in srgb, var(--tint) 5%, var(--surface));
 }
-.latis-chat[data-tinted] .latis-bubble {
+.lattiz-chat[data-tinted] .lattiz-bubble {
   border-left-color: var(--tint);
   background: color-mix(in srgb, var(--tint) 7%, var(--surface-2));
 }
 
 /* Section labels on the canvas. */
-.latis-label-dot {
+.lattiz-label-dot {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-[data-card-style="glass"] .latis-chat[data-tinted] {
+[data-card-style="glass"] .lattiz-chat[data-tinted] {
   background: color-mix(in srgb, var(--surface) calc(var(--card-opacity, 0.85) * 100%), transparent);
 }

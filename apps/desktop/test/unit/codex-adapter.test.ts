@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { AgentEvent, DEFAULT_ALWAYS_ASK, type AgentSession, type PermissionMode } from "@latis/shared";
+import { AgentEvent, DEFAULT_ALWAYS_ASK, type AgentSession, type PermissionMode } from "@lattiz/shared";
 import { CodexAdapter } from "../../src/main/agents/adapters/codex";
 import { CodexMapper, unwrapCommand } from "../../src/main/agents/adapters/codex/mapper";
 import { ReplayLibrary, replayTransport } from "../../src/main/agents/rpc/replay";
@@ -197,7 +197,7 @@ describe("CodexAdapter (replayed app-server)", () => {
     const sent: Record<string, unknown>[] = [];
     const s = await adapter(sent).startSession({ cwd: CWD, permissionMode: "full-auto", alwaysAsk: DEFAULT_ALWAYS_ASK });
     const { events, waitFor } = collect(s);
-    // Codex has to ask about every command for Latis to see them.
+    // Codex has to ask about every command for Lattiz to see them.
     expect(sent.find((m) => m.method === "thread/start")).toMatchObject({
       params: { approvalPolicy: "untrusted", sandbox: "danger-full-access" },
     });

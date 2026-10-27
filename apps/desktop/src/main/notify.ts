@@ -1,5 +1,5 @@
 import { app, Notification, type BrowserWindow } from "electron";
-import type { AttentionItem, Prefs } from "@latis/shared";
+import type { AttentionItem, Prefs } from "@lattiz/shared";
 
 // OS notifications and the dock/taskbar badge for the attention system (SPEC §8.6).
 

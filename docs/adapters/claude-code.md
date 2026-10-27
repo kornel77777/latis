@@ -5,8 +5,8 @@ Verified 2026-10-22 against `@anthropic-ai/claude-agent-sdk@0.3.309` and Claude 
 ## Integration
 
 - `query({ prompt: AsyncIterable<SDKUserMessage>, options })` returns a `Query` (an async iterator of `SDKMessage` plus control methods). Streaming input keeps one CLI process alive across turns: push a user message per turn, read until `type: "result"`.
-- **Executable.** The SDK ships per-platform CLI binaries as optional deps (`@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, ~263 MB on darwin-arm64) and spawns one unless `options.pathToClaudeCodeExecutable` is set. Latis always passes the user's own installed `claude` (found through the login shell's PATH, because GUI apps on macOS don't inherit it), and doesn't ship the bundled binary (SPEC §6.5; app size). If `claude` isn't found the agent shows as Not installed with an install hint. SDK 0.3.N pairs with CLI 2.1.N; a newer user CLI has worked so far, but a mismatch is the first suspect if events stop parsing.
-- **Auth.** Nothing to pass: the CLI uses its own sign-in (`apiKeySource: "none"` in `system/init` when it's a subscription login) or `ANTHROPIC_API_KEY` from the environment. Latis never reads `~/.claude*` credential files.
+- **Executable.** The SDK ships per-platform CLI binaries as optional deps (`@anthropic-ai/claude-agent-sdk-<platform>-<arch>`, ~263 MB on darwin-arm64) and spawns one unless `options.pathToClaudeCodeExecutable` is set. Lattiz always passes the user's own installed `claude` (found through the login shell's PATH, because GUI apps on macOS don't inherit it), and doesn't ship the bundled binary (SPEC §6.5; app size). If `claude` isn't found the agent shows as Not installed with an install hint. SDK 0.3.N pairs with CLI 2.1.N; a newer user CLI has worked so far, but a mismatch is the first suspect if events stop parsing.
+- **Auth.** Nothing to pass: the CLI uses its own sign-in (`apiKeySource: "none"` in `system/init` when it's a subscription login) or `ANTHROPIC_API_KEY` from the environment. Lattiz never reads `~/.claude*` credential files.
 - `settingSources: []` isolates recordings from the user's settings; the adapter keeps the SDK default so users' own CLAUDE.md, hooks and permissions apply.
 
 ## Options used
@@ -24,7 +24,7 @@ Verified 2026-10-22 against `@anthropic-ai/claude-agent-sdk@0.3.309` and Claude 
 
 ## Permission modes (SPEC §9.8)
 
-| Latis               | SDK `permissionMode` | Notes                                                                               |
+| Lattiz              | SDK `permissionMode` | Notes                                                                               |
 | ------------------- | -------------------- | ----------------------------------------------------------------------------------- |
 | Read-only           | `default`            | `canUseTool` auto-denies every non-read tool                                        |
 | Ask                 | `default`            | Reads run without asking; edits and commands go through `canUseTool`                |
@@ -33,7 +33,7 @@ Verified 2026-10-22 against `@anthropic-ai/claude-agent-sdk@0.3.309` and Claude 
 
 `canUseTool(toolName, input, { toolUseID, title, displayName, decisionReason, suggestions, signal })` resolves to `{ behavior: "allow", updatedInput, updatedPermissions? }` or `{ behavior: "deny", message, interrupt? }`.
 
-- `suggestions` arrive with `destination: "localSettings"`, which would write into the repo's `.claude/settings.local.json`. For "Always for this chat" Latis rewrites them to `destination: "session"`.
+- `suggestions` arrive with `destination: "localSettings"`, which would write into the repo's `.claude/settings.local.json`. For "Always for this chat" Lattiz rewrites them to `destination: "session"`.
 - Reads (`Read`, `Glob`, `Grep`) are not asked in `default` mode.
 
 ## Always-ask list (probed live 2026-10-26, SDK 0.3.309, Haiku)
@@ -87,44 +87,44 @@ The platform binary packages are excluded from the app (`!**/claude-agent-sdk-*/
 
 ## Steering (probed live 2026-10-23)
 
-Pushing `{ type: "user", message, parent_tool_use_id: null, priority: "next" }` into the streaming input while a turn runs delivers it at the model's next step **without ending the turn**: one `result` for the whole turn, and the model followed the new instruction (ran `echo STEERED` instead of `echo second`). The CLI doesn't echo the steered message back in the stream, so Latis records it itself (`user.steered` event). The replay query skips `priority: "next"` messages.
+Pushing `{ type: "user", message, parent_tool_use_id: null, priority: "next" }` into the streaming input while a turn runs delivers it at the model's next step **without ending the turn**: one `result` for the whole turn, and the model followed the new instruction (ran `echo STEERED` instead of `echo second`). The CLI doesn't echo the steered message back in the stream, so Lattiz records it itself (`user.steered` event). The replay query skips `priority: "next"` messages.
 
 ## MCP servers and instructions (verified 2026-10-23, SDK 0.3.309, CLI 2.1.309)
 
 - `Options.mcpServers` takes `{ [name]: { type: "http", url, headers } | { type: "stdio", command, args, env } }`. Tools show up as `mcp__<server>__<tool>`; Claude Code may load them lazily via `ToolSearch` first, which is visible as a step.
-- MCP tool calls go through `canUseTool` like any other tool. Latis allows `mcp__latis__*` without asking (except in read-only chats).
-- Long tool calls: the CLI's own MCP timeout is set with the `MCP_TOOL_TIMEOUT` env var (ms). Latis sets 30 minutes because `wait_for_chats` blocks.
-- Instructions: `systemPrompt: { type: "preset", preset: "claude_code", append }` keeps Claude Code's own prompt and adds Latis's.
+- MCP tool calls go through `canUseTool` like any other tool. Lattiz allows `mcp__lattiz__*` without asking (except in read-only chats).
+- Long tool calls: the CLI's own MCP timeout is set with the `MCP_TOOL_TIMEOUT` env var (ms). Lattiz sets 30 minutes because `wait_for_chats` blocks.
+- Instructions: `systemPrompt: { type: "preset", preset: "claude_code", append }` keeps Claude Code's own prompt and adds Lattiz's.
 - Live S4 (`e2e/live-m5.spec.ts`): as the Conductor, Claude Code called `spawn_chat` ×3 (and chose `permission_mode: "read-only"` itself), then `wait_for_chats` and `create_note`, in a 47 s turn.
 
 ## Two ways to run Claude (2026-10-26)
 
-Anthropic's Agent SDK docs: "Unless previously approved, Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products, including agents built on the Claude Agent SDK." So Latis has two Claude agents:
+Anthropic's Agent SDK docs: "Unless previously approved, Anthropic does not allow third party developers to offer claude.ai login or rate limits for their products, including agents built on the Claude Agent SDK." So Lattiz has two Claude agents:
 
-| Agent       | id                | UI                                        | Auth                                                                                                                                                                                 |
-| ----------- | ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Claude      | `claude-code`     | Latis's chat card (this SDK adapter)      | An Anthropic API key (Settings → Agents, keychain) or `ANTHROPIC_API_KEY` from the shell. The user's sign-in only in dev runs and personal builds (`LATIS_PERSONAL=1 pnpm package`). |
-| Claude Code | `terminal:claude` | Claude Code's own terminal UI in the tile | The user's own Claude Code sign-in, untouched by Latis                                                                                                                               |
+| Agent       | id                | UI                                        | Auth                                                                                                                                                                                  |
+| ----------- | ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude      | `claude-code`     | Lattiz's chat card (this SDK adapter)     | An Anthropic API key (Settings → Agents, keychain) or `ANTHROPIC_API_KEY` from the shell. The user's sign-in only in dev runs and personal builds (`LATTIZ_PERSONAL=1 pnpm package`). |
+| Claude Code | `terminal:claude` | Claude Code's own terminal UI in the tile | The user's own Claude Code sign-in, untouched by Lattiz                                                                                                                               |
 
 Verified 2026-10-26 (CLI 2.1.310): with `ANTHROPIC_API_KEY` in the env, the SDK session uses only the key. `accountInfo()` reports `apiKeySource: "ANTHROPIC_API_KEY"`, and a bad key fails with "Invalid API key" rather than falling back to the subscription.
 
 ## Terminal (`terminal:claude`, probed live 2026-10-26)
 
-Latis starts `claude --session-id <uuid> --settings <file>` in a PTY. After a restart it uses `--resume <uuid>`. With workspace tools it adds `--mcp-config <file>`, and with instructions `--append-system-prompt`. The files go in `<dataDir>/run`, mode 0600 (they hold tokens), and are removed when the session ends. The settings file adds HTTP hooks (`type: "http"`, `Authorization: Bearer <per-chat hook token>`) for `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Notification` and `Stop`. They POST to `/hooks` on Latis's loopback server, next to `/mcp`, with separate tokens. The user's own hooks keep running.
+Lattiz starts `claude --session-id <uuid> --settings <file>` in a PTY. After a restart it uses `--resume <uuid>`. With workspace tools it adds `--mcp-config <file>`, and with instructions `--append-system-prompt`. The files go in `<dataDir>/run`, mode 0600 (they hold tokens), and are removed when the session ends. The settings file adds HTTP hooks (`type: "http"`, `Authorization: Bearer <per-chat hook token>`) for `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `Notification` and `Stop`. They POST to `/hooks` on Lattiz's loopback server, next to `/mcp`, with separate tokens. The user's own hooks keep running.
 
-| Hook                           | Latis                                                                                                                                                                                                                                                                       |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `UserPromptSubmit`             | Records a turn and takes its checkpoint before answering, so Review and the timeline work. Text Latis typed itself (queue, flows) doesn't start a second turn.                                                                                                              |
-| `PreToolUse` (Bash/PowerShell) | Always-ask list. A match is held, and shown as a banner over the terminal and in the Inbox. The answer comes back as `permissionDecision`.                                                                                                                                  |
-| `PermissionRequest`            | Claude Code shows its own prompt **and** Latis raises an Inbox item. Whichever answers first wins. When the terminal answers, Claude abandons the HTTP request and the next hook settles Latis's item. "Always" maps to `updatedPermissions` with `destination: "session"`. |
-| `PostToolUse`                  | Working.                                                                                                                                                                                                                                                                    |
-| `Notification`                 | `idle_prompt` means idle when no turn is open. Other types (not `permission_prompt`) mean needs-you.                                                                                                                                                                        |
-| `Stop`                         | `last_assistant_message` becomes the finished summary, then `turn.completed`.                                                                                                                                                                                               |
+| Hook                           | Lattiz                                                                                                                                                                                                                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UserPromptSubmit`             | Records a turn and takes its checkpoint before answering, so Review and the timeline work. Text Lattiz typed itself (queue, flows) doesn't start a second turn.                                                                                                               |
+| `PreToolUse` (Bash/PowerShell) | Always-ask list. A match is held, and shown as a banner over the terminal and in the Inbox. The answer comes back as `permissionDecision`.                                                                                                                                    |
+| `PermissionRequest`            | Claude Code shows its own prompt **and** Lattiz raises an Inbox item. Whichever answers first wins. When the terminal answers, Claude abandons the HTTP request and the next hook settles Lattiz's item. "Always" maps to `updatedPermissions` with `destination: "session"`. |
+| `PostToolUse`                  | Working.                                                                                                                                                                                                                                                                      |
+| `Notification`                 | `idle_prompt` means idle when no turn is open. Other types (not `permission_prompt`) mean needs-you.                                                                                                                                                                          |
+| `Stop`                         | `last_assistant_message` becomes the finished summary, then `turn.completed`.                                                                                                                                                                                                 |
 
-- **Not observed:** `SessionStart` didn't reach an HTTP hook in the probes. Latis passes `--session-id` instead, so it knows the id up front.
+- **Not observed:** `SessionStart` didn't reach an HTTP hook in the probes. Lattiz passes `--session-id` instead, so it knows the id up front.
 - **Interrupts:** Esc or Ctrl+C mid-turn with no hook within 2.5 s counts as an interrupt, because Claude Code doesn't run `Stop` on an interrupt.
 - **Trust prompt:** a new folder still shows Claude Code's own "trust this folder" prompt, which the user answers in the terminal.
 - **Tests:**
   - `fixtures/terminal/fake-claude/claude` speaks the same hook protocol for `e2e/claude-terminal.spec.ts`.
-  - `e2e/live-claude-terminal.spec.ts` (`LATIS_LIVE=1`) runs the real CLI.
+  - `e2e/live-claude-terminal.spec.ts` (`LATTIZ_LIVE=1`) runs the real CLI.
   - Windows is unverified: Claude Code runs hooks itself, but `--settings` paths there aren't tested.

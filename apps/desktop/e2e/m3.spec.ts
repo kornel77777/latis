@@ -2,14 +2,14 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { fixturesRoot, launch, stubFolderPicker, tempDataDir } from "./helpers";
 
 // M3: worktrees, checkpoints/undo/timeline, Review Inbox, merge with conflict detection.
 // The demo agent's `/write <word>` script writes src/<word>.txt for real, so git sees real changes.
 
-const shots = process.env.LATIS_SCREENSHOTS;
-type Api = { latis: LatisApi };
+const shots = process.env.LATTIZ_SCREENSHOTS;
+type Api = { lattiz: LattizApi };
 const run = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" });
 
 async function setup() {
@@ -21,7 +21,7 @@ async function setup() {
   run(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "init", "--allow-empty");
   run(repo, "add", "-A");
   run(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "readme");
-  const { app, page } = await launch(dataDir, { LATIS_REPLAY: fixturesRoot });
+  const { app, page } = await launch(dataDir, { LATTIZ_REPLAY: fixturesRoot });
   await stubFolderPicker(app, repo);
   await page.getByTestId("empty-open-folder").click();
   await expect(page.getByTestId("project-frame")).toContainText("shop");
@@ -31,7 +31,7 @@ async function setup() {
 /** Demo-agent chats inside the project (the UI keeps the demo agent out of real folders). */
 async function demoChats(page: Page, isolate: boolean[]): Promise<void> {
   await page.evaluate(async (flags) => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const canvas = await api.invoke("canvas:load");
     for (const isolate of flags) {
       await api.invoke("chat:create", { canvasId: canvas.id, projectId: canvas.projects[0]!.id, agentId: "fake", x: 0, y: 0, isolate });
@@ -96,7 +96,7 @@ test("S1: two agents in their own worktrees, reviewed in the Review Inbox, both 
   }
   expect(readFileSync(join(repo, "src/pricing.txt"), "utf8")).toContain("Feature: pricing");
   expect(readFileSync(join(repo, "src/checkout.txt"), "utf8")).toContain("Feature: checkout");
-  expect(run(repo, "worktree", "list")).not.toContain("latis/");
+  expect(run(repo, "worktree", "list")).not.toContain("lattiz/");
   await app.close();
 });
 
@@ -181,7 +181,7 @@ test("S1 with the keyboard only: two agents in their own copies, reviewed and me
   run(repo, "init", "-q", "-b", "main");
   run(repo, "add", "-A");
   run(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "readme");
-  const { app, page } = await launch(dataDir, { LATIS_REPLAY: fixturesRoot, LATIS_DEMO_IN_PROJECTS: "1" });
+  const { app, page } = await launch(dataDir, { LATTIZ_REPLAY: fixturesRoot, LATTIZ_DEMO_IN_PROJECTS: "1" });
   await stubFolderPicker(app, repo); // the native folder dialog is the one thing a test can't type into
   const kb = page.keyboard;
   const palette = async (query: string) => {

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AgentAdapter, AgentEvent, AgentSession, ReviewItem } from "@latis/shared";
+import type { AgentAdapter, AgentEvent, AgentSession, ReviewItem } from "@lattiz/shared";
 import { SessionSupervisor } from "../../src/main/agents/supervisor";
 import { Changes } from "../../src/main/git/changes";
 import { git, initRepo } from "../../src/main/git/git";
@@ -46,12 +46,12 @@ function writerAdapter(received: string[]): AgentAdapter {
 }
 
 async function setup() {
-  const dataDir = mkdtempSync(join(tmpdir(), "latis-changes-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "lattiz-changes-"));
   const repo = join(dataDir, "repo");
   mkdirSync(repo);
   writeFileSync(join(repo, "README.md"), "# repo\n");
   await initRepo(repo);
-  const store = new WorkspaceStore(openDb(join(dataDir, "latis.db")));
+  const store = new WorkspaceStore(openDb(join(dataDir, "lattiz.db")));
   const canvasId = store.ensureDefaultCanvas();
   const { project } = store.createProject({ canvasId, folderPath: repo, x: 0, y: 0 });
   const reviews: ReviewItem[][] = [];
@@ -110,7 +110,7 @@ describe("safe changes", () => {
     const { sup, changes, chat, repo, reviews, store } = await setup();
     const a = await chat(true);
     const b = await chat(true);
-    expect(a.worktree?.branch).toMatch(/^latis\/writer-/);
+    expect(a.worktree?.branch).toMatch(/^lattiz\/writer-/);
     expect(a.cwd).not.toBe(repo);
     await sup.send(a.id, "build pricing");
     await sup.send(b.id, "build checkout");
@@ -190,8 +190,8 @@ describe("safe changes", () => {
 
     await sup.send(c.id, "write three");
     await settle();
-    expect(received.at(-1)).toMatch(/^\[Note from Latis\] The user undid/m);
-    expect(received.at(-1)).toContain("[Note from Latis] The user restored");
+    expect(received.at(-1)).toMatch(/^\[Note from Lattiz\] The user undid/m);
+    expect(received.at(-1)).toContain("[Note from Lattiz] The user restored");
     // The transcript keeps what the user typed.
     expect(store.turns(c.id).at(-1)?.userText).toBe("write three");
   });

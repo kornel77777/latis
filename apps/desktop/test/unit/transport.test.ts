@@ -15,7 +15,7 @@ const alive = (pid: number) => {
 
 describe("spawnTransport", () => {
   it.skipIf(process.platform === "win32")("kills helpers the agent started, not just the agent (gemini re-launches itself)", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "latis-tree-"));
+    const dir = mkdtempSync(join(tmpdir(), "lattiz-tree-"));
     const pidFile = join(dir, "child.pid");
     // A wrapper that spawns a long-lived child, like `gemini` re-launching with a bigger heap.
     writeFileSync(

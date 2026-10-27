@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LatticeNode } from "@latis/shared";
+import type { LatticeNode } from "@lattiz/shared";
 import {
   add,
   arrange,

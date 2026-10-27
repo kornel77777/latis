@@ -1,13 +1,13 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import { eventChannels, invokeChannels, type IpcResult, type LatisApi } from "@latis/shared";
+import { eventChannels, invokeChannels, type IpcResult, type LattizApi } from "@lattiz/shared";
 
-// Sandboxed preload: exposes exactly one object, `window.latis`, and only for
+// Sandboxed preload: exposes exactly one object, `window.lattiz`, and only for
 // channels in the IPC contract. Payload validation happens in main and renderer.
 
 const invokeSet = new Set<string>(invokeChannels);
 const eventSet = new Set<string>(eventChannels);
 
-const api: LatisApi = {
+const api: LattizApi = {
   async invoke(channel, ...req) {
     if (!invokeSet.has(channel)) throw new Error(`unknown channel ${channel}`);
     const result = (await ipcRenderer.invoke(channel, req[0])) as IpcResult<never>;
@@ -24,4 +24,4 @@ const api: LatisApi = {
   platform: process.platform,
 };
 
-contextBridge.exposeInMainWorld("latis", api);
+contextBridge.exposeInMainWorld("lattiz", api);

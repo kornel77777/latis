@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Columns3, LayoutGrid, PanelLeft, X } from "lucide-react";
-import type { FocusView as View } from "@latis/shared";
-import { Button, cn } from "@latis/ui";
+import type { FocusView as View } from "@lattiz/shared";
+import { Button, cn } from "@lattiz/ui";
 import { FullChat } from "../chat/ChatNode";
 import { useWorkspace } from "../stores/workspace";
 

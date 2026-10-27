@@ -26,9 +26,9 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import type { ImageAttachment, QueuedMessage } from "@latis/shared";
-import { buildTranscript } from "@latis/shared";
-import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot, cn } from "@latis/ui";
+import type { ImageAttachment, QueuedMessage } from "@lattiz/shared";
+import { buildTranscript } from "@lattiz/shared";
+import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot, cn } from "@lattiz/ui";
 import { useZoomLevel } from "../canvas/zoom";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { ChatCondensed, ChatTile } from "./ChatCompact";
@@ -183,7 +183,7 @@ export const FullChat = memo(function FullChat({
         data-agent={s.agentId}
         data-completed-turns={items.filter((i) => i.kind === "turn-end").length}
         className={cn(
-          "latis-chat flex h-full w-full flex-col overflow-hidden rounded-card border bg-surface transition-shadow duration-fast",
+          "lattiz-chat flex h-full w-full flex-col overflow-hidden rounded-card border bg-surface transition-shadow duration-fast",
           selected ? "border-line-strong shadow-lift" : "border-line",
           s.status === "needs-you" && "ring-1 ring-state-needs-you/50",
         )}
@@ -191,7 +191,7 @@ export const FullChat = memo(function FullChat({
         style={{ "--tint": `var(--hue-${hue})` } as React.CSSProperties}
       >
         <header
-          className="latis-drag flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3 active:cursor-grabbing"
+          className="lattiz-drag flex h-10 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3 active:cursor-grabbing"
           {...(onHeaderPointerDown && { onPointerDown: onHeaderPointerDown })}
         >
           {paneGrip}
@@ -239,7 +239,7 @@ export const FullChat = memo(function FullChat({
             )}
             {unenforced && (
               <span
-                title={`Full-auto: ${agentLabel} runs most tools without asking. Latis checks the always-ask list only when ${agentLabel} asks before running a command.`}
+                title={`Full-auto: ${agentLabel} runs most tools without asking. Lattiz checks the always-ask list only when ${agentLabel} asks before running a command.`}
                 className="text-state-working"
               >
                 <AlertTriangle size={13} />
@@ -255,7 +255,7 @@ export const FullChat = memo(function FullChat({
                     data-testid="branch-chip"
                   >
                     <GitBranch size={12} className="shrink-0" />{" "}
-                    <span className="truncate">{s.worktree.branch.replace(/^latis\//, "")}</span>
+                    <span className="truncate">{s.worktree.branch.replace(/^lattiz\//, "")}</span>
                     {s.worktree.merged && <span className="text-text-3">· merged</span>}
                   </button>
                 }
@@ -293,7 +293,7 @@ export const FullChat = memo(function FullChat({
                 {s.projectId && !terminalAgent && (
                   <MenuItem
                     onSelect={() =>
-                      void window.latis
+                      void window.lattiz
                         .invoke("chat:isolate", { chatId })
                         .then(() => useWorkspace.getState().toast("This chat now works in its own copy on a new branch."))
                         .catch((err: unknown) => useWorkspace.getState().toast(err instanceof Error ? err.message : String(err)))
@@ -441,7 +441,7 @@ export const FullChat = memo(function FullChat({
                   increaseViewportBy={{ top: 400, bottom: 400 }}
                   computeItemKey={(_i, it) => it.key}
                   itemContent={(_i, it) => (
-                    <div className="latis-item px-3.5 py-1.25">
+                    <div className="lattiz-item px-3.5 py-1.25">
                       <Item item={it} actions={actions} />
                     </div>
                   )}

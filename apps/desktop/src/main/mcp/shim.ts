@@ -1,10 +1,10 @@
-// `latis-mcp`: the stdio shim for agents that only speak MCP over stdio (SPEC §10.1). Latis starts
-// it with ELECTRON_RUN_AS_NODE=1 and LATIS_MCP_URL / LATIS_MCP_TOKEN set; it forwards each JSON-RPC
+// `lattiz-mcp`: the stdio shim for agents that only speak MCP over stdio (SPEC §10.1). Lattiz starts
+// it with ELECTRON_RUN_AS_NODE=1 and LATTIZ_MCP_URL / LATTIZ_MCP_TOKEN set; it forwards each JSON-RPC
 // line to the running app's Workspace MCP server and writes the replies back.
 import { createInterface } from "node:readline";
 
-const url = process.env.LATIS_MCP_URL;
-const token = process.env.LATIS_MCP_TOKEN;
+const url = process.env.LATTIZ_MCP_URL;
+const token = process.env.LATTIZ_MCP_TOKEN;
 
 function write(msg: unknown) {
   process.stdout.write(JSON.stringify(msg) + "\n");
@@ -21,7 +21,7 @@ async function forward(line: string) {
   const fail = (message: string) => {
     if (msg.id !== undefined) write({ jsonrpc: "2.0", id: msg.id, error: { code: -32000, message } });
   };
-  if (!url || !token) return fail("latis-mcp needs LATIS_MCP_URL and LATIS_MCP_TOKEN (Latis sets them for its own chats).");
+  if (!url || !token) return fail("lattiz-mcp needs LATTIZ_MCP_URL and LATTIZ_MCP_TOKEN (Lattiz sets them for its own chats).");
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -35,11 +35,11 @@ async function forward(line: string) {
     });
     if (res.status === 202) return; // a notification
     const text = await res.text();
-    if (!res.ok) return fail(`Latis answered ${res.status}: ${text.slice(0, 200)}`);
+    if (!res.ok) return fail(`Lattiz answered ${res.status}: ${text.slice(0, 200)}`);
     const body = JSON.parse(text) as unknown;
     for (const m of Array.isArray(body) ? body : [body]) write(m);
   } catch (err) {
-    fail(`Latis isn't reachable (${err instanceof Error ? err.message : String(err)}). Is the app still running?`);
+    fail(`Lattiz isn't reachable (${err instanceof Error ? err.message : String(err)}). Is the app still running?`);
   }
 }
 

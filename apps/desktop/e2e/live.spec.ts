@@ -5,8 +5,8 @@ import { expect, test } from "@playwright/test";
 import { launch, stubFolderPicker, tempDataDir } from "./helpers";
 
 // M1 exit criterion against the real Claude Code CLI. Opt-in: spends real tokens (Haiku, a few cents).
-//   LATIS_LIVE=1 pnpm e2e -- e2e/live.spec.ts
-test.skip(!process.env.LATIS_LIVE, "set LATIS_LIVE=1 to run against the real Claude Code");
+//   LATTIZ_LIVE=1 pnpm e2e -- e2e/live.spec.ts
+test.skip(!process.env.LATTIZ_LIVE, "set LATTIZ_LIVE=1 to run against the real Claude Code");
 test.setTimeout(240_000);
 
 test("live: open a repo, chat with Claude Code, approve a command, see the diff, restart and resume", async () => {
@@ -49,7 +49,7 @@ test("live: open a repo, chat with Claude Code, approve a command, see the diff,
   await expect(card).toHaveAttribute("data-completed-turns", "1", { timeout: 120_000 });
   expect(readFileSync(join(repo, "hello.txt"), "utf8").trim()).toBe("hi");
   await expect(card.getByTestId("diff").first()).toContainText("hi");
-  if (process.env.LATIS_SCREENSHOTS) await page.screenshot({ path: `${process.env.LATIS_SCREENSHOTS}/live-1.png` });
+  if (process.env.LATTIZ_SCREENSHOTS) await page.screenshot({ path: `${process.env.LATTIZ_SCREENSHOTS}/live-1.png` });
 
   await app.close();
   ({ app, page } = await launch(dataDir));
@@ -61,6 +61,6 @@ test("live: open a repo, chat with Claude Code, approve a command, see the diff,
   await again.getByTestId("send").click();
   await expect(again).toHaveAttribute("data-completed-turns", "2", { timeout: 120_000 });
   await expect(again.getByTestId("assistant-message").last()).toContainText("hello.txt");
-  if (process.env.LATIS_SCREENSHOTS) await page.screenshot({ path: `${process.env.LATIS_SCREENSHOTS}/live-2.png` });
+  if (process.env.LATTIZ_SCREENSHOTS) await page.screenshot({ path: `${process.env.LATTIZ_SCREENSHOTS}/live-2.png` });
   await app.close();
 });

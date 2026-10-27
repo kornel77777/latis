@@ -7,7 +7,7 @@ import { openDb } from "../../src/main/store/db";
 import { WorkspaceStore } from "../../src/main/store/workspace";
 
 function setup(start: number) {
-  const store = new WorkspaceStore(openDb(join(mkdtempSync(join(tmpdir(), "latis-sched-")), "latis.db")));
+  const store = new WorkspaceStore(openDb(join(mkdtempSync(join(tmpdir(), "lattiz-sched-")), "lattiz.db")));
   let now = start;
   const sent: [string, string][] = [];
   const notes: string[] = [];
@@ -43,7 +43,7 @@ describe("Scheduler", () => {
     await s.tick();
     expect(sent.map((x) => x[1])).toEqual(["missed", "hourly"]);
     expect(notes).toHaveLength(2);
-    expect(notes[0]).toMatch(/late because Latis wasn't running/);
+    expect(notes[0]).toMatch(/late because Lattiz wasn't running/);
     expect(s.list()).toEqual([expect.objectContaining({ text: "hourly", fireAt: 10.5 * hour })]);
   });
 

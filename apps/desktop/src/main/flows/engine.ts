@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CanvasNode, FlowEdge, FlowSchedule } from "@latis/shared";
+import type { CanvasNode, FlowEdge, FlowSchedule } from "@lattiz/shared";
 import type { WorkspaceStore } from "../store/workspace";
 
 // The flows engine (SPEC §11). A run moves items along a flow's edges: when a node produces
@@ -306,7 +306,7 @@ export class FlowEngine {
     return parts.join("\n\n");
   }
 
-  // ── Events from the rest of Latis ─────────────────────────────────────────
+  // ── Events from the rest of Lattiz ─────────────────────────────────────────
 
   /** A chat's turn ended: its final message is its output (supervisor hook). */
   turnEnded(chatId: string, status: "ok" | "interrupted" | "error", final: string | undefined): void {
@@ -454,14 +454,14 @@ export class FlowEngine {
       const inflight = run.state.inflight;
       run.state.inflight = {};
       const n = Object.keys(inflight).length;
-      if (n) this.log(run, `Latis restarted; ${n} chat${n === 1 ? "" : "s"} get${n === 1 ? "s" : ""} their input again.`);
+      if (n) this.log(run, `Lattiz restarted; ${n} chat${n === 1 ? "" : "s"} get${n === 1 ? "s" : ""} their input again.`);
       for (const [nodeId, batches] of Object.entries(inflight)) for (const items of batches) this.deliver(run, nodeId, items);
       this.finishIfIdle(run);
       this.save(run);
     }
   }
 
-  /** Starts flows whose schedule is due; a run missed while Latis was closed happens once (§11.3). */
+  /** Starts flows whose schedule is due; a run missed while Lattiz was closed happens once (§11.3). */
   tick(): void {
     const now = this.now();
     for (const f of this.d.store.liveFlows()) {
@@ -474,7 +474,7 @@ export class FlowEngine {
         if (now - f.nextRunAt > LATE_MS) {
           const run = this.active(f.id);
           if (run) {
-            this.log(run, `It was due ${new Date(f.nextRunAt).toLocaleString()}, while Latis was closed.`);
+            this.log(run, `It was due ${new Date(f.nextRunAt).toLocaleString()}, while Lattiz was closed.`);
             this.save(run);
           }
         }

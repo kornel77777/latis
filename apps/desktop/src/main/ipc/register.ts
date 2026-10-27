@@ -7,7 +7,7 @@ import {
   type InvokeChannel,
   type InvokeRes,
   type IpcResult,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { z } from "zod";
 
 type Handlers = {

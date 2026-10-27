@@ -1,4 +1,4 @@
-import type { FlowSpec } from "@latis/shared";
+import type { FlowSpec } from "@lattiz/shared";
 
 // One-click flows (SPEC §11.5). `agent: "auto"` spreads chats across the connected agents.
 

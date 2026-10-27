@@ -13,7 +13,7 @@ import {
   type RequestResponse,
   type SessionOptions,
   type UserTurn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { AgentManifest } from "../../manifests";
 import { JsonRpcPeer, RpcError, type Params } from "../../rpc/peer";
 import { spawnTransport, type LineTransport } from "../../rpc/transport";
@@ -45,7 +45,7 @@ const pairs = (o?: Record<string, string>) => Object.entries(o ?? {}).map(([name
 
 /**
  * ACP's `mcpServers` entries. Every agent takes stdio; HTTP only when it says so, otherwise
- * HTTP servers are skipped (Latis's own goes through the `latis-mcp` shim, see index.ts).
+ * HTTP servers are skipped (Lattiz's own goes through the `lattiz-mcp` shim, see index.ts).
  */
 function acpMcp(list: McpServerConfig[] | undefined, http: boolean): unknown[] {
   return (list ?? []).flatMap((m): unknown[] => {
@@ -54,11 +54,11 @@ function acpMcp(list: McpServerConfig[] | undefined, http: boolean): unknown[] {
   });
 }
 
-/** Calls to Latis's own workspace tools; they carry their guardrails in Latis and don't ask the user. */
-const isWorkspaceTool = (call: ToolCall) => /\(latis MCP Server\)/.test(call.title ?? "") || /^(mcp__)?latis__/.test(call.toolCallId);
+/** Calls to Lattiz's own workspace tools; they carry their guardrails in Lattiz and don't ask the user. */
+const isWorkspaceTool = (call: ToolCall) => /\(lattiz MCP Server\)/.test(call.title ?? "") || /^(mcp__)?lattiz__/.test(call.toolCallId);
 type PermissionOption = { optionId: string; name: string; kind: "allow_once" | "allow_always" | "reject_once" | "reject_always" };
 
-/** Well-known mode ids per Latis mode, used when a manifest doesn't map them. */
+/** Well-known mode ids per Lattiz mode, used when a manifest doesn't map them. */
 const MODE_ALIASES: Record<PermissionMode, string[]> = {
   "read-only": ["plan", "read-only", "readonly", "read_only"],
   ask: ["default", "ask", "manual"],
@@ -73,7 +73,7 @@ function commandOf(call: ToolCall): string {
 
 const READ_KINDS = new Set(["read", "search", "fetch", "think", "switch_mode"]);
 const EDIT_KINDS = new Set(["edit", "delete", "move"]);
-const CLIENT_INFO = { name: "latis", title: "Latis", version: "0.1.0" };
+const CLIENT_INFO = { name: "lattiz", title: "Lattiz", version: "0.1.0" };
 
 function isAuthError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -199,7 +199,7 @@ export class AcpAdapter implements AgentAdapter {
 }
 
 function initializeParams() {
-  // No fs/terminal client capabilities: agents work on disk with their own tools and Latis observes.
+  // No fs/terminal client capabilities: agents work on disk with their own tools and Lattiz observes.
   return {
     protocolVersion: 1,
     clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
@@ -280,7 +280,7 @@ class AcpSession extends SessionBase implements AgentSession {
       s.images = Boolean(init.agentCapabilities?.promptCapabilities?.image);
       const mcpServers = acpMcp(opts.mcpServers, Boolean(init.agentCapabilities?.mcpCapabilities?.http));
       if (resume && init.agentCapabilities?.loadSession) {
-        // The agent replays the conversation as updates; Latis already has it in the event log.
+        // The agent replays the conversation as updates; Lattiz already has it in the event log.
         s.loading = true;
         s.state = await s.peer.request<NewSessionResult>("session/load", { sessionId: resume, cwd: opts.cwd, mcpServers });
         s.loading = false;
@@ -321,16 +321,16 @@ class AcpSession extends SessionBase implements AgentSession {
 
   private async applyMode(mode: PermissionMode) {
     // The agent's yolo mode never asks, so with an always-ask list Full-auto runs the agent in its auto-edit mode
-    // and Latis allows everything that isn't listed (docs/adapters/acp.md → Always-ask list).
+    // and Lattiz allows everything that isn't listed (docs/adapters/acp.md → Always-ask list).
     const id = this.modeId(mode === "full-auto" && this.alwaysAsk.length ? "auto-edit" : mode);
     if (!id || id === this.state.modes?.currentModeId) return;
     try {
       await this.peer.request("session/set_mode", { sessionId: this.sessionId, modeId: id });
       if (this.state.modes) this.state.modes.currentModeId = id;
     } catch (err) {
-      // Gemini refuses autoEdit/yolo in folders it doesn't trust yet. Latis enforces the mode itself
+      // Gemini refuses autoEdit/yolo in folders it doesn't trust yet. Lattiz enforces the mode itself
       // on every permission request (onRequest), so the chat still behaves as chosen.
-      console.warn(`[${this.adapter.id}] agent kept its own mode; Latis enforces ${mode}`, err instanceof Error ? err.message : err);
+      console.warn(`[${this.adapter.id}] agent kept its own mode; Lattiz enforces ${mode}`, err instanceof Error ? err.message : err);
     }
   }
 
@@ -379,7 +379,7 @@ class AcpSession extends SessionBase implements AgentSession {
   }
 
   private onRequest(method: string, params: Params): Promise<unknown> {
-    if (method !== "session/request_permission") return Promise.reject(new RpcError(`Latis doesn't provide ${method}`, -32601));
+    if (method !== "session/request_permission") return Promise.reject(new RpcError(`Lattiz doesn't provide ${method}`, -32601));
     const call = params.toolCall as ToolCall;
     const options = params.options as PermissionOption[];
     // Emulated modes on top of whatever the agent's own mode decides (docs/adapters/acp.md).
@@ -453,7 +453,7 @@ class AcpSession extends SessionBase implements AgentSession {
       this.mapper.markDenied(p.call.toolCallId);
       p.resolve(this.pick(p.options, ["reject_once", "reject_always"]));
     } else {
-      // "Always" is remembered by Latis and answered with allow-once: agents' own allow_always can fail
+      // "Always" is remembered by Lattiz and answered with allow-once: agents' own allow_always can fail
       // (Gemini refuses it in untrusted folders) and would outlive the chat.
       if (response.decision !== "allow-once" && !p.alwaysAsk) this.always.add(alwaysKey(p.call));
       p.resolve(this.pick(p.options, ["allow_once", "allow_always"]));

@@ -11,7 +11,7 @@
     <div id="box"></div>
     <script>
       async function show() {
-        const inbox = (await latis.data.get("inbox")) ?? [];
+        const inbox = (await lattiz.data.get("inbox")) ?? [];
         const box = document.getElementById("box");
         const it = inbox[0];
         if (!it) {
@@ -24,12 +24,12 @@
         box.querySelector("textarea").value = it.text;
         box.querySelector(".muted").textContent = inbox.length > 1 ? `${inbox.length - 1} more waiting` : "";
         box.querySelector("button").onclick = async () => {
-          await latis.sendToFlow({ text: box.querySelector("textarea").value });
-          await latis.data.set("inbox", inbox.slice(1));
+          await lattiz.sendToFlow({ text: box.querySelector("textarea").value });
+          await lattiz.data.set("inbox", inbox.slice(1));
           show();
         };
       }
-      latis.data.onChange(show);
+      lattiz.data.onChange(show);
       show();
     </script>
   </body>

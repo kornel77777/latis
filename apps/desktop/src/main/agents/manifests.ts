@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { PermissionModeSchema } from "@latis/shared";
+import { PermissionModeSchema } from "@lattiz/shared";
 
 // Agent manifests (SPEC §6.4): JSON files in <dataDir>/agents/*.json add ACP or
 // terminal agents without an app release. Built-ins use the same shape.
@@ -21,7 +21,7 @@ export const AgentManifest = z.object({
   promptRegex: z.string().optional(),
   /** Terminal protocol: output that means the agent is waiting for an approval. */
   approvalRegex: z.string().optional(),
-  /** ACP: Latis permission mode → the agent's own mode id. */
+  /** ACP: Lattiz permission mode → the agent's own mode id. */
   modes: z.partialRecord(PermissionModeSchema, z.string()).optional(),
   hue: z.string().default("violet"),
   installHint: z.string().optional(),

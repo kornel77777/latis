@@ -1,7 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
-import type { AgentAdapter, AgentEvent, AgentSession, SessionOptions } from "@latis/shared";
+import type { AgentAdapter, AgentEvent, AgentSession, SessionOptions } from "@lattiz/shared";
 import { FromRunner, type ToRunner } from "./protocol";
 
 export interface FakeAdapterOptions {
@@ -53,15 +53,15 @@ export class FakeAdapter implements AgentAdapter {
   }
 
   async startSession(opts: SessionOptions): Promise<AgentSession> {
-    const latis = opts.mcpServers?.find((m) => m.name === "latis");
+    const lattiz = opts.mcpServers?.find((m) => m.name === "lattiz");
     const child = spawn(process.execPath, [this.opts.runnerPath], {
       cwd: opts.cwd,
       env: {
         ...process.env,
         ...opts.env,
         ELECTRON_RUN_AS_NODE: "1",
-        // Only Latis's own tools: the demo agent doesn't run other MCP servers.
-        ...(latis && { LATIS_FAKE_MCP: JSON.stringify(latis) }),
+        // Only Lattiz's own tools: the demo agent doesn't run other MCP servers.
+        ...(lattiz && { LATTIZ_FAKE_MCP: JSON.stringify(lattiz) }),
       },
       stdio: "pipe",
     });

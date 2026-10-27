@@ -10,7 +10,7 @@ import {
   type RequestResponse,
   type SessionOptions,
   type UserTurn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { HookEndpoint } from "../../../mcp/server";
 import type { PtyManager } from "../../../terminal/pty-manager";
 import type { AgentManifest } from "../../manifests";
@@ -20,8 +20,8 @@ import { TerminalAdapter } from "../terminal";
 import { ClaudeMapper } from "./mapper";
 
 // Claude Code in its own terminal UI, on the user's own sign-in (docs/adapters/claude-code.md → Terminal).
-// Latis starts `claude` with an extra settings file whose HTTP hooks report to Latis: status, turns,
-// approvals (answered in the terminal or in Latis, whichever is first) and the always-ask list.
+// Lattiz starts `claude` with an extra settings file whose HTTP hooks report to Lattiz: status, turns,
+// approvals (answered in the terminal or in Lattiz, whichever is first) and the always-ask list.
 
 export const CLAUDE_TERMINAL_MANIFEST: AgentManifest = {
   id: "terminal:claude",
@@ -35,7 +35,7 @@ export const CLAUDE_TERMINAL_MANIFEST: AgentManifest = {
   installHint: "npm install -g @anthropic-ai/claude-code",
 };
 
-/** Hook events Latis listens to. A user's own hooks keep running next to these. */
+/** Hook events Lattiz listens to. A user's own hooks keep running next to these. */
 const EVENTS = ["UserPromptSubmit", "PreToolUse", "PermissionRequest", "PostToolUse", "Notification", "Stop"] as const;
 const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
 /** Hooks wait while the user decides; Claude Code's limit is per hook, in seconds. */
@@ -44,7 +44,7 @@ const HOOK_TIMEOUT_SEC = 7 * 24 * 3600;
 const INTERRUPT_GRACE_MS = 2500;
 
 export interface ClaudeTerminalOptions {
-  /** Latis's hook endpoint, once its server is listening. */
+  /** Lattiz's hook endpoint, once its server is listening. */
   endpoint: () => Promise<HookEndpoint>;
   /** Where per-session settings files (they hold tokens) are written. */
   runDir: string;
@@ -164,7 +164,7 @@ export class ClaudeTerminalSession extends SessionBase implements AgentSession {
   private mapper: ClaudeMapper;
   private alwaysAsk: string[];
   private turnStart: number | null = null;
-  /** Text Latis typed for the user (queue, Inbox); its prompt hook doesn't start a second turn. */
+  /** Text Lattiz typed for the user (queue, Inbox); its prompt hook doesn't start a second turn. */
   private typed: string | null = null;
   private status: "working" | "idle" | "needs-you" | null = null;
   private interruptTimer: NodeJS.Timeout | null = null;
@@ -244,7 +244,7 @@ export class ClaudeTerminalSession extends SessionBase implements AgentSession {
       case "UserPromptSubmit": {
         const prompt = str(input.prompt) ?? "";
         if (this.turnStart !== null) this.endTurn("interrupted");
-        // Latis records the turn and takes its checkpoint before Claude sees the prompt.
+        // Lattiz records the turn and takes its checkpoint before Claude sees the prompt.
         if (this.typed !== null && prompt.trim() === this.typed.trim()) this.typed = null;
         else await this.opts.onUserTurn?.(prompt);
         this.turnStart = Date.now();
@@ -266,10 +266,10 @@ export class ClaudeTerminalSession extends SessionBase implements AgentSession {
             hookEventName: "PreToolUse",
             permissionDecision: allow ? "allow" : "deny",
             permissionDecisionReason: allow
-              ? `The user approved this in Latis (always-ask: ${pattern}).`
+              ? `The user approved this in Lattiz (always-ask: ${pattern}).`
               : answer.kind === "permission" && answer.reason
-                ? `The user denied this in Latis: ${answer.reason}`
-                : "The user denied this in Latis.",
+                ? `The user denied this in Lattiz: ${answer.reason}`
+                : "The user denied this in Lattiz.",
           },
         };
       }
@@ -286,7 +286,7 @@ export class ClaudeTerminalSession extends SessionBase implements AgentSession {
           answer.decision === "deny"
             ? {
                 behavior: "deny",
-                message: answer.reason ? `The user denied this in Latis: ${answer.reason}` : "The user denied this in Latis.",
+                message: answer.reason ? `The user denied this in Lattiz: ${answer.reason}` : "The user denied this in Lattiz.",
               }
             : {
                 behavior: "allow",
@@ -333,7 +333,7 @@ export class ClaudeTerminalSession extends SessionBase implements AgentSession {
     else this.exit({ code, signal: null });
   }
 
-  /** Messages from Latis (queue, Inbox, flows) are typed into Claude Code's prompt. */
+  /** Messages from Lattiz (queue, Inbox, flows) are typed into Claude Code's prompt. */
   async send(turn: UserTurn): Promise<void> {
     this.typed = turn.text;
     this.ptys.write(this.ptyId, turn.text);

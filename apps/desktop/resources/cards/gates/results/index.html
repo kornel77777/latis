@@ -14,7 +14,7 @@
     <div id="list" class="items"></div>
     <script>
       async function show() {
-        const items = (await latis.data.get("items")) ?? [];
+        const items = (await lattiz.data.get("items")) ?? [];
         const list = document.getElementById("list");
         list.innerHTML = items.length ? "" : "<div class='empty'>Results collect here as the flow runs.</div>";
         for (const it of items.slice().reverse()) {
@@ -27,10 +27,10 @@
         }
       }
       document.getElementById("clear").onclick = async () => {
-        await latis.data.set("items", []);
+        await lattiz.data.set("items", []);
         show();
       };
-      latis.data.onChange(show);
+      lattiz.data.onChange(show);
       show();
     </script>
   </body>

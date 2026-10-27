@@ -7,28 +7,28 @@ import Database from "better-sqlite3";
 /** Folders that are the user's work. Left out: accounts/ (agent sign-ins), run/ (tokens), electron/ (browser profile), logs. */
 const INCLUDED = ["skills", "conductor", "cards", "agents", "projects"];
 
-const README = `Latis workspace export
+const README = `Lattiz workspace export
 
-latis.db holds the canvas, chats and their transcripts, notes, flows and settings.
+lattiz.db holds the canvas, chats and their transcripts, notes, flows and settings.
 Secrets were removed: the Anthropic API key and the encrypted values of MCP connections
-(add them again after restoring). Agent sign-ins and Latis's browser profile aren't included.
+(add them again after restoring). Agent sign-ins and Lattiz's browser profile aren't included.
 
-To restore, quit Latis and copy these files into its data folder (Settings → Data → Open).
+To restore, quit Lattiz and copy these files into its data folder (Settings → Data → Open).
 `;
 
 const stamp = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ` +
   `${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
 
-/** Writes "Latis export <date>" inside `targetDir` and returns its path. */
+/** Writes "Lattiz export <date>" inside `targetDir` and returns its path. */
 export function exportWorkspace(dataDir: string, targetDir: string, now = new Date()): string {
-  let out = join(targetDir, `Latis export ${stamp(now)}`);
-  for (let n = 2; existsSync(out); n++) out = join(targetDir, `Latis export ${stamp(now)} (${n})`);
+  let out = join(targetDir, `Lattiz export ${stamp(now)}`);
+  for (let n = 2; existsSync(out); n++) out = join(targetDir, `Lattiz export ${stamp(now)} (${n})`);
   mkdirSync(out, { recursive: true });
 
-  // A consistent copy of the database even while Latis writes to it, then the secrets go.
-  const db = join(out, "latis.db");
-  const live = new Database(join(dataDir, "latis.db"), { readonly: true, fileMustExist: true });
+  // A consistent copy of the database even while Lattiz writes to it, then the secrets go.
+  const db = join(out, "lattiz.db");
+  const live = new Database(join(dataDir, "lattiz.db"), { readonly: true, fileMustExist: true });
   try {
     live.prepare("VACUUM INTO ?").run(db);
   } finally {

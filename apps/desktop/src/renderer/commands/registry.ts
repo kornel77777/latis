@@ -5,7 +5,7 @@ import { chordOf, isBare, isMac } from "./keys";
 
 export { bindingsOf, conflicts } from "./bindings";
 
-// Every action Latis can do from the keyboard or the palette is a command (Settings → Commands).
+// Every action Lattiz can do from the keyboard or the palette is a command (Settings → Commands).
 // Defaults live with the command; the user's overrides live in prefs.keybindings.
 
 export type Scope = "global" | "canvas" | "lattice";

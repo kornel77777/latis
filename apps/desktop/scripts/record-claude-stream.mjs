@@ -1,6 +1,6 @@
 // Records a real Claude Agent SDK stream into fixtures/claude-code/<name>.jsonl (SPEC §0.2, §16).
 // Usage: node scripts/record-claude-stream.mjs <name> "<prompt>" [--deny] [--model haiku] [--mode plan] [--then "<second prompt>"]
-//          [--deny-matching "<regex>"]   PreToolUse hook on Bash, as Latis uses for the always-ask list; denies matching commands
+//          [--deny-matching "<regex>"]   PreToolUse hook on Bash, as Lattiz uses for the always-ask list; denies matching commands
 // Spends real tokens on whatever account Claude Code is signed in with. Paths and identities are scrubbed.
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -11,7 +11,7 @@ const [name, prompt, ...rest] = process.argv.slice(2);
 if (!name || !prompt) throw new Error("usage: record-claude-stream.mjs <name> <prompt> [--deny] [--model m] [--then p2]");
 const flag = (f) => rest.includes(f);
 const arg = (f) => (rest.includes(f) ? rest[rest.indexOf(f) + 1] : undefined);
-const cwd = mkdtempSync(join(process.env.LATIS_TEST_TMP ?? tmpdir(), "latis-rec-"));
+const cwd = mkdtempSync(join(process.env.LATTIZ_TEST_TMP ?? tmpdir(), "lattiz-rec-"));
 writeFileSync(join(cwd, "README.md"), "# Recording sandbox\n");
 
 const prompts = [prompt, arg("--then")].filter(Boolean);

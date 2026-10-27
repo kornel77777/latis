@@ -24,8 +24,8 @@ export function StatusDot({ status, className, still = false }: { status: Status
         className={cn(
           "absolute inset-0",
           status === "idle" && "rounded-full border-[1.5px] border-state-idle",
-          status === "working" && cn("rounded-full bg-state-working", !still && "animate-latis-pulse"),
-          status === "needs-you" && cn("rotate-45 rounded-[2px] bg-state-needs-you", !still && "animate-latis-breathe"),
+          status === "working" && cn("rounded-full bg-state-working", !still && "animate-lattiz-pulse"),
+          status === "needs-you" && cn("rotate-45 rounded-[2px] bg-state-needs-you", !still && "animate-lattiz-breathe"),
           status === "done" && "rounded-full bg-state-done",
           status === "error" && "rounded-[2px] bg-state-error",
         )}

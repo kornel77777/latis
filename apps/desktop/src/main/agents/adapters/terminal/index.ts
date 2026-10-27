@@ -7,7 +7,7 @@ import type {
   ModelInfo,
   SessionOptions,
   UserTurn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import type { AgentManifest } from "../../manifests";
 import { SessionBase } from "../../session-base";
 import { shellEnv, versionOf, which } from "../../shell-env";
@@ -15,7 +15,7 @@ import type { PtyManager } from "../../../terminal/pty-manager";
 import { StatusDetector } from "./detector";
 
 // Any CLI agent run raw in a PTY (SPEC §6.3 terminal-only). The terminal is the UI;
-// Latis only infers working / idle / needs-you from the output.
+// Lattiz only infers working / idle / needs-you from the output.
 
 const TICK_MS = 500;
 
@@ -138,7 +138,7 @@ class TerminalSession extends SessionBase implements AgentSession {
     if (state) this.emit({ type: "agent.status", status: state, ...(detail && { detail }) });
   }
 
-  /** Messages from Latis (Inbox, queue) are typed into the terminal. */
+  /** Messages from Lattiz (Inbox, queue) are typed into the terminal. */
   async send(turn: UserTurn): Promise<void> {
     this.ptys.write(this.ptyId, turn.text + "\r");
   }

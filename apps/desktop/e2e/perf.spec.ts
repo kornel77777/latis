@@ -1,15 +1,15 @@
 /// <reference lib="dom" />
 
 import { expect, test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // SPEC §14: pan/zoom with 50 nodes and 10 streaming chats at 60 fps, no frame over 32 ms.
-// Opt-in (timing depends on the machine): LATIS_PERF=1 pnpm e2e -- e2e/perf.spec.ts
-test.skip(!process.env.LATIS_PERF, "set LATIS_PERF=1 to run the frame-budget test");
+// Opt-in (timing depends on the machine): LATTIZ_PERF=1 pnpm e2e -- e2e/perf.spec.ts
+test.skip(!process.env.LATTIZ_PERF, "set LATTIZ_PERF=1 to run the frame-budget test");
 test.setTimeout(240_000);
 
-type Api = { latis: LatisApi };
+type Api = { lattiz: LattizApi };
 const COLS = 10;
 
 async function sample(page: Page, ms: number): Promise<number[]> {
@@ -44,7 +44,7 @@ const stats = (frames: number[]) => {
 test("50 nodes, 10 streaming chats: frame budget at 100% and zoomed out", async () => {
   const { app, page } = await launch(tempDataDir());
   const ids = await page.evaluate(async (cols) => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const canvas = await api.invoke("canvas:load");
     const out: string[] = [];
     for (let i = 0; i < 50; i++) {
@@ -62,12 +62,12 @@ test("50 nodes, 10 streaming chats: frame budget at 100% and zoomed out", async 
   await page.reload();
   await page.waitForSelector("[aria-label='Canvas']");
   await page.evaluate(() =>
-    (globalThis as unknown as Api).latis.invoke("canvas:saveViewport", { canvasId: "main", viewport: { x: 0, y: 0, zoom: 1 } }),
+    (globalThis as unknown as Api).lattiz.invoke("canvas:saveViewport", { canvasId: "main", viewport: { x: 0, y: 0, zoom: 1 } }),
   );
 
   const stream = (chatIds: string[]) =>
     page.evaluate(
-      (list) => Promise.all(list.map((chatId) => (globalThis as unknown as Api).latis.invoke("chat:send", { chatId, text: "go /long" }))),
+      (list) => Promise.all(list.map((chatId) => (globalThis as unknown as Api).lattiz.invoke("chat:send", { chatId, text: "go /long" }))),
       chatIds,
     );
 

@@ -55,7 +55,7 @@ export function App() {
         <div className="flex min-h-0 flex-1">
           {sidebarOpen && !zen && <Sidebar />}
           {loadError ? (
-            <div className="m-auto max-w-md text-center text-[13px] text-text-2">Latis couldn't load your workspace: {loadError}</div>
+            <div className="m-auto max-w-md text-center text-[13px] text-text-2">Lattiz couldn't load your workspace: {loadError}</div>
           ) : ready && view ? (
             <FocusView view={view} />
           ) : ready && lattice ? (

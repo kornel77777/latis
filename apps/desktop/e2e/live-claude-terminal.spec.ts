@@ -2,22 +2,22 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, stubFolderPicker, tempDataDir } from "./helpers";
 
-// Live (LATIS_LIVE=1, spends a few tokens): the real Claude Code in a terminal tile, on the user's own sign-in.
-// Its HTTP hooks reach Latis, and `git push` waits for the always-ask banner.
+// Live (LATTIZ_LIVE=1, spends a few tokens): the real Claude Code in a terminal tile, on the user's own sign-in.
+// Its HTTP hooks reach Lattiz, and `git push` waits for the always-ask banner.
 
-test.skip(process.env.LATIS_LIVE !== "1", "live: set LATIS_LIVE=1");
-type Api = { latis: LatisApi };
+test.skip(process.env.LATTIZ_LIVE !== "1", "live: set LATTIZ_LIVE=1");
+type Api = { lattiz: LattizApi };
 const ptySnapshot = (page: Page, id: string | null) =>
-  page.evaluate((ptyId) => (globalThis as unknown as Api).latis.invoke("pty:snapshot", { id: ptyId! }).then((r) => r.data), id);
+  page.evaluate((ptyId) => (globalThis as unknown as Api).lattiz.invoke("pty:snapshot", { id: ptyId! }).then((r) => r.data), id);
 const ptyWrite = (page: Page, id: string | null, data: string) =>
-  page.evaluate(([ptyId, d]) => (globalThis as unknown as Api).latis.invoke("pty:write", { id: ptyId!, data: d! }), [id, data] as const);
+  page.evaluate(([ptyId, d]) => (globalThis as unknown as Api).lattiz.invoke("pty:write", { id: ptyId!, data: d! }), [id, data] as const);
 // eslint-disable-next-line no-control-regex -- terminal escape codes
 const plain = (s: string) => s.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "");
 
-test("live: Claude Code in a terminal asks Latis before `git push`", async () => {
+test("live: Claude Code in a terminal asks Lattiz before `git push`", async () => {
   test.setTimeout(180_000);
   const dataDir = tempDataDir();
   const repo = join(dataDir, "repo");

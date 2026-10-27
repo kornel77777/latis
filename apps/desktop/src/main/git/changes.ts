@@ -1,6 +1,6 @@
 import { mkdirSync, realpathSync } from "node:fs";
 import { basename, join, relative } from "node:path";
-import type { FileDiff, MergePreview, ReviewDecisions, ReviewItem, TimelineEntry } from "@latis/shared";
+import type { FileDiff, MergePreview, ReviewDecisions, ReviewItem, TimelineEntry } from "@lattiz/shared";
 import type { WorkspaceStore } from "../store/workspace";
 import {
   addWorktree,
@@ -67,9 +67,9 @@ export class Changes {
     if (!chat) return;
     const repo = await repoRoot(chat.cwd);
     if (!repo) return;
-    const before = await snapshot(repo, `Latis checkpoint before turn ${turnId}`);
+    const before = await snapshot(repo, `Lattiz checkpoint before turn ${turnId}`);
     // Refs keep the snapshot commits alive through `git gc`.
-    await setRef(repo, `refs/latis/checkpoints/${chatId}/${turnId}/before`, before);
+    await setRef(repo, `refs/lattiz/checkpoints/${chatId}/${turnId}/before`, before);
     this.store.addCheckpoint({ chatId, turnId, repo, before });
   }
 
@@ -77,8 +77,8 @@ export class Changes {
   async afterTurn(chatId: string, turnId: string, finalMessage: string | undefined): Promise<void> {
     const cp = this.store.checkpoint(turnId);
     if (!cp || cp.after) return;
-    const after = await snapshot(cp.repo, `Latis checkpoint after turn ${turnId}`);
-    await setRef(cp.repo, `refs/latis/checkpoints/${chatId}/${turnId}/after`, after);
+    const after = await snapshot(cp.repo, `Lattiz checkpoint after turn ${turnId}`);
+    await setRef(cp.repo, `refs/lattiz/checkpoints/${chatId}/${turnId}/after`, after);
     const files = await changedPaths(cp.repo, cp.before, after);
     this.store.finishCheckpoint(turnId, after, files);
     if (files.length) {
@@ -242,7 +242,7 @@ export class Changes {
     await initRepo(folder);
   }
 
-  /** A worktree on a new `latis/<slug>` branch from the project's current HEAD (§9.3 AC1). */
+  /** A worktree on a new `lattiz/<slug>` branch from the project's current HEAD (§9.3 AC1). */
   async createWorktree(projectId: string, folder: string, title: string): Promise<{ worktreeId: string; cwd: string }> {
     const repo = await repoRoot(folder);
     if (!repo) throw new Error("This folder isn't a git repository, so it can't have separate copies. Initialise git first.");
@@ -253,7 +253,7 @@ export class Changes {
     const dir = join(this.dataDir, "worktrees", slugify(basename(repo)));
     mkdirSync(dir, { recursive: true });
     const path = join(dir, slug);
-    const branch = `latis/${slug}`;
+    const branch = `lattiz/${slug}`;
     await addWorktree(repo, path, branch, "HEAD");
     const wt = this.store.createWorktree({ projectId, path, branch, baseRef, baseCommit: head });
     // A project opened at a subfolder of the repo works in the same subfolder of the copy.
@@ -279,7 +279,7 @@ export class Changes {
   /** Worktree branch plus uncommitted work vs. where it forked from its base (§9.3 AC3). */
   async branchDiff(chatId: string): Promise<FileDiff[]> {
     const { wt } = this.worktree(chatId);
-    const snap = await snapshot(wt.path, "Latis review snapshot");
+    const snap = await snapshot(wt.path, "Lattiz review snapshot");
     const base = (await git(wt.path, ["merge-base", wt.baseRef, snap])).stdout.trim();
     return diff(wt.path, base, snap);
   }
@@ -298,7 +298,7 @@ export class Changes {
   async mergePreview(chatId: string): Promise<MergePreview> {
     const { chat, wt, project } = this.worktree(chatId);
     // The agent's uncommitted work goes into a commit on its branch so the merge includes it.
-    await commitAll(wt.path, `Latis: ${chat.title}`);
+    await commitAll(wt.path, `Lattiz: ${chat.title}`);
     const repo = await this.mainRepo(project.folderPath);
     const ahead = await aheadCount(repo, wt.baseRef, wt.branch);
     const conflicts = ahead ? await mergeConflicts(repo, wt.baseRef, wt.branch) : [];
@@ -328,7 +328,7 @@ export class Changes {
     const repo = await this.mainRepo(project.folderPath);
     // A squash merge leaves the branch "unmerged" to git, but its work is in the base.
     const deleteUnmerged = force || wt.mergedAt !== null;
-    if (!deleteUnmerged) await commitAll(wt.path, `Latis: ${chat.title}`);
+    if (!deleteUnmerged) await commitAll(wt.path, `Lattiz: ${chat.title}`);
     try {
       await removeWorktree(repo, wt.path, wt.branch, { base: wt.baseRef, deleteUnmerged });
     } catch (err) {

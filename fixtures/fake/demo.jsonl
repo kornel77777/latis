@@ -8,9 +8,9 @@
 {"delay":0,"awaitResponse":"p1","denied":[{"delay":100,"event":{"type":"tool.completed","id":"p1","status":"denied"}},{"delay":20,"stream":"Understood, I won't run it. Nothing was changed.","chunk":3},{"delay":50,"event":{"type":"usage","outputTokens":42}},{"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":1800}}]}
 {"delay":100,"event":{"type":"tool.started","id":"t2","kind":"exec","name":"Bash","input":{"command":"npm install sharp"}}}
 {"delay":600,"event":{"type":"tool.completed","id":"t2","status":"ok","output":"added 1 package"}}
-{"delay":100,"event":{"type":"tool.started","id":"t3","kind":"edit","name":"Write","input":{"path":"notes/latis-demo.md"},"paths":["notes/latis-demo.md"]}}
-{"delay":200,"writeFile":{"path":"notes/latis-demo.md","content":"# Demo\n\nRequested: {{text}}\n"}}
+{"delay":100,"event":{"type":"tool.started","id":"t3","kind":"edit","name":"Write","input":{"path":"notes/lattiz-demo.md"},"paths":["notes/lattiz-demo.md"]}}
+{"delay":200,"writeFile":{"path":"notes/lattiz-demo.md","content":"# Demo\n\nRequested: {{text}}\n"}}
 {"delay":50,"event":{"type":"tool.completed","id":"t3","status":"ok"}}
-{"delay":20,"stream":"Done. I installed the dependency and wrote notes/latis-demo.md describing the change. Let me know if you want anything else.","chunk":4}
+{"delay":20,"stream":"Done. I installed the dependency and wrote notes/lattiz-demo.md describing the change. Let me know if you want anything else.","chunk":4}
 {"delay":50,"event":{"type":"usage","inputTokens":1200,"outputTokens":96}}
 {"delay":0,"event":{"type":"turn.completed","status":"ok","durationMs":3100}}

@@ -1,11 +1,11 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import type { Account, AccountsState } from "@latis/shared";
+import type { Account, AccountsState } from "@lattiz/shared";
 import type { WorkspaceStore } from "./store/workspace";
 
 // Multiple accounts per provider (SPEC §9.12 AC3). An extra account is a separate home folder
-// under <dataDir>/accounts; the agent's CLI keeps that account's sign-in there. Latis only points
+// under <dataDir>/accounts; the agent's CLI keeps that account's sign-in there. Lattiz only points
 // the CLI at the folder through the CLI's own env var and never reads what's inside (§6.5).
 
 /** Each CLI's own variable for where it keeps its config and sign-in. */
@@ -33,7 +33,7 @@ export class Accounts {
   }
 
   add(agentId: string, label: string): Account {
-    if (!this.supports(agentId)) throw new Error("Latis can't keep separate accounts for this agent.");
+    if (!this.supports(agentId)) throw new Error("Lattiz can't keep separate accounts for this agent.");
     const id = randomUUID().slice(0, 8);
     const home = join(this.dataDir, "accounts", agentId, id);
     mkdirSync(home, { recursive: true });

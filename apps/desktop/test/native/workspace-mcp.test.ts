@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { AgentAdapter, AgentEvent, AgentSession, CanvasNode, ChatSummary, FocusView, Project } from "@latis/shared";
+import type { AgentAdapter, AgentEvent, AgentSession, CanvasNode, ChatSummary, FocusView, Project } from "@lattiz/shared";
 import { SessionSupervisor } from "../../src/main/agents/supervisor";
 import { WorkspaceMcpServer } from "../../src/main/mcp/server";
 import { WorkspaceService } from "../../src/main/mcp/workspace";
@@ -60,11 +60,11 @@ const servers: WorkspaceMcpServer[] = [];
 afterEach(() => servers.splice(0).forEach((s) => s.stop()));
 
 async function setup(opts: { confirm?: boolean; maxSpawned?: number } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "latis-mcp-"));
+  const dir = mkdtempSync(join(tmpdir(), "lattiz-mcp-"));
   mkdirSync(join(dir, "cards"));
   const repo = join(dir, "shop");
   mkdirSync(repo);
-  const store = new WorkspaceStore(openDb(join(dir, "latis.db")));
+  const store = new WorkspaceStore(openDb(join(dir, "lattiz.db")));
   const canvasId = store.ensureDefaultCanvas();
   const supervisor = new SessionSupervisor(store, new EventLog(store), new Map([["stub", replyAdapter()]]), noSinks);
   const cards = new Cards(store, join(dir, "cards"), { confirm: async () => true });
@@ -238,11 +238,11 @@ describe("Workspace MCP server", () => {
     expect(res.headers.get("content-security-policy")).toBe(cardCsp([]));
     expect(res.headers.get("content-security-policy")).toContain("connect-src 'none'");
     const html = await res.text();
-    expect(html).toContain(`<head><script src="card://${id}/__latis.js"></script><title>`);
+    expect(html).toContain(`<head><script src="card://${id}/__lattiz.js"></script><title>`);
     expect(html).toContain("v1");
-    expect(await cards.serve(`card://${id}/__latis.js`).text()).toContain('Object.defineProperty(window, "latis"');
+    expect(await cards.serve(`card://${id}/__lattiz.js`).text()).toContain('Object.defineProperty(window, "lattiz"');
     // No escaping the folder, no serving the refresh script, no unknown cards.
-    expect(cards.serve(`card://${id}/..%2F..%2Flatis.db`).status).toBe(404);
+    expect(cards.serve(`card://${id}/..%2F..%2Flattiz.db`).status).toBe(404);
     expect(cards.serve(`card://nope/index.html`).status).toBe(404);
     await call("update_card", { card_id: id, html: "<p>v2</p>" });
     expect(await cards.serve(`card://${id}/`).text()).toContain("v2");

@@ -1,10 +1,10 @@
-import { latis } from "../api";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 import { surfaces, type Command } from "./registry";
 import { stackAgent } from "../lattice/collab";
 import { broadcastInput } from "../lattice/LatticeBars";
 
-// The built-in commands. Titles read as actions; the defaults keep every shortcut Latis had.
+// The built-in commands. Titles read as actions; the defaults keep every shortcut Lattiz had.
 
 const ws = () => useWorkspace.getState();
 const centre = () => surfaces.canvas?.center() ?? { x: 0, y: 0 };
@@ -76,7 +76,7 @@ export function builtInCommands(): Command[] {
       category: "General",
       keys: ["Ctrl+Alt+P"],
       palette: false,
-      run: () => window.dispatchEvent(new Event("latis-perf-toggle")),
+      run: () => window.dispatchEvent(new Event("lattiz-perf-toggle")),
     },
 
     // ── Navigate ─────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ export function builtInCommands(): Command[] {
       category: "Chat",
       when: () => Boolean(selectedChat()?.projectId && !selectedChat()?.worktree),
       run: () =>
-        void latis
+        void lattiz
           .invoke("chat:isolate", { chatId: selectedChat()!.id })
           .catch((err: unknown) => ws().toast(err instanceof Error ? err.message : String(err))),
     },

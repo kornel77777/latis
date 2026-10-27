@@ -1,7 +1,7 @@
-import { buildTranscript, type ChatSummary, type FileDiff } from "@latis/shared";
+import { buildTranscript, type ChatSummary, type FileDiff } from "@lattiz/shared";
 import type { WorkspaceStore } from "./store/workspace";
 
-// Handoff (SPEC §9.11): a brief for the next agent, built from what Latis already has: the first
+// Handoff (SPEC §9.11): a brief for the next agent, built from what Lattiz already has: the first
 // message, the outgoing agent's latest report, the files changed and the open TODOs.
 
 const REPORT_CAP = 4000;

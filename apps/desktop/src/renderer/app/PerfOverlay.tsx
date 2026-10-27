@@ -17,8 +17,8 @@ export function PerfOverlay() {
   useEffect(() => {
     // The perf.toggle command (Ctrl+Alt+P by default).
     const onToggle = () => setOpen((v) => !v);
-    window.addEventListener("latis-perf-toggle", onToggle);
-    return () => window.removeEventListener("latis-perf-toggle", onToggle);
+    window.addEventListener("lattiz-perf-toggle", onToggle);
+    return () => window.removeEventListener("lattiz-perf-toggle", onToggle);
   }, []);
 
   useEffect(() => {

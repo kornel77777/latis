@@ -1,5 +1,5 @@
 {
-  "name": "latis",
+  "name": "lattiz",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -8,17 +8,17 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @latis/desktop dev",
-    "build": "pnpm --filter @latis/desktop build",
+    "dev": "pnpm --filter @lattiz/desktop dev",
+    "build": "pnpm --filter @lattiz/desktop build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run --project unit && node scripts/test-native.mjs",
-    "e2e": "pnpm --filter @latis/desktop e2e",
+    "e2e": "pnpm --filter @lattiz/desktop e2e",
     "test:unit": "vitest run --project unit",
     "test:native": "node scripts/test-native.mjs",
     "format:check": "prettier --check .",
-    "package": "pnpm --filter @latis/desktop package",
+    "package": "pnpm --filter @lattiz/desktop package",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "devDependencies": {

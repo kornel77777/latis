@@ -12,7 +12,7 @@ import {
   SquareTerminal,
   Trash2,
 } from "lucide-react";
-import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot } from "@latis/ui";
+import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, StatusDot } from "@lattiz/ui";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { AgentMenuItems } from "./AgentMenuItems";
@@ -57,7 +57,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
             background: `color-mix(in srgb, ${color} 5%, transparent)`,
           }}
         >
-          <header className="latis-frame-drag flex cursor-grab items-center gap-5 px-8 py-6 active:cursor-grabbing">
+          <header className="lattiz-frame-drag flex cursor-grab items-center gap-5 px-8 py-6 active:cursor-grabbing">
             <span className="h-8 w-8 rounded-control" style={{ background: color }} />
             <span className="text-[56px] font-semibold text-text-1">{project.name}</span>
             {counts[0]! > 0 && (
@@ -87,7 +87,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
           background: `color-mix(in srgb, ${color} 4%, transparent)`,
         }}
       >
-        <header className="latis-frame-drag flex h-11 cursor-grab items-center gap-2 px-4 active:cursor-grabbing">
+        <header className="lattiz-frame-drag flex h-11 cursor-grab items-center gap-2 px-4 active:cursor-grabbing">
           <span className="h-2.5 w-2.5 rounded-control" style={{ background: color }} />
           {renaming ? (
             <input
@@ -151,7 +151,7 @@ export const ProjectFrame = memo(function ProjectFrame({ data, selected }: NodeP
               size="icon"
               variant="ghost"
               aria-label="Open folder"
-              onClick={() => void window.latis.invoke("project:reveal", { projectId: project.id })}
+              onClick={() => void window.lattiz.invoke("project:reveal", { projectId: project.id })}
             >
               <FolderOpen size={14} />
             </Button>

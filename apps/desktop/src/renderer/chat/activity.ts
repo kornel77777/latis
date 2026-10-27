@@ -1,4 +1,4 @@
-import type { StoredEvent, Turn } from "@latis/shared";
+import type { StoredEvent, Turn } from "@lattiz/shared";
 
 // What a chat is doing right now, for the condensed card and the status tile (§8.4).
 // Scans back through the current turn's events only, so it stays cheap at low zoom.

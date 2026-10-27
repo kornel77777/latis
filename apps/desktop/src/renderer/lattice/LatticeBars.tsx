@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Plus, Radio, SendHorizontal } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import { StatusDot, cn } from "@latis/ui";
+import { StatusDot, cn } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 import { broadcast, canStart, stackAgent, targetProject } from "./collab";
 
@@ -19,7 +19,7 @@ export function AgentStrip({ big = false }: { big?: boolean }) {
   if (!agents.length) return null;
   return (
     <div className={cn("flex min-w-0 items-center", big ? "flex-wrap justify-center gap-2" : "gap-px")} data-testid="agent-strip">
-      {!big && <span className="latis-caps mr-2 shrink-0 text-text-3">{projectName ? `+ in ${projectName}` : "+ agent"}</span>}
+      {!big && <span className="lattiz-caps mr-2 shrink-0 text-text-3">{projectName ? `+ in ${projectName}` : "+ agent"}</span>}
       {agents.map((a) => {
         const ok = canStart(a.id, project);
         return (
@@ -83,7 +83,7 @@ export function BroadcastBar({ ids }: { ids: string[] }) {
     <div className="flex shrink-0 items-start gap-2 border-t border-line bg-bg-0 px-2 py-1.5" data-testid="broadcast-bar">
       <div className="flex h-8 shrink-0 items-center gap-1.5 text-text-3">
         <Radio size={13} className="text-accent" />
-        <span className="latis-caps">All</span>
+        <span className="lattiz-caps">All</span>
       </div>
       <div className="flex max-w-[45%] shrink-0 items-center gap-px self-center overflow-x-auto" role="group" aria-label="Send to">
         {targets.map((t) => {

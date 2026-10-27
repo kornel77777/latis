@@ -1,12 +1,12 @@
 import { Bot } from "lucide-react";
-import { MenuItem, MenuLabel } from "@latis/ui";
+import { MenuItem, MenuLabel } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 
 /** Which Claude is which, since both are there. */
 function hint(a: { id: string; apiKey?: string | undefined }): string | undefined {
   if (a.id === "terminal:claude") return "Your Claude subscription, in its own terminal";
   if (a.id === "claude-code")
-    return a.apiKey === "none" ? "Latis chat view, on your Claude sign-in (personal build)" : "Latis chat view, on your API key";
+    return a.apiKey === "none" ? "Lattiz chat view, on your Claude sign-in (personal build)" : "Lattiz chat view, on your API key";
   return undefined;
 }
 

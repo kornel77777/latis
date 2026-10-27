@@ -1,4 +1,4 @@
-import { coalesceEvents, type StoredEvent } from "@latis/shared";
+import { coalesceEvents, type StoredEvent } from "@lattiz/shared";
 
 /** Buffers agent events and delivers them per chat every `intervalMs` (SPEC §5.2: 16 ms). */
 export class EventCoalescer {

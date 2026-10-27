@@ -15,8 +15,8 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
-import type { FileChange, RespondPayload, ToolKind, TranscriptItem } from "@latis/shared";
-import { Button, Chip, cn } from "@latis/ui";
+import type { FileChange, RespondPayload, ToolKind, TranscriptItem } from "@lattiz/shared";
+import { Button, Chip, cn } from "@lattiz/ui";
 import { Markdown } from "../markdown/Markdown";
 
 const toolIcon: Record<ToolKind, LucideIcon> = {
@@ -44,7 +44,7 @@ export function Item({ item, actions }: { item: TranscriptItem; actions: ItemAct
     case "user":
       return (
         <div
-          className="latis-bubble whitespace-pre-wrap border-l-2 border-accent bg-surface-2 px-3 py-2 text-text-1"
+          className="lattiz-bubble whitespace-pre-wrap border-l-2 border-accent bg-surface-2 px-3 py-2 text-text-1"
           data-testid="user-message"
         >
           {item.text}
@@ -132,7 +132,7 @@ function AssistantMessage({ text, streaming }: { text: string; streaming: boolea
   return (
     <div className="group relative text-text-1" data-testid="assistant-message">
       <Markdown text={text} />
-      {streaming && <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 animate-latis-pulse bg-accent" aria-hidden />}
+      {streaming && <span className="ml-0.5 inline-block h-3.5 w-1.5 translate-y-0.5 animate-lattiz-pulse bg-accent" aria-hidden />}
       {!streaming && text && (
         <button
           aria-label="Copy message"
@@ -196,7 +196,7 @@ function StepRow({ item, openPath }: { item: Extract<TranscriptItem, { kind: "st
         <span
           className={cn(
             "shrink-0 text-[11px]",
-            item.status === "running" && "animate-latis-pulse text-state-working",
+            item.status === "running" && "animate-lattiz-pulse text-state-working",
             item.status === "ok" && "text-text-3",
             (item.status === "error" || item.status === "denied") && "text-state-error",
           )}
@@ -359,7 +359,7 @@ export function PermissionBlock({
           <div className="mt-1 flex items-center gap-1.5 text-[12px] text-text-2" data-testid="always-ask-match">
             <ShieldAlert size={12} className="shrink-0 text-state-needs-you" />
             <span>
-              Matches <code className="font-mono text-text-1">{item.alwaysAsk}</code> on your always-ask list, so Latis asks every time.
+              Matches <code className="font-mono text-text-1">{item.alwaysAsk}</code> on your always-ask list, so Lattiz asks every time.
             </span>
           </div>
         )}

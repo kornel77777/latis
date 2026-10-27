@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { AgentAdapter, AgentEvent, AgentSession, AttentionItem, SessionOptions } from "@latis/shared";
+import type { AgentAdapter, AgentEvent, AgentSession, AttentionItem, SessionOptions } from "@lattiz/shared";
 import { SessionSupervisor } from "../../src/main/agents/supervisor";
 import { openDb } from "../../src/main/store/db";
 import { EventLog } from "../../src/main/store/event-log";
@@ -67,8 +67,8 @@ const noSinks = {
 };
 
 function setup(script: Parameters<typeof stubAdapter>[0], steerable = false) {
-  const dir = mkdtempSync(join(tmpdir(), "latis-sup-"));
-  const store = new WorkspaceStore(openDb(join(dir, "latis.db")));
+  const dir = mkdtempSync(join(tmpdir(), "lattiz-sup-"));
+  const store = new WorkspaceStore(openDb(join(dir, "lattiz.db")));
   const calls: Call[] = [];
   const updated: string[] = [];
   const inbox: { items: AttentionItem[]; raised: AttentionItem[] } = { items: [], raised: [] };
@@ -221,7 +221,7 @@ describe("SessionSupervisor", () => {
     expect(inbox.items).toEqual([]);
   });
 
-  it("clears a request item when the agent moves on without Latis answering it", async () => {
+  it("clears a request item when the agent moves on without Lattiz answering it", async () => {
     const { sup, chat, calls, inbox } = setup(() => [
       { type: "session.started", model: "m" },
       { type: "permission.requested", id: "req-2", kind: "edit", summary: "Edit a.txt" },

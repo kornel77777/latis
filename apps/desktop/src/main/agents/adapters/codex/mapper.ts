@@ -1,9 +1,9 @@
 import { isAbsolute, relative } from "node:path";
-import { countChanges, parseUnifiedDiff, type AgentEvent, type QuestionSpec, type ToolKind, type UsageWindow } from "@latis/shared";
+import { countChanges, parseUnifiedDiff, type AgentEvent, type QuestionSpec, type ToolKind, type UsageWindow } from "@lattiz/shared";
 import type { Params } from "../../rpc/peer";
 
 // Codex app-server notifications → AgentEvents (docs/adapters/codex.md).
-// The subset of the generated protocol types (`codex app-server generate-ts`) that Latis reads.
+// The subset of the generated protocol types (`codex app-server generate-ts`) that Lattiz reads.
 
 interface CommandAction {
   type: "read" | "listFiles" | "search" | "unknown";
@@ -46,7 +46,7 @@ interface TokenUsage {
   outputTokens: number;
 }
 
-/** What a server request needs from the user, plus what Latis needs to auto-answer it. */
+/** What a server request needs from the user, plus what Lattiz needs to auto-answer it. */
 export interface CodexRequest {
   requestId: string;
   event: AgentEvent;
@@ -227,7 +227,7 @@ export class CodexMapper {
     }
   }
 
-  /** Maps a server→client request to a Latis request, or null if Latis doesn't handle it. */
+  /** Maps a server→client request to a Lattiz request, or null if Lattiz doesn't handle it. */
   request(method: string, params: Params): CodexRequest | null {
     const itemId = String(params.itemId ?? "");
     const requestId = params.approvalId ? `${itemId}:${String(params.approvalId)}` : itemId;

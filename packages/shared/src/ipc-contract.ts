@@ -263,7 +263,7 @@ export const ScheduledMessage = z.object({
 });
 export type ScheduledMessage = z.infer<typeof ScheduledMessage>;
 
-/** What Latis knows about each agent's usage (§9.12), by agent id. Unknown stays unknown. */
+/** What Lattiz knows about each agent's usage (§9.12), by agent id. Unknown stays unknown. */
 export const UsageState = z.record(
   z.string(),
   z.object({
@@ -550,7 +550,7 @@ export const invokeContract = {
       version: z.string(),
       platform: z.string(),
       dataDir: z.string(),
-      /** LATIS_DEMO_IN_PROJECTS=1 (tests): the demo agent can work in project folders. */
+      /** LATTIZ_DEMO_IN_PROJECTS=1 (tests): the demo agent can work in project folders. */
       demoInProjects: z.boolean(),
     }),
   },
@@ -575,7 +575,7 @@ export const invokeContract = {
       model: z.string().optional(),
       reasoning: z.string().optional(),
       permissionMode: PermissionModeSchema.optional(),
-      /** Run in its own git worktree on a new `latis/<slug>` branch (§9.3 AC1). */
+      /** Run in its own git worktree on a new `lattiz/<slug>` branch (§9.3 AC1). */
       isolate: z.boolean().optional(),
     }),
     /** `frame` is the project frame's new geometry when it grew to fit the chat. */
@@ -907,8 +907,8 @@ export type EventPayload<C extends EventChannel> = z.output<(typeof eventContrac
 export const invokeChannels = Object.keys(invokeContract) as InvokeChannel[];
 export const eventChannels = Object.keys(eventContract) as EventChannel[];
 
-/** The object the preload exposes as `window.latis`. */
-export interface LatisApi {
+/** The object the preload exposes as `window.lattiz`. */
+export interface LattizApi {
   invoke<C extends InvokeChannel>(channel: C, ...req: InvokeReq<C> extends undefined ? [] : [InvokeReq<C>]): Promise<InvokeRes<C>>;
   on<C extends EventChannel>(channel: C, listener: (payload: EventPayload<C>) => void): () => void;
   platform: string;

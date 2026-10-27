@@ -7,7 +7,7 @@ import { migrate, migrations, openDb } from "../../src/main/store/db";
 import { EventLog } from "../../src/main/store/event-log";
 import { WorkspaceStore } from "../../src/main/store/workspace";
 
-const file = () => join(mkdtempSync(join(tmpdir(), "latis-store-")), "latis.db");
+const file = () => join(mkdtempSync(join(tmpdir(), "lattiz-store-")), "lattiz.db");
 
 describe("migrations", () => {
   it("apply once and are idempotent", () => {
@@ -95,7 +95,7 @@ describe("EventLog", () => {
   it("soft-deletes a project frame with its contents, lists it for restore, and restores it", () => {
     const store = new WorkspaceStore(openDb(file()));
     const canvasId = store.ensureDefaultCanvas();
-    const { project, node: frame } = store.createProject({ canvasId, folderPath: "/tmp/latis-x", x: 0, y: 0 });
+    const { project, node: frame } = store.createProject({ canvasId, folderPath: "/tmp/lattiz-x", x: 0, y: 0 });
     const { node: chatNode } = store.createChatNode({
       canvasId,
       projectId: project.id,
@@ -106,7 +106,7 @@ describe("EventLog", () => {
       model: null,
       reasoning: null,
       permissionMode: "ask",
-      cwd: "/tmp/latis-x",
+      cwd: "/tmp/lattiz-x",
       title: "Pricing",
     });
     const note = store.createNote({ canvasId, projectId: null, parentId: null, x: 900, y: 0, text: "# Ideas\nmore" });
@@ -117,7 +117,7 @@ describe("EventLog", () => {
     expect(after.nodes.map((n) => n.id)).toEqual([note.id]);
     expect(after.projects).toEqual([]);
     expect(store.deletedItems(canvasId)).toEqual([
-      expect.objectContaining({ type: "frame", title: "latis-x", nodeIds: expect.arrayContaining([frame.id, chatNode.id]) }),
+      expect.objectContaining({ type: "frame", title: "lattiz-x", nodeIds: expect.arrayContaining([frame.id, chatNode.id]) }),
     ]);
 
     store.restore(deleted);

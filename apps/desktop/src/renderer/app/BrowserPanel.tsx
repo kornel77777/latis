@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Crosshair, Globe, RotateCw, SquareTerminal } from "lucide-react";
-import { Button, Menu, MenuItem, MenuLabel, cn } from "@latis/ui";
-import { latis } from "../api";
+import { Button, Menu, MenuItem, MenuLabel, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace } from "../stores/workspace";
 
 // Dock browser (§9.7). The page is a native view laid over `area`; this component reports
@@ -22,7 +22,7 @@ let navigations = 0;
 async function go(target: string) {
   const mine = ++navigations;
   try {
-    const s = await latis.invoke("browser:navigate", { url: target });
+    const s = await lattiz.invoke("browser:navigate", { url: target });
     // A navigation that was cut short by a newer one replies late; its state is out of date.
     if (mine === navigations) useWorkspace.setState({ browser: s });
   } catch (err) {
@@ -54,7 +54,7 @@ export function BrowserPanel() {
   const url = edit ?? state?.url ?? "";
   const [ports, setPorts] = useState<number[]>([]);
   const [device, setDevice] = useState<Device>("responsive");
-  const [picked, setPicked] = useState<Awaited<ReturnType<typeof latis.invoke<"browser:pick">>>>(null);
+  const [picked, setPicked] = useState<Awaited<ReturnType<typeof lattiz.invoke<"browser:pick">>>>(null);
   const [picking, setPicking] = useState(false);
 
   // Keep the native view on top of `area`.
@@ -63,7 +63,7 @@ export function BrowserPanel() {
     if (!el) return;
     const report = () => {
       const r = el.getBoundingClientRect();
-      void latis.invoke("browser:bounds", {
+      void lattiz.invoke("browser:bounds", {
         x: r.left,
         y: r.top,
         width: r.width,
@@ -78,14 +78,14 @@ export function BrowserPanel() {
     return () => {
       ro.disconnect();
       window.removeEventListener("resize", report);
-      void latis.invoke("browser:bounds", { x: 0, y: 0, width: 0, height: 0, visible: false });
+      void lattiz.invoke("browser:bounds", { x: 0, y: 0, width: 0, height: 0, visible: false });
     };
   }, [covered, picked]);
 
   // First open: find running dev servers and show the first one (§9.7 AC1).
   useEffect(() => {
     const before = navigations;
-    void latis.invoke("browser:detect").then((found) => {
+    void lattiz.invoke("browser:detect").then((found) => {
       setPorts(found);
       if (navigations === before && !useWorkspace.getState().browser?.url && found[0]) void go(`localhost:${found[0]}`);
     });
@@ -94,7 +94,7 @@ export function BrowserPanel() {
   const pick = async () => {
     setPicking(true);
     try {
-      const r = await latis.invoke("browser:pick");
+      const r = await lattiz.invoke("browser:pick");
       if (r) setPicked(r);
     } catch (err) {
       useWorkspace.getState().toast(err instanceof Error ? err.message : String(err));
@@ -132,7 +132,7 @@ export function BrowserPanel() {
           variant="ghost"
           aria-label="Back"
           disabled={!state?.canGoBack}
-          onClick={() => void latis.invoke("browser:nav", "back")}
+          onClick={() => void lattiz.invoke("browser:nav", "back")}
         >
           <ArrowLeft size={13} />
         </Button>
@@ -141,11 +141,11 @@ export function BrowserPanel() {
           variant="ghost"
           aria-label="Forward"
           disabled={!state?.canGoForward}
-          onClick={() => void latis.invoke("browser:nav", "forward")}
+          onClick={() => void lattiz.invoke("browser:nav", "forward")}
         >
           <ArrowRight size={13} />
         </Button>
-        <Button size="icon" variant="ghost" aria-label="Reload" onClick={() => void latis.invoke("browser:nav", "reload")}>
+        <Button size="icon" variant="ghost" aria-label="Reload" onClick={() => void lattiz.invoke("browser:nav", "reload")}>
           <RotateCw size={13} className={state?.loading ? "animate-spin" : undefined} />
         </Button>
         <form
@@ -170,7 +170,7 @@ export function BrowserPanel() {
           onChange={(e) => {
             const d = e.target.value as Device;
             setDevice(d);
-            void latis.invoke("browser:device", d);
+            void lattiz.invoke("browser:device", d);
           }}
           aria-label="Device"
           className="h-7 rounded-control border border-line bg-surface px-1 text-[12px] text-text-1"
@@ -205,7 +205,7 @@ export function BrowserPanel() {
         {!state?.url && !err && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-[12px] text-text-3">
             <Globe size={22} />
-            <p>Type an address, or start a dev server: Latis looks on ports 3000–3010, 4173, 5173, 8000 and 8080.</p>
+            <p>Type an address, or start a dev server: Lattiz looks on ports 3000–3010, 4173, 5173, 8000 and 8080.</p>
           </div>
         )}
         {err && (
@@ -218,7 +218,7 @@ export function BrowserPanel() {
                   <SquareTerminal size={12} /> Open a terminal
                 </Button>
               )}
-              <Button size="sm" variant="secondary" onClick={() => void latis.invoke("browser:nav", "reload")}>
+              <Button size="sm" variant="secondary" onClick={() => void lattiz.invoke("browser:nav", "reload")}>
                 <RotateCw size={12} /> Try again
               </Button>
             </div>

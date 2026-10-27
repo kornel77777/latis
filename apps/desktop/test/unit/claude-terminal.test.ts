@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AgentEvent, type AgentSession, type SessionOptions } from "@latis/shared";
+import { AgentEvent, type AgentSession, type SessionOptions } from "@lattiz/shared";
 import { ClaudeTerminalAdapter } from "../../src/main/agents/adapters/claude-code/terminal";
 import type { HookEndpoint, HookHandler } from "../../src/main/mcp/server";
 import type { PtyManager } from "../../src/main/terminal/pty-manager";
@@ -43,7 +43,7 @@ function fakeEndpoint() {
 }
 
 async function open(opts: Partial<SessionOptions> = {}, resumeId?: string) {
-  const runDir = mkdtempSync(join(tmpdir(), "latis-claude-term-"));
+  const runDir = mkdtempSync(join(tmpdir(), "lattiz-claude-term-"));
   const p = fakePtys();
   const e = fakeEndpoint();
   const adapter = new ClaudeTerminalAdapter(p.ptys, { endpoint: async () => e.endpoint, runDir, executable: "/usr/bin/claude" });
@@ -65,7 +65,7 @@ const respondTo = (session: AgentSession, events: AgentEvent[], decision: "allow
 afterEach(() => vi.useRealTimers());
 
 describe("ClaudeTerminalAdapter", () => {
-  it("starts claude with a session id and a private settings file whose HTTP hooks report to Latis", async () => {
+  it("starts claude with a session id and a private settings file whose HTTP hooks report to Lattiz", async () => {
     const { spawned, events, runDir } = await open();
     const args = spawned[0]!.args;
     expect(args[0]).toBe("--session-id");
@@ -94,8 +94,8 @@ describe("ClaudeTerminalAdapter", () => {
   it("resumes by id, passes workspace tools and instructions, and removes its files when disposed", async () => {
     const { session, spawned, registered } = await open(
       {
-        mcpServers: [{ name: "latis", transport: "http", url: "http://127.0.0.1:1/mcp", headers: { Authorization: "Bearer x" } }],
-        systemPromptAppend: "Use the latis tools.",
+        mcpServers: [{ name: "lattiz", transport: "http", url: "http://127.0.0.1:1/mcp", headers: { Authorization: "Bearer x" } }],
+        systemPromptAppend: "Use the lattiz tools.",
       },
       "11111111-2222-3333-4444-555555555555",
     );
@@ -103,9 +103,9 @@ describe("ClaudeTerminalAdapter", () => {
     expect(args.slice(0, 2)).toEqual(["--resume", "11111111-2222-3333-4444-555555555555"]);
     const mcpFile = args[args.indexOf("--mcp-config") + 1]!;
     expect(JSON.parse(readFileSync(mcpFile, "utf8"))).toEqual({
-      mcpServers: { latis: { type: "http", url: "http://127.0.0.1:1/mcp", headers: { Authorization: "Bearer x" } } },
+      mcpServers: { lattiz: { type: "http", url: "http://127.0.0.1:1/mcp", headers: { Authorization: "Bearer x" } } },
     });
-    expect(args[args.indexOf("--append-system-prompt") + 1]).toBe("Use the latis tools.");
+    expect(args[args.indexOf("--append-system-prompt") + 1]).toBe("Use the lattiz tools.");
     await session.dispose();
     expect(existsSync(mcpFile)).toBe(false);
     expect(existsSync(args[args.indexOf("--settings") + 1]!)).toBe(false);
@@ -130,7 +130,7 @@ describe("ClaudeTerminalAdapter", () => {
     for (const e of events) expect(AgentEvent.safeParse(e).success).toBe(true);
   });
 
-  it("doesn't start a second turn for text Latis typed", async () => {
+  it("doesn't start a second turn for text Lattiz typed", async () => {
     const onUserTurn = vi.fn(async () => undefined);
     const { session, hook, written } = await open({ onUserTurn });
     await session.send({ text: "from the queue" });
@@ -139,7 +139,7 @@ describe("ClaudeTerminalAdapter", () => {
     expect(onUserTurn).not.toHaveBeenCalled();
   });
 
-  it("holds always-ask commands for Latis and lets the rest through", async () => {
+  it("holds always-ask commands for Lattiz and lets the rest through", async () => {
     const { session, hook, events } = await open();
     expect(await hook({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_use_id: "t1" })).toEqual({});
     const held = hook({
@@ -155,12 +155,12 @@ describe("ClaudeTerminalAdapter", () => {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        permissionDecisionReason: "The user denied this in Latis.",
+        permissionDecisionReason: "The user denied this in Lattiz.",
       },
     });
   });
 
-  it("answers Claude Code's approvals from Latis, keeping 'always' in the session", async () => {
+  it("answers Claude Code's approvals from Lattiz, keeping 'always' in the session", async () => {
     const { session, hook, events } = await open();
     const held = hook({
       hook_event_name: "PermissionRequest",

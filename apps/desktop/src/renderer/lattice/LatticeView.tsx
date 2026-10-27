@@ -15,8 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import type { LatticeNode } from "@latis/shared";
-import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@latis/ui";
+import type { LatticeNode } from "@lattiz/shared";
+import { Button, Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@lattiz/ui";
 import { FullChat } from "../chat/ChatNode";
 import { display } from "../commands/keys";
 import { allCommands, bindingsOf, surfaces } from "../commands/registry";
@@ -247,10 +247,10 @@ export function LatticeView() {
   return (
     <div className="flex min-w-0 flex-1 flex-col bg-bg-0" data-testid="lattice">
       <div className="flex h-10 shrink-0 items-center gap-3 border-b border-line bg-bg-0 px-3">
-        <span className="latis-caps flex shrink-0 items-center gap-2 text-text-1">
+        <span className="lattiz-caps flex shrink-0 items-center gap-2 text-text-1">
           <Grid2x2 size={13} className="text-accent" /> Lattice
         </span>
-        <span className="latis-caps shrink-0 text-text-3" data-testid="lattice-count">
+        <span className="lattiz-caps shrink-0 text-text-3" data-testid="lattice-count">
           {ids.length} {ids.length === 1 ? "chat" : "chats"}
           {working > 0 && <span className="text-state-working"> · {working} working</span>}
           {waiting > 0 && <span className="text-state-needs-you"> · {waiting} need you</span>}
@@ -326,7 +326,7 @@ export function LatticeView() {
       <div ref={box} className={cn("relative min-h-0 flex-1 p-1", drag?.on && "cursor-grabbing select-none")}>
         {!ids.length ? (
           <div className="flex h-full flex-col items-center justify-center gap-5 text-center">
-            <span className="latis-caps text-text-3">Lattice · empty</span>
+            <span className="lattiz-caps text-text-3">Lattice · empty</span>
             <p className="max-w-md text-[13px] leading-relaxed text-text-2">
               Stack agents side by side and run them together. Each one tiles in next to the others; drag a header to an edge to split, or
               to the middle to swap. Type in the bar at the bottom to message them all at once.

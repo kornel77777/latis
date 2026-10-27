@@ -1,15 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { LatisApi } from "@latis/shared";
+import type { LattizApi } from "@lattiz/shared";
 import { launch, tempDataDir } from "./helpers";
 
 // Feedback from 0.1.1: deleting chats, moving around the canvas, the Focus name, and two-line menu items.
 
-type Api = { latis: LatisApi };
-const shots = process.env.LATIS_SCREENSHOTS;
+type Api = { lattiz: LattizApi };
+const shots = process.env.LATTIZ_SCREENSHOTS;
 
 async function demoChats(page: Page, n: number) {
   await page.evaluate(async (count) => {
-    const api = (globalThis as unknown as Api).latis;
+    const api = (globalThis as unknown as Api).lattiz;
     const canvas = await api.invoke("canvas:load");
     for (let i = 0; i < count; i++)
       await api.invoke("chat:create", { canvasId: canvas.id, projectId: null, agentId: "fake", x: i * 520, y: 0 });

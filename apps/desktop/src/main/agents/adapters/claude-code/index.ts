@@ -27,7 +27,7 @@ import {
   type RequestResponse,
   type SessionOptions,
   type UserTurn,
-} from "@latis/shared";
+} from "@lattiz/shared";
 import { agentEnv, versionOf, which } from "../../shell-env";
 import { ClaudeMapper, toolKind } from "./mapper";
 
@@ -52,8 +52,8 @@ function sdkMcp(m: McpServerConfig): McpStdioServerConfig | McpHttpServerConfig 
     : { type: "stdio", command: m.command!, args: m.args ?? [], ...(m.env && { env: m.env }) };
 }
 
-/** The workspace tools carry their own guardrails in Latis, so they don't ask the user each time. */
-const isWorkspaceTool = (name: string) => name.startsWith("mcp__latis__");
+/** The workspace tools carry their own guardrails in Lattiz, so they don't ask the user each time. */
+const isWorkspaceTool = (name: string) => name.startsWith("mcp__lattiz__");
 
 export interface ClaudeAdapterOptions {
   /** Injected in tests to replay recorded streams. */
@@ -72,7 +72,7 @@ export interface ClaudeAdapterOptions {
 export const NEEDS_API_KEY =
   "The Claude chat view needs an Anthropic API key (Settings → Agents → Claude). To use your Claude subscription, start a Claude Code chat instead: it runs in a terminal.";
 
-/** Claude Code via the Claude Agent SDK, drawn as Latis's chat card (SPEC §6.3, docs/adapters/claude-code.md). */
+/** Claude Code via the Claude Agent SDK, drawn as Lattiz's chat card (SPEC §6.3, docs/adapters/claude-code.md). */
 export class ClaudeCodeAdapter implements AgentAdapter {
   readonly id = "claude-code";
   // Anthropic's branding rules for Agent SDK products: "Claude", not "Claude Code".
@@ -125,7 +125,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
   }
 
   /**
-   * The API key as env (saved in Latis, else ANTHROPIC_API_KEY from the user's shell), or nothing to run on the
+   * The API key as env (saved in Lattiz, else ANTHROPIC_API_KEY from the user's shell), or nothing to run on the
    * user's sign-in where that's allowed. Null when neither is available.
    */
   private async credentials(): Promise<Record<string, string> | null> {
@@ -185,7 +185,7 @@ export class ClaudeCodeAdapter implements AgentAdapter {
     return this.models;
   }
 
-  /** `claude auth login` in a terminal; Latis never touches Claude's credential files (§6.5). */
+  /** `claude auth login` in a terminal; Lattiz never touches Claude's credential files (§6.5). */
   async login(): Promise<LoginHandle> {
     const bin = (await this.executable()) ?? "claude";
     return { pty: { file: bin, args: ["auth", "login"], cwd: process.cwd() }, done: Promise.resolve({ signedIn: false }) };
@@ -318,7 +318,7 @@ class ClaudeSession implements AgentSession {
   private canUseTool: CanUseTool = (toolName, input, opts) => {
     if (this.mode === "read-only" && !DIALOG_TOOLS.has(toolName) && !READ_ONLY_KINDS.has(toolKind(toolName))) {
       this.mapper.markDenied(opts.toolUseID);
-      return Promise.resolve({ behavior: "deny", message: "This chat is read-only in Latis. Describe the change instead of making it." });
+      return Promise.resolve({ behavior: "deny", message: "This chat is read-only in Lattiz. Describe the change instead of making it." });
     }
     if (isWorkspaceTool(toolName)) return Promise.resolve({ behavior: "allow", updatedInput: input });
     const event = this.mapper.requestEvent(toolName, input, {

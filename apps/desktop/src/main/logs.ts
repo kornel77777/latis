@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { format } from "node:util";
 
-// Local diagnostics (docs/privacy.md): warnings and errors from the main process go to <dataDir>/logs/latis.log,
+// Local diagnostics (docs/privacy.md): warnings and errors from the main process go to <dataDir>/logs/lattiz.log,
 // scrubbed of home paths, tokens and keys. Nothing is sent anywhere; "Report a problem" copies the tail for the
 // user to paste themselves.
 
@@ -24,13 +24,13 @@ export class LogFile {
   readonly file: string;
 
   constructor(private readonly dir: string) {
-    this.file = join(dir, "latis.log");
+    this.file = join(dir, "lattiz.log");
   }
 
   write(level: "warn" | "error", args: unknown[]): void {
     try {
       mkdirSync(this.dir, { recursive: true });
-      if (existsSync(this.file) && statSync(this.file).size > MAX_BYTES) renameSync(this.file, join(this.dir, "latis.1.log"));
+      if (existsSync(this.file) && statSync(this.file).size > MAX_BYTES) renameSync(this.file, join(this.dir, "lattiz.1.log"));
       appendFileSync(this.file, `${new Date().toISOString()} [${level}] ${scrub(format(...args))}\n`);
     } catch {
       // Logging must never break the app.

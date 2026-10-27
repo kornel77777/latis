@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { launch, tempDataDir } from "./helpers";
 
-const shots = process.env.LATIS_SCREENSHOTS;
+const shots = process.env.LATTIZ_SCREENSHOTS;
 
 test("fake chat streams, asks permission, and everything survives a restart", async () => {
   const dataDir = tempDataDir();
@@ -24,11 +24,11 @@ test("fake chat streams, asks permission, and everything survives a restart", as
   await card.getByTestId("allow-once").click();
   await expect(card.getByTestId("turn-end")).toBeVisible({ timeout: 15_000 });
   await expect(card).toHaveAttribute("data-status", "done");
-  await expect(card.getByTestId("assistant-message").last()).toContainText("notes/latis-demo.md");
+  await expect(card.getByTestId("assistant-message").last()).toContainText("notes/lattiz-demo.md");
   if (shots) await page.screenshot({ path: `${shots}/done.png` });
 
   // Move the card so we can check geometry persistence.
-  const header = card.locator(".latis-drag");
+  const header = card.locator(".lattiz-drag");
   const before = await card.boundingBox();
   await header.hover();
   await page.mouse.down();
@@ -44,7 +44,7 @@ test("fake chat streams, asks permission, and everything survives a restart", as
   const again = page.getByTestId("chat-card");
   await expect(again).toHaveCount(1);
   await expect(again.getByTestId("user-message")).toHaveText("swap the hero image");
-  await expect(again.getByTestId("assistant-message").last()).toContainText("notes/latis-demo.md");
+  await expect(again.getByTestId("assistant-message").last()).toContainText("notes/lattiz-demo.md");
   await expect(again).toHaveAttribute("data-status", "done");
   const after = await again.boundingBox();
   expect(Math.abs(after!.x - moved!.x)).toBeLessThan(2);

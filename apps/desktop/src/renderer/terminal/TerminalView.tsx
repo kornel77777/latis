@@ -5,8 +5,8 @@ import { SearchAddon } from "@xterm/addon-search";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
-import { eventContract } from "@latis/shared";
-import { latis } from "../api";
+import { eventContract } from "@lattiz/shared";
+import { lattiz } from "../api";
 
 // One xterm per mounted view; the PTY itself lives in main (§9.6), so a view can
 // unmount and remount (canvas switch, dock toggle) and repaint from the snapshot.
@@ -17,7 +17,7 @@ let wired = false;
 function wire() {
   if (wired) return;
   wired = true;
-  latis.on("pty:data", (raw) => {
+  lattiz.on("pty:data", (raw) => {
     const parsed = eventContract["pty:data"].safeParse(raw);
     if (!parsed.success) return;
     sinks.get(parsed.data.id)?.forEach((fn) => fn(parsed.data.data));
@@ -90,7 +90,7 @@ export function TerminalView({
     const sink: Sink = (d) => (painted ? term.write(d) : buffered.push(d));
     if (!sinks.has(ptyId)) sinks.set(ptyId, new Set());
     sinks.get(ptyId)!.add(sink);
-    void latis.invoke("pty:snapshot", { id: ptyId }).then(({ data }) => {
+    void lattiz.invoke("pty:snapshot", { id: ptyId }).then(({ data }) => {
       if (disposed) return;
       term.write(data);
       // Output that raced the snapshot is already in it only if it arrived first; the overlap is harmless repaint.
@@ -98,8 +98,8 @@ export function TerminalView({
       painted = true;
     });
 
-    const input = term.onData((data) => void latis.invoke("pty:write", { id: ptyId, data }).catch(() => undefined));
-    const resize = term.onResize(({ cols, rows }) => void latis.invoke("pty:resize", { id: ptyId, cols, rows }).catch(() => undefined));
+    const input = term.onData((data) => void lattiz.invoke("pty:write", { id: ptyId, data }).catch(() => undefined));
+    const resize = term.onResize(({ cols, rows }) => void lattiz.invoke("pty:resize", { id: ptyId, cols, rows }).catch(() => undefined));
     const ro = new ResizeObserver(() => {
       if (el.offsetWidth > 0 && el.offsetHeight > 0) fit.fit();
     });

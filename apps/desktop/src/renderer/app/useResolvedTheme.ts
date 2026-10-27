@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Theme } from "@latis/shared";
+import type { Theme } from "@lattiz/shared";
 
 /** Applies the theme to <html data-theme> and returns the resolved light/dark value. */
 export function useResolvedTheme(theme: Theme): "dark" | "light" {

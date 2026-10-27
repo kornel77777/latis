@@ -1,9 +1,9 @@
 import { memo, useEffect, useState } from "react";
 import { BaseEdge, EdgeLabelRenderer, Handle, NodeResizer, Position, getBezierPath, type EdgeProps, type NodeProps } from "@xyflow/react";
 import { CalendarClock, Check, ListOrdered, Pause, Play, ScrollText, Square, Trash2, Workflow, X } from "lucide-react";
-import type { EdgeMode, FlowInfo, FlowSchedule } from "@latis/shared";
-import { Button, Dialog, Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@latis/ui";
-import { latis } from "../api";
+import type { EdgeMode, FlowInfo, FlowSchedule } from "@lattiz/shared";
+import { Button, Dialog, Menu, MenuItem, MenuLabel, MenuSeparator, cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useWorkspace, type FlowNode } from "../stores/workspace";
 import { useZoomLevel } from "./zoom";
 
@@ -34,8 +34,8 @@ export function FlowHandles({ nodeId, input = true }: { nodeId: string; input?: 
   if (!inFlow) return null;
   return (
     <>
-      {input && <Handle type="target" position={Position.Left} className="latis-handle" />}
-      <Handle type="source" position={Position.Right} className="latis-handle" />
+      {input && <Handle type="target" position={Position.Left} className="lattiz-handle" />}
+      <Handle type="source" position={Position.Right} className="lattiz-handle" />
     </>
   );
 }
@@ -71,7 +71,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
         data-testid="flow-frame"
         className="h-full w-full rounded-panel border-2 border-dashed border-accent/50 bg-accent/5"
       >
-        <header className="latis-frame-drag flex items-center gap-5 px-8 py-6">
+        <header className="lattiz-frame-drag flex items-center gap-5 px-8 py-6">
           <Workflow size={48} className="text-accent" />
           <span className="truncate text-[56px] font-semibold text-text-1">{flow.name}</span>
           {live && <span className="text-[40px] text-text-2">{STATUS_TEXT[run.status]}</span>}
@@ -89,7 +89,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
         data-run={run?.status ?? "none"}
         className="h-full w-full rounded-panel border border-dashed border-accent/50 bg-accent/[0.03]"
       >
-        <header className="latis-frame-drag flex h-12 cursor-grab items-center gap-2 px-3 active:cursor-grabbing">
+        <header className="lattiz-frame-drag flex h-12 cursor-grab items-center gap-2 px-3 active:cursor-grabbing">
           <Workflow size={14} className="shrink-0 text-accent" />
           <span className="min-w-0 truncate text-[13px] font-semibold text-text-1">{flow.name}</span>
           <span className="text-[12px] text-text-3" data-testid="flow-status">
@@ -105,7 +105,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
             {run?.loopCheck && (
               <>
                 <span className="text-[12px] text-state-needs-you">Many handoffs in a row.</span>
-                <Button size="sm" variant="secondary" onClick={() => call(latis.invoke("flow:loop", { flowId, continue: true }), setFlow)}>
+                <Button size="sm" variant="secondary" onClick={() => call(lattiz.invoke("flow:loop", { flowId, continue: true }), setFlow)}>
                   Continue
                 </Button>
               </>
@@ -121,7 +121,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
               <Button
                 size="sm"
                 variant="primary"
-                onClick={() => call(latis.invoke("flow:start", { flowId }), setFlow)}
+                onClick={() => call(lattiz.invoke("flow:start", { flowId }), setFlow)}
                 data-testid="flow-start"
               >
                 <Play size={12} /> Start
@@ -131,7 +131,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
                 size="icon"
                 variant="ghost"
                 aria-label="Pause"
-                onClick={() => call(latis.invoke("flow:control", { flowId, action: "pause" }), setFlow)}
+                onClick={() => call(lattiz.invoke("flow:control", { flowId, action: "pause" }), setFlow)}
               >
                 <Pause size={13} />
               </Button>
@@ -140,7 +140,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
                 size="icon"
                 variant="ghost"
                 aria-label="Resume"
-                onClick={() => call(latis.invoke("flow:control", { flowId, action: "resume" }), setFlow)}
+                onClick={() => call(lattiz.invoke("flow:control", { flowId, action: "resume" }), setFlow)}
               >
                 <Play size={13} />
               </Button>
@@ -150,7 +150,7 @@ export const FlowFrame = memo(function FlowFrame({ id, data, selected }: NodePro
                 size="icon"
                 variant="ghost"
                 aria-label="Stop"
-                onClick={() => call(latis.invoke("flow:control", { flowId, action: "stop" }), setFlow)}
+                onClick={() => call(lattiz.invoke("flow:control", { flowId, action: "stop" }), setFlow)}
               >
                 <Square size={12} />
               </Button>
@@ -190,7 +190,7 @@ export const StartNode = memo(function StartNode({ id, data, selected, parentId 
   const [input, setInput] = useState(d.input ?? "");
   const [perLine, setPerLine] = useState(Boolean(d.oneTaskPerLine));
   const save = (next: { input?: string; oneTaskPerLine?: boolean }) =>
-    call(latis.invoke("flow:setStart", { nodeId: id, input: next.input ?? input, oneTaskPerLine: next.oneTaskPerLine ?? perLine }));
+    call(lattiz.invoke("flow:setStart", { nodeId: id, input: next.input ?? input, oneTaskPerLine: next.oneTaskPerLine ?? perLine }));
   return (
     <>
       <NodeResizer isVisible={selected} minWidth={240} minHeight={180} />
@@ -201,7 +201,7 @@ export const StartNode = memo(function StartNode({ id, data, selected, parentId 
           selected ? "border-line-strong shadow-lift" : "border-line",
         )}
       >
-        <header className="latis-drag flex h-9 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3">
+        <header className="lattiz-drag flex h-9 shrink-0 cursor-grab items-center gap-2 border-b border-line px-3">
           <Play size={12} className="text-accent" />
           <span className="truncate text-[13px] font-semibold text-text-1">{d.title ?? "Start"}</span>
         </header>
@@ -232,7 +232,7 @@ export const StartNode = memo(function StartNode({ id, data, selected, parentId 
             variant="primary"
             className="ml-auto"
             disabled={live || !flowId}
-            onClick={() => call(latis.invoke("flow:start", { flowId, input }), setFlow)}
+            onClick={() => call(lattiz.invoke("flow:start", { flowId, input }), setFlow)}
             data-testid="start-run"
           >
             <Play size={11} /> Run
@@ -253,7 +253,7 @@ export function FlowEdgeView(props: EdgeProps) {
   );
   const [path, lx, ly] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const set = (m: EdgeMode | null) =>
-    call(latis.invoke("flow:edge", { edgeId: id, mode: m }), () =>
+    call(lattiz.invoke("flow:edge", { edgeId: id, mode: m }), () =>
       useWorkspace.setState((s) => ({
         flowEdges: m === null ? s.flowEdges.filter((e) => e.id !== id) : s.flowEdges.map((e) => (e.id === id ? { ...e, mode: m } : e)),
       })),
@@ -363,7 +363,7 @@ function Approvals({ flow, onDone }: { flow: FlowInfo; onDone: () => void }) {
   }, [items.length, onDone]);
   const act = (approvalId: string, action: "keep" | "sendBack" | "drop") =>
     call(
-      latis.invoke("flow:approve", {
+      lattiz.invoke("flow:approve", {
         flowId: flow.id,
         approvalId,
         action,
@@ -416,7 +416,7 @@ function ScheduleForm({ flow, onDone }: { flow: FlowInfo; onDone: () => void }) 
   const [weekday, setWeekday] = useState(flow.schedule?.weekday ?? 1);
   const save = () =>
     call(
-      latis.invoke("flow:update", {
+      lattiz.invoke("flow:update", {
         flowId: flow.id,
         schedule: every === "off" ? null : { every, at, ...(every === "weekly" && { weekday }) },
       }),
@@ -447,7 +447,7 @@ function ScheduleForm({ flow, onDone }: { flow: FlowInfo; onDone: () => void }) 
         {every !== "off" && <input type="time" value={at} onChange={(e) => setAt(e.target.value)} aria-label="Time" className={input} />}
       </div>
       <p className="text-[12px] text-text-3">
-        Runs while Latis is open. A run missed while it was closed happens once when Latis next starts.
+        Runs while Lattiz is open. A run missed while it was closed happens once when Lattiz next starts.
         {flow.nextRunAt ? ` Next: ${new Date(flow.nextRunAt).toLocaleString()}.` : ""}
       </p>
       <div className="flex justify-end">
@@ -486,7 +486,7 @@ function BriefForm({ flow, onDone }: { flow: FlowInfo; onDone: () => void }) {
           variant="primary"
           disabled={!name.trim()}
           onClick={() =>
-            call(latis.invoke("flow:update", { flowId: flow.id, name: name.trim(), brief }), (f) => {
+            call(lattiz.invoke("flow:update", { flowId: flow.id, name: name.trim(), brief }), (f) => {
               setFlow(f);
               onDone();
             })
@@ -504,12 +504,12 @@ export function FlowTemplates() {
   const at = useWorkspace((s) => s.flowTemplatesAt);
   const [list, setList] = useState<{ id: string; title: string; description: string }[]>([]);
   useEffect(() => {
-    if (at && !list.length) void latis.invoke("flow:templates").then(setList);
+    if (at && !list.length) void lattiz.invoke("flow:templates").then(setList);
   }, [at, list.length]);
   const close = () => useWorkspace.setState({ flowTemplatesAt: null });
   const pick = (template: string) => {
     const ws = useWorkspace.getState();
-    call(latis.invoke("flow:create", { canvasId: ws.canvasId, template, x: Math.round(at!.x), y: Math.round(at!.y) }), (r) => {
+    call(lattiz.invoke("flow:create", { canvasId: ws.canvasId, template, x: Math.round(at!.x), y: Math.round(at!.y) }), (r) => {
       ws.addFlow(r);
       close();
     });
@@ -555,7 +555,7 @@ export function ChatJob({ nodeId }: { nodeId: string }) {
         onSubmit={(e) => {
           e.preventDefault();
           setEditing(false);
-          call(latis.invoke("flow:setJob", { nodeId, job: text }), () =>
+          call(lattiz.invoke("flow:setJob", { nodeId, job: text }), () =>
             useWorkspace.setState((s) => ({ nodes: s.nodes.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, job: text } } : n)) })),
           );
         }}

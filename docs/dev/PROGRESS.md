@@ -8,7 +8,7 @@
 - Chat transcripts follow a streaming reply in every view (canvas, lattice, lock-in) and stop following when the user scrolls up; e2e in `e2e/lattice.spec.ts`.
 - M7 has started (link policy, fuses, signing/notarization config, icon); auto-update, privacy doc, docs site, crash-report opt-in, perf and security passes and signed installers are still open.
 - 2026-10-26: **Performance and security pass** (M7, `docs/qa/M7.md`). Fixed:
-  - web permissions were open to cards; now only clipboard write, for Latis's own page
+  - web permissions were open to cards; now only clipboard write, for Lattiz's own page
   - `<webview>` blocked
   - release CSP without the dev socket
   - endless status-bar animations: idle CPU went from about 2% to 0.03%
@@ -16,8 +16,8 @@
 - 2026-10-26: **Privacy and diagnostics** (M7): `docs/privacy.md`; Settings → Data (open folder, export without secrets); local scrubbed log file and crash dumps (never uploaded); "Report a problem" copies diagnostics and opens a GitHub issue. Tests: 179 unit, 46 native, 28 e2e.
 - 2026-10-26: **Release notice** (M7, instead of auto-update for now): installed copies check GitHub Releases every 6 h and link to a newer version from the status bar and the new Settings → General (version, Check now, off switch). Tests: 173 unit, 45 native, 27 e2e.
 - 2026-10-26: **Claude, two ways** (DECISIONS 2026-10-26):
-  - **Claude Code** runs the user's own `claude` in a terminal tile on their subscription. HTTP hooks give it status, Inbox approvals (answer in the terminal or Latis), the always-ask banner, recorded turns with checkpoints, resume after restart, and workspace tools.
-  - **Claude** (the chat view) needs an API key in release builds; dev runs and `LATIS_PERSONAL=1` builds keep the user's sign-in.
+  - **Claude Code** runs the user's own `claude` in a terminal tile on their subscription. HTTP hooks give it status, Inbox approvals (answer in the terminal or Lattiz), the always-ask banner, recorded turns with checkpoints, resume after restart, and workspace tools.
+  - **Claude** (the chat view) needs an API key in release builds; dev runs and `LATTIZ_PERSONAL=1` builds keep the user's sign-in.
   - The Conductor, flows and handoff can use the terminal Claude.
   - Live-tested against Claude Code 2.1.310 (`e2e/live-claude-terminal.spec.ts`).
   - Tests: 158 unit, 45 native, 26 e2e.
@@ -43,7 +43,7 @@ Exit criteria: **S5** and **S6** pass. The e2e runs use the demo and replayed ag
   - Multiple accounts per agent as separate CLI homes: add, label, switch (waits for running turns), forget.
 - **Cards (§12):**
   - `card://` origin per card in a sandboxed iframe, no network unless granted per origin.
-  - The `window.latis` bridge: data, refresh, ask, exportPdf, theme, usage.
+  - The `window.lattiz` bridge: data, refresh, ask, exportPdf, theme, usage.
   - Refresh scripts are approved per version and run without secrets.
   - PDF export.
   - Six bundled starters: Habit tracker, Countdown, Kanban, Repo dashboard, Usage dashboard, Pomodoro.
@@ -75,7 +75,7 @@ Exit criterion: **S4 with a real agent as Conductor** passes (`e2e/live-m5.spec.
   - Streamable HTTP on 127.0.0.1 with a bearer token per chat. Stateless, refuses browsers.
   - Tools: `list_projects`, `list_chats`, `read_chat`, `spawn_chat`, `send_message`, `wait_for_chats`, `get_diff`, `create_note`, `append_note`, `focus`, plus `tidy_canvas` and `close_chat`.
   - Guardrails: spawned chats get the same or a stricter mode, a per-caller running limit, closing only your own chats after the user confirms.
-  - The `latis-mcp` stdio shim for agents that only speak stdio.
+  - The `lattiz-mcp` stdio shim for agents that only speak stdio.
 - **Agents get MCP servers:** Claude Code (`mcpServers`, `MCP_TOOL_TIMEOUT`), Codex (`config.mcp_servers`, `developerInstructions`, approval mode, MCP elicitations shown as approvals), ACP (`mcpServers` in `session/new`/`load`, instructions with the first message), and the demo agent (scripted tool calls).
 - **Conductor (§10.2):**
   - A pinned chat at the top left, on the first ready agent of Claude Code, Codex, Gemini.
@@ -87,7 +87,7 @@ Exit criterion: **S4 with a real agent as Conductor** passes (`e2e/live-m5.spec.
   - "Share with every chat", or attach per chat from the ⋯ menu.
   - Import from Claude Desktop, Claude Code, Cursor, Gemini CLI, Codex and VS Code, only on click and with a preview.
 - **Skills (§9.14):**
-  - `<dataDir>/skills/*.md`, `<project>/.latis/skills/`, and SKILL.md folders.
+  - `<dataDir>/skills/*.md`, `<project>/.lattiz/skills/`, and SKILL.md folders.
   - `/name` suggestions in the composer; the agent receives the skill text.
   - Settings → Skills with import.
 - **Tests:** 96 unit, 31 native, 21 e2e (+ live S4 and live Codex tools, opt-in).
@@ -157,7 +157,7 @@ Exit criterion **S1 passes live** (`e2e/live-m3.spec.ts`). Claude Code and Codex
 - Snapshots on very large repos haven't been timed. Binary files have no hunk actions.
 - A Claude chat moved into its own copy can't resume its old conversation (Claude sessions are per-folder); it starts a new one.
 - The always-ask list still isn't enforced in Full-auto.
-- Gemini verified live 2026-10-23 (sign-in through Latis, recordings, six-chat run). That run had 3 frames over the 32 ms budget (max 125 ms); investigate in the M4 perf pass.
+- Gemini verified live 2026-10-23 (sign-in through Lattiz, recordings, six-chat run). That run had 3 frames over the 32 ms budget (max 125 ms); investigate in the M4 perf pass.
 
 ## M2 Many agents: done 2026-10-23 (Gemini verified live the same day)
 
@@ -197,7 +197,7 @@ Exit criteria, live against real agents (`e2e/live-m2.spec.ts`): **S3**: a Codex
 
 ## M1 First real agent: done 2026-10-22
 
-Exit criterion met **live** against Claude Code 2.1.309 (Haiku 5.5), both from `out/` and from the packaged `Latis.app`: open a repo → chat with Claude Code → approve a request → see the edit as an inline diff → restart the app → the conversation resumes (`e2e/live.spec.ts`, opt-in with `LATIS_LIVE=1`).
+Exit criterion met **live** against Claude Code 2.1.309 (Haiku 5.5), both from `out/` and from the packaged `Lattiz.app`: open a repo → chat with Claude Code → approve a request → see the edit as an inline diff → restart the app → the conversation resumes (`e2e/live.spec.ts`, opt-in with `LATTIZ_LIVE=1`).
 
 ### Done
 
@@ -207,13 +207,13 @@ Exit criterion met **live** against Claude Code 2.1.309 (Haiku 5.5), both from `
 - **Projects**: Open folder → project frame on the canvas (React Flow sub-flow); chats placed in free slots, frame grows; sidebar project tree with live status counts; "Folder missing" state; reveal in Finder.
 - **Chat card** (§8.5): markdown with Shiki highlighting in a web worker (JS regex engine, no WASM); virtualised transcript (react-virtuoso); step rows with tool icons, clickable paths, IN/OUT; inline unified diffs with +/− stats; permission (once / always for chat / deny / deny with reason), multi-question, plan blocks that collapse once answered; turn footer with duration, tokens, API-equivalent cost; copy; model, effort and permission pickers; rename; stop; Full-auto warning where the always-ask list can't be enforced.
 - **Agents**: detection + install hint + sign-in status, model lists fetched without spending tokens, "Re-check agents".
-- **Replay mode** (`LATIS_CLAUDE_REPLAY=<fixtures dir>`): e2e tests drive the real adapter path through the UI from recordings.
+- **Replay mode** (`LATTIZ_CLAUDE_REPLAY=<fixtures dir>`): e2e tests drive the real adapter path through the UI from recordings.
 - Tests: 34 unit (incl. 15 replaying real Claude streams), 7 native (store, EventLog, supervisor resume/title/failure), 5 e2e + 1 opt-in live.
 
 ### Not done / known issues
 
 - **CI not yet run** (no GitHub remote). Linux e2e under xvfb and Windows/Linux packaging unverified.
-- "Always for this project" is treated like "Always for this chat" (session-scoped). Project-scoped rules stored by Latis come with Settings → Permissions.
+- "Always for this project" is treated like "Always for this chat" (session-scoped). Project-scoped rules stored by Lattiz come with Settings → Permissions.
 - The always-ask list isn't enforced in Full-auto for Claude Code yet (needs a PreToolUse hook). The chat header warns.
 - Open-as-terminal (§9.2 AC5) needs the terminal dock (M2).
 - Thinking text is shown when Claude returns a summary; the model may still return it empty.
@@ -224,7 +224,7 @@ Exit criterion met **live** against Claude Code 2.1.309 (Haiku 5.5), both from `
 ### Done
 
 - pnpm monorepo: `apps/desktop` (electron-vite), `packages/shared`, `packages/ui`; strict TS, ESLint (typescript-eslint strict), Prettier.
-- IPC contract (`packages/shared/src/ipc-contract.ts`) with zod; main validates every request, renderer validates every event; failures cross IPC as data. Typed `window.latis` from a sandboxed CJS preload.
+- IPC contract (`packages/shared/src/ipc-contract.ts`) with zod; main validates every request, renderer validates every event; failures cross IPC as data. Typed `window.lattiz` from a sandboxed CJS preload.
 - AgentEvent union (§6.2) and adapter interfaces (§6.1) in `packages/shared`.
 - SQLite + drizzle (`canvases`, `nodes`, `chats`, `turns`, `events`, `settings`); bundled migrations tracked by `user_version`.
 - EventLog: in-memory seq, 250 ms batched writes, flush on turn end, retry on failure.
@@ -235,8 +235,8 @@ Exit criterion met **live** against Claude Code 2.1.309 (Haiku 5.5), both from `
 - Shell: title bar (canvas tab, search placeholder, settings/theme), sidebar (`Ctrl/⌘+B`), dock (`` Ctrl/⌘+` ``), status bar with live state counts.
 - Canvas: React Flow pan/zoom 10–400%, marquee select, Space/middle-drag pan, minimap, zoom badge, `Shift+1/2`, `0`; viewport + node geometry persisted (300 ms debounce).
 - Minimal chat card: header + status, streamed transcript, collapsible steps, file changes, inline permission (allow/deny), turn footer, composer, stop, restart.
-- Tests: 18 Vitest (schema, status machine, coalescing, transcript, IPC validation, fake scripts, migrations, store, EventLog) + 3 Playwright e2e (stream → permission → restart persistence; crash → restart; theme persists). The e2e suite also passes against the packaged `.app` (`LATIS_E2E_EXECUTABLE=…`).
-- `pnpm package` → unsigned `Latis.app` (app.asar 12 MB) launches and works.
+- Tests: 18 Vitest (schema, status machine, coalescing, transcript, IPC validation, fake scripts, migrations, store, EventLog) + 3 Playwright e2e (stream → permission → restart persistence; crash → restart; theme persists). The e2e suite also passes against the packaged `.app` (`LATTIZ_E2E_EXECUTABLE=…`).
+- `pnpm package` → unsigned `Lattiz.app` (app.asar 12 MB) launches and works.
 
 ### Not done / known issues
 

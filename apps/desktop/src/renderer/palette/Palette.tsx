@@ -22,8 +22,8 @@ import {
   StickyNote,
   TextSearch,
 } from "lucide-react";
-import { cn } from "@latis/ui";
-import { latis } from "../api";
+import { cn } from "@lattiz/ui";
+import { lattiz } from "../api";
 import { useCanvasActions } from "../canvas/useCanvasActions";
 import { display } from "../commands/keys";
 import { allCommands, bindingsOf, runCommand } from "../commands/registry";
@@ -44,8 +44,8 @@ interface Item {
   run: () => void;
 }
 
-type SearchHit = Awaited<ReturnType<typeof latis.invoke<"search:query">>>[number];
-type Deleted = Awaited<ReturnType<typeof latis.invoke<"canvas:deleted">>>[number];
+type SearchHit = Awaited<ReturnType<typeof lattiz.invoke<"search:query">>>[number];
+type Deleted = Awaited<ReturnType<typeof lattiz.invoke<"canvas:deleted">>>[number];
 
 const CATEGORY_ICON: Record<string, ReactNode> = {
   General: <Settings size={14} />,
@@ -135,12 +135,12 @@ function PaletteBody({ close }: { close: () => void }) {
   }, [ws.nodes, ws.chats, ws.projects]);
 
   useEffect(() => {
-    void latis
+    void lattiz
       .invoke("canvas:deleted")
       .then(setDeleted)
       .catch(() => undefined);
     if (activeProject)
-      void latis.invoke("project:files", { projectId: activeProject }).then((paths) => setFiles({ projectId: activeProject, paths }));
+      void lattiz.invoke("project:files", { projectId: activeProject }).then((paths) => setFiles({ projectId: activeProject, paths }));
   }, [activeProject]);
 
   useEffect(() => {
@@ -148,7 +148,7 @@ function PaletteBody({ close }: { close: () => void }) {
     if (q.length < 2) return;
     let live = true;
     const t = setTimeout(() => {
-      void latis.invoke("search:query", { q }).then((r) => live && setHits(r));
+      void lattiz.invoke("search:query", { q }).then((r) => live && setHits(r));
     }, 120);
     return () => {
       live = false;
@@ -176,7 +176,7 @@ function PaletteBody({ close }: { close: () => void }) {
           `Work in its own copy: ${chat.title}`,
           <GitBranch size={14} />,
           () =>
-            void latis
+            void lattiz
               .invoke("chat:isolate", { chatId: chat.id })
               .catch((err: unknown) => ws.toast(err instanceof Error ? err.message : String(err))),
         );
@@ -257,7 +257,7 @@ function PaletteBody({ close }: { close: () => void }) {
           group: "Files",
           label: f,
           icon: <File size={14} />,
-          run: run(() => void latis.invoke("project:openFile", { projectId: files.projectId, path: f })),
+          run: run(() => void lattiz.invoke("project:openFile", { projectId: files.projectId, path: f })),
         });
       }
     }

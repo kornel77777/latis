@@ -1,4 +1,4 @@
-/* Latis design tokens (SPEC §8.1): cold, sharp and flat. Dark-first. Hairline borders do the work shadows and radii did. */
+/* Lattiz design tokens (SPEC §8.1): cold, sharp and flat. Dark-first. Hairline borders do the work shadows and radii did. */
 :root,
 [data-theme="dark"] {
   color-scheme: dark;

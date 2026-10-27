@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { AgentAdapter, AgentInfo, AuthStatus, DetectResult, PermissionMode } from "@latis/shared";
+import type { AgentAdapter, AgentInfo, AuthStatus, DetectResult, PermissionMode } from "@lattiz/shared";
 import type { PtyManager } from "../terminal/pty-manager";
 import { AcpAdapter } from "./adapters/acp";
 import { ClaudeCodeAdapter } from "./adapters/claude-code";
@@ -18,9 +18,9 @@ export interface RegistryOptions {
   dataDir: string;
   ptys: PtyManager;
   fakeRunnerPath: string;
-  /** LATIS_REPLAY=<fixtures dir>: agents replay recordings instead of starting CLIs (e2e; no network, no tokens). */
+  /** LATTIZ_REPLAY=<fixtures dir>: agents replay recordings instead of starting CLIs (e2e; no network, no tokens). */
   replayRoot?: string;
-  /** Latis's hook endpoint, for Claude Code in a terminal. */
+  /** Lattiz's hook endpoint, for Claude Code in a terminal. */
   hooks: () => Promise<HookEndpoint>;
   /** The chat-view Claude: the user's Anthropic API key, if one is saved. */
   claudeApiKey: () => string | null;
@@ -39,7 +39,7 @@ function unenforceable(a: AgentAdapter): PermissionMode[] {
   return [];
 }
 
-/** All agents Latis knows: built-in adapters plus manifest agents from <dataDir>/agents (§6.4). */
+/** All agents Lattiz knows: built-in adapters plus manifest agents from <dataDir>/agents (§6.4). */
 export class AgentRegistry {
   readonly adapters = new Map<string, AgentAdapter>();
   manifestErrors: Record<string, string> = {};
@@ -108,7 +108,7 @@ export class AgentRegistry {
     return this.adapters.get(id) instanceof TerminalAdapter;
   }
 
-  /** A terminal agent that reports turns and takes messages through hooks (Claude Code), so Latis can drive it. */
+  /** A terminal agent that reports turns and takes messages through hooks (Claude Code), so Lattiz can drive it. */
   isHooked(id: string): boolean {
     return this.adapters.get(id) instanceof ClaudeTerminalAdapter;
   }

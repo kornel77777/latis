@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { GitBranch, MessageSquareReply, ShieldQuestion } from "lucide-react";
-import { StatusDot, cn, statusLabel } from "@latis/ui";
+import { StatusDot, cn, statusLabel } from "@lattiz/ui";
 import { useWorkspace } from "../stores/workspace";
 import { activityOf, elapsed } from "./activity";
 
@@ -73,7 +73,7 @@ export const ChatTile = memo(function ChatTile({ chatId, selected }: { chatId: s
       {...cardProps(chatId, s.status, s.agentId, completed, s.title)}
       data-zoom="tile"
       className={cn(
-        "latis-drag flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-card border-2 bg-surface p-8",
+        "lattiz-drag flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-card border-2 bg-surface p-8",
         selected ? "border-line-strong" : "border-line",
         s.status === "needs-you" && "border-state-needs-you/70",
       )}
@@ -128,7 +128,7 @@ export const ChatCondensed = memo(function ChatCondensed({ chatId, selected }: {
       )}
       style={{ borderTop: `4px solid var(--hue-${hue})` }}
     >
-      <header className="latis-drag flex h-16 shrink-0 cursor-grab items-center gap-3 border-b border-line px-5">
+      <header className="lattiz-drag flex h-16 shrink-0 cursor-grab items-center gap-3 border-b border-line px-5">
         <StatusDot status={s.status} className="!h-4 !w-4" />
         <span className="min-w-0 flex-1 truncate text-[20px] font-semibold text-text-1">{s.title}</span>
         <span className="shrink-0 text-[16px] text-text-3">{agent?.displayName ?? s.agentId}</span>

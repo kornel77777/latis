@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { Skills, projectSkillsDir } from "../../src/main/skills";
 
 function setup() {
-  const dir = mkdtempSync(join(tmpdir(), "latis-skills-"));
+  const dir = mkdtempSync(join(tmpdir(), "lattiz-skills-"));
   const user = join(dir, "skills");
   const project = join(dir, "shop");
   mkdirSync(user, { recursive: true });

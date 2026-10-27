@@ -1,8 +1,8 @@
-import type { ScheduledMessage } from "@latis/shared";
+import type { ScheduledMessage } from "@lattiz/shared";
 import type { WorkspaceStore } from "./store/workspace";
 
 // Send later (SPEC §9.10). Messages wait in the `scheduled` table, so they survive restarts.
-// One that was due while Latis was closed goes out once on the next launch, with a note saying so.
+// One that was due while Lattiz was closed goes out once on the next launch, with a note saying so.
 
 const TICK_MS = 15_000;
 /** Later than this counts as missed rather than just a slow timer. */
@@ -69,7 +69,7 @@ export class Scheduler {
       try {
         if (now - m.fireAt > LATE_MS) {
           const when = new Date(m.fireAt).toLocaleString();
-          this.d.note(m.chatId, `This message was scheduled for ${when} and is late because Latis wasn't running then.`);
+          this.d.note(m.chatId, `This message was scheduled for ${when} and is late because Lattiz wasn't running then.`);
         }
         await this.d.deliver(m.chatId, m.text);
       } catch (err) {

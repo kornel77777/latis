@@ -1,6 +1,6 @@
 import { isAbsolute, relative } from "node:path";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { AgentEvent, DiffHunk, QuestionSpec, ToolKind, UsageWindow } from "@latis/shared";
+import type { AgentEvent, DiffHunk, QuestionSpec, ToolKind, UsageWindow } from "@lattiz/shared";
 
 // Maps Claude Agent SDK messages onto the normalised AgentEvent schema.
 // Verified against fixtures/claude-code/*.jsonl; see docs/adapters/claude-code.md.
