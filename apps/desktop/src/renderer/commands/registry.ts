@@ -34,6 +34,8 @@ export const surfaces: {
     zoomIn(): void;
     zoomOut(): void;
     zoomReset(): void;
+    /** Moves the view by a share of the visible canvas (arrow keys). */
+    pan(dx: number, dy: number): void;
     /** A point in the middle of the visible canvas, for new notes and cards. */
     center(): { x: number; y: number };
   };

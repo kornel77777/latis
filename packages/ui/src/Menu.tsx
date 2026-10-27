@@ -45,7 +45,8 @@ export function MenuItem({
       {...(onSelect && { onSelect })}
       {...(disabled && { disabled })}
       className={cn(
-        "flex h-7 cursor-default select-none items-center gap-2 rounded-control px-2 text-[13px] outline-none",
+        // At least one line high; items with a second line (hints, install commands) grow instead of overlapping.
+        "flex min-h-7 cursor-default select-none items-center gap-2 rounded-control px-2 py-1 text-[13px] leading-snug outline-none",
         "data-[highlighted]:bg-surface-2 data-[disabled]:opacity-45",
         danger ? "text-state-error" : "text-text-1",
       )}

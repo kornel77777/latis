@@ -54,11 +54,7 @@ export function TitleBar() {
     >
       <span className="text-[13px] font-semibold tracking-wide text-text-1">Latis</span>
       {!zen && (
-        <nav
-          className="no-drag ml-3 flex min-w-0 items-center gap-1 overflow-x-auto"
-          aria-label="Canvases and Lock In views"
-          role="tablist"
-        >
+        <nav className="no-drag ml-3 flex min-w-0 items-center gap-1 overflow-x-auto" aria-label="Canvases and Focus views" role="tablist">
           <div className="flex shrink-0 rounded-control border border-line bg-bg-1 p-0.5" role="radiogroup" aria-label="Layout">
             {(
               [
@@ -98,7 +94,7 @@ export function TitleBar() {
               data-testid="view-tab"
             >
               <button onClick={() => openView(v.id)} className="max-w-40 truncate">
-                Lock In: {v.name}
+                Focus: {v.name}
               </button>
               <button
                 aria-label={`Close ${v.name}`}
@@ -112,11 +108,11 @@ export function TitleBar() {
           <Button
             variant="ghost"
             size="sm"
-            aria-label="Lock In on the selected chats (F)"
-            title="Lock In: open the selected chats side by side in their own tab (F)"
+            aria-label="Focus on the selected chats (F)"
+            title="Focus: open the selected chats side by side in their own tab (F)"
             onClick={() => focusSelection()}
           >
-            <ScanSearch size={13} /> Lock In
+            <ScanSearch size={13} /> Focus
           </Button>
         </nav>
       )}

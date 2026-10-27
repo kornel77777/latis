@@ -211,6 +211,8 @@ interface WorkspaceState {
   updateNote(nodeId: string, text: string): void;
   /** Soft delete with undo (§7.2). */
   deleteNodes(nodeIds: string[]): Promise<void>;
+  /** Deletes a chat's card (undo, and ⌘K restore for 7 days). */
+  deleteChat(chatId: string): Promise<void>;
   restoreNodes(nodeIds: string[]): Promise<void>;
   undo(): Promise<void>;
   redo(): Promise<void>;
@@ -912,6 +914,10 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
         latis.invoke("note:update", { nodeId, text }).catch((err: unknown) => get().toast(`Note not saved: ${errorText(err)}`));
       }, 400),
     );
+  },
+  async deleteChat(chatId) {
+    const node = get().nodes.find((n) => n.data.chatId === chatId && n.type !== "frame");
+    if (node) await get().deleteNodes([node.id]);
   },
   async deleteNodes(nodeIds) {
     try {

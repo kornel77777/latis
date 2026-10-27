@@ -117,6 +117,12 @@ export function CanvasView() {
       zoomIn: () => void flow.zoomIn({ duration: 150 }),
       zoomOut: () => void flow.zoomOut({ duration: 150 }),
       zoomReset: () => void flow.zoomTo(1, { duration: 200 }),
+      pan: (dx, dy) => {
+        const box = container.current?.getBoundingClientRect();
+        const v = flow.getViewport();
+        // dx/dy are fractions of the visible area, so a step feels the same at any zoom.
+        void flow.setViewport({ x: v.x - dx * (box?.width ?? 800), y: v.y - dy * (box?.height ?? 600), zoom: v.zoom }, { duration: 140 });
+      },
       center: () => {
         const box = container.current?.getBoundingClientRect();
         return box ? flow.screenToFlowPosition({ x: box.left + box.width / 2, y: box.top + box.height / 2 }) : { x: 0, y: 0 };
@@ -149,9 +155,9 @@ export function CanvasView() {
         // Two-finger scroll / the wheel pans (default) or zooms (Appearance → Scroll wheel); pinch and ⌘/Ctrl + wheel always zoom.
         panOnScroll={wheel === "pan"}
         zoomOnScroll={wheel === "zoom"}
-        selectionOnDrag
-        panOnDrag={[1]}
-        panActivationKeyCode="Space"
+        // Dragging empty canvas pans (left or middle button); Shift + drag draws a selection box.
+        panOnDrag={[0, 1]}
+        selectionKeyCode="Shift"
         // Deleting goes through soft delete + undo (onKey), not React Flow's own removal.
         deleteKeyCode={null}
         zoomActivationKeyCode={["Meta", "Control"]}

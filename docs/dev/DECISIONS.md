@@ -455,3 +455,10 @@ Everything that leaves the machine is listed in `docs/privacy.md`.
 ### 2026-10-26: First releases are macOS (Apple Silicon) only
 
 At the user's request, `release.yml` builds only the macOS installers. Windows and Linux keep building in CI on every push (`ci.yml`, unpacked), so they don't rot. Adding them to the release matrix brings them back; the Linux `.deb` naming and homepage fixes are already in. Intel Macs need an x64 (or universal) build, also later.
+
+### 2026-10-26: Feedback from 0.1.1: deleting chats, canvas movement, "Focus", menu items
+
+- **Deleting chats:** possible before only by selecting a card and pressing Delete. Now also in every chat's ⋯ menu (canvas and lattice) and as a trash button on hover in the sidebar. It's the same soft delete: Undo, or ⌘K restore for 7 days. The Conductor stays undeletable.
+- **Canvas movement:** dragging empty canvas with the left (or middle) button pans, like most canvas apps. A selection box is now Shift + drag, and Space + drag no longer exists. Arrow keys move the view by 15% of the visible area, Shift + arrow by 50%.
+- **"Focus":** the focus views of §8.7 are called "Focus" again ("Lock In" before, DECISIONS 2026-10-23), at the user's request.
+- **Menu items:** they have a minimum height instead of a fixed one, so items with a second line (hints, install commands) no longer overlap the next item.

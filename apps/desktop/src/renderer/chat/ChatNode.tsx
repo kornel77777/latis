@@ -365,6 +365,11 @@ export const FullChat = memo(function FullChat({
               <MenuItem onSelect={() => void restart(chatId)}>
                 <RotateCcw size={13} /> Restart agent
               </MenuItem>
+              {!conductor && (
+                <MenuItem danger onSelect={() => void useWorkspace.getState().deleteChat(chatId)}>
+                  <Trash2 size={13} /> Delete chat
+                </MenuItem>
+              )}
             </Menu>
           </div>
         </header>

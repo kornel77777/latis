@@ -229,7 +229,7 @@ export function builtInCommands(): Command[] {
     },
     {
       id: "canvas.focus",
-      title: "Lock In on the selected chats",
+      title: "Focus on the selected chats",
       category: "Canvas",
       keys: ["F"],
       scope: "canvas",
@@ -262,6 +262,28 @@ export function builtInCommands(): Command[] {
     { id: "canvas.zoomIn", title: "Zoom in", category: "Canvas", keys: ["="], scope: "canvas", run: () => surfaces.canvas?.zoomIn() },
     { id: "canvas.zoomOut", title: "Zoom out", category: "Canvas", keys: ["-"], scope: "canvas", run: () => surfaces.canvas?.zoomOut() },
     { id: "canvas.tidy", title: "Tidy up frames", category: "Canvas", keys: ["Shift+T"], scope: "canvas", run: () => ws().tidyUp() },
+    ...(["left", "right", "up", "down"] as const).flatMap((d): Command[] => {
+      const key = { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown" }[d];
+      const [dx, dy] = { left: [-1, 0], right: [1, 0], up: [0, -1], down: [0, 1] }[d];
+      return [
+        {
+          id: `canvas.pan.${d}`,
+          title: `Move the view ${d}`,
+          category: "Canvas",
+          keys: [key],
+          scope: "canvas",
+          run: () => surfaces.canvas?.pan(dx! * 0.15, dy! * 0.15),
+        },
+        {
+          id: `canvas.panFar.${d}`,
+          title: `Move the view ${d}, further`,
+          category: "Canvas",
+          keys: [`Shift+${key}`],
+          scope: "canvas",
+          run: () => surfaces.canvas?.pan(dx! * 0.5, dy! * 0.5),
+        },
+      ];
+    }),
 
     // ── Lattice ──────────────────────────────────────────────────────────────
     ...(["left", "right", "up", "down"] as const).flatMap((d): Command[] => {

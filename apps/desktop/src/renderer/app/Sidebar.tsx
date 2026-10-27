@@ -16,6 +16,7 @@ import {
   ScrollText,
   ShieldQuestion,
   Timer,
+  Trash2,
   X,
 } from "lucide-react";
 import type { AttentionItem, ChatSummary } from "@latis/shared";
@@ -224,18 +225,35 @@ function Section({ title, children, action }: { title: string; children: React.R
 function ChatRow({ chat, indent }: { chat: ChatSummary; indent: boolean }) {
   const hue = useWorkspace((s) => s.agents.find((a) => a.id === chat.agentId)?.hue ?? FALLBACK_HUE[chat.agentId] ?? "violet");
   return (
-    <button
-      onClick={() => useWorkspace.getState().focusChat(chat.id)}
+    <div
       className={cn(
-        "group flex h-7 w-full items-center gap-2 rounded-control pr-2 text-left text-[12px] text-text-2 hover:bg-surface-2 hover:text-text-1",
+        "group flex h-7 w-full items-center rounded-control pr-1 text-[12px] text-text-2 hover:bg-surface-2 hover:text-text-1",
         indent ? "pl-7" : "pl-2",
       )}
       data-testid="sidebar-chat"
     >
-      <span className="h-3 w-[3px] shrink-0" style={{ background: `var(--hue-${hue})` }} />
-      <span className="min-w-0 flex-1 truncate">{chat.title}</span>
-      <StatusDot status={chat.status} />
-    </button>
+      <button
+        onClick={() => useWorkspace.getState().focusChat(chat.id)}
+        className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
+      >
+        <span className="h-3 w-[3px] shrink-0" style={{ background: `var(--hue-${hue})` }} />
+        <span className="min-w-0 flex-1 truncate">{chat.title}</span>
+      </button>
+      {chat.role !== "conductor" && (
+        <button
+          onClick={() => void useWorkspace.getState().deleteChat(chat.id)}
+          aria-label={`Delete ${chat.title}`}
+          title="Delete chat (undo, or restore from ⌘K for 7 days)"
+          className="hidden h-5 w-5 shrink-0 items-center justify-center rounded-control text-text-3 hover:bg-bg-1 hover:text-state-error focus-visible:flex group-hover:flex"
+          data-testid="sidebar-chat-delete"
+        >
+          <Trash2 size={12} />
+        </button>
+      )}
+      <span className="ml-1.5 flex shrink-0">
+        <StatusDot status={chat.status} />
+      </span>
+    </div>
   );
 }
 
